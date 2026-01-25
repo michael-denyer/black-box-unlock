@@ -103,7 +103,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         }}
         #treemap {{
             width: 100%;
-            height: 600px;
+            min-height: 600px;
+            height: calc(100vh - 350px);
             background: var(--surface);
             border-radius: 6px;
             border: 1px solid var(--secondary);
@@ -275,12 +276,14 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             outsidetextfont: {{ color: '#444' }},
             pathbar: {{ visible: true, edgeshape: '>' }}
         }}], {{
-            margin: {{ t: 40, l: 10, r: 10, b: 10 }},
+            margin: {{ t: 30, l: 0, r: 0, b: 0 }},
             paper_bgcolor: '#ffffff',
             plot_bgcolor: '#ffffff',
-            font: {{ color: '#444', family: 'Inter, Roboto, Helvetica Neue, Arial, sans-serif' }}
+            font: {{ color: '#444', family: 'Inter, Roboto, Helvetica Neue, Arial, sans-serif' }},
+            autosize: true
         }}, {{
-            responsive: true
+            responsive: true,
+            displayModeBar: false
         }});
     </script>
 </body>

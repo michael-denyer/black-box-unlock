@@ -344,6 +344,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
             Plotly.newPlot('treemap', [{{
                 type: 'treemap',
+                ids: treemapData.ids,
                 labels: treemapData.labels,
                 parents: treemapData.parents,
                 values: treemapData.values,

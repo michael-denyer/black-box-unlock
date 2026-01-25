@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Interactive Plotly treemap visualization for file hotspots (BBU-6335)
+- Tabbed HTML report with Table, Hotspots, and Coupling views
+- Collapsible help section explaining metrics (hotspot score, ownership risk, coupling)
+- HTML report generator with severity-based coloring
 - File churn extraction from git history using gmap (BBU-8b03)
 - Temporal coupling detection from git commits (BBU-f3v2)
 - File ownership spread calculation (BBU-k4e2)

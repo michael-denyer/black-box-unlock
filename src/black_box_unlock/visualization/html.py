@@ -172,6 +172,42 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             border-radius: 6px;
             border: 1px solid var(--secondary);
         }}
+        .help {{
+            background: var(--surface);
+            border: 1px solid var(--secondary);
+            border-radius: 6px;
+            padding: 1.25rem;
+            margin-bottom: 2rem;
+            font-size: 0.85rem;
+            line-height: 1.7;
+        }}
+        .help summary {{
+            cursor: pointer;
+            font-weight: 500;
+            color: var(--text);
+        }}
+        .help-grid {{
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }}
+        .help-item {{
+            padding: 0.75rem;
+            background: var(--bg);
+            border-radius: 4px;
+        }}
+        .help-item h4 {{
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text);
+            margin-bottom: 0.25rem;
+        }}
+        .help-item p {{
+            color: var(--muted);
+            font-size: 0.8rem;
+            margin: 0;
+        }}
     </style>
 </head>
 <body>
@@ -193,6 +229,28 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 <div class="stat-label">Coupled Pairs</div>
             </div>
         </div>
+
+        <details class="help">
+            <summary>Understanding the metrics</summary>
+            <div class="help-grid">
+                <div class="help-item">
+                    <h4>Hotspot Score</h4>
+                    <p>Commits × Lines Changed. High scores indicate files that change frequently and extensively—prime candidates for refactoring or closer review.</p>
+                </div>
+                <div class="help-item">
+                    <h4>High Risk Ownership</h4>
+                    <p>Files with 4+ authors and high churn. Diffuse ownership often leads to inconsistent patterns and more defects.</p>
+                </div>
+                <div class="help-item">
+                    <h4>Coupled Pairs</h4>
+                    <p>Files that change together >30% of the time. Hidden dependencies that may indicate architectural issues or missing abstractions.</p>
+                </div>
+                <div class="help-item">
+                    <h4>Treemap Visualization</h4>
+                    <p>Rectangle size = lines changed. Color = hotspot score (green=low, red=high). Click directories to drill down.</p>
+                </div>
+            </div>
+        </details>
 
         <div class="tabs">
             <button class="tab active" data-tab="table">Table</button>

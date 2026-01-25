@@ -145,10 +145,12 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         }}
         .hotspot {{
             display: inline-block;
-            padding: 0.2rem 0.5rem;
-            border-radius: 3px;
-            font-weight: 500;
+            padding: 0.25rem 0.6rem;
+            border-radius: 4px;
+            font-weight: 600;
             font-size: 0.85rem;
+            background: linear-gradient(90deg, #e09850, #cb4b3f);
+            color: white;
         }}
         .placeholder {{
             padding: 3rem;
@@ -181,16 +183,12 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         </div>
 
         <div class="tabs">
-            <button class="tab active" data-tab="hotspots">Hotspots</button>
-            <button class="tab" data-tab="table">Table</button>
+            <button class="tab active" data-tab="table">Table</button>
+            <button class="tab" data-tab="hotspots">Hotspots</button>
             <button class="tab" data-tab="coupling">Coupling</button>
         </div>
 
-        <div id="hotspots" class="tab-content active">
-            <div id="treemap"></div>
-        </div>
-
-        <div id="table" class="tab-content">
+        <div id="table" class="tab-content active">
             <table>
                 <thead>
                     <tr>
@@ -206,6 +204,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 {file_rows}
                 </tbody>
             </table>
+        </div>
+
+        <div id="hotspots" class="tab-content">
+            <div id="treemap"></div>
         </div>
 
         <div id="coupling" class="tab-content">

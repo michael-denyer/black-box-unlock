@@ -1,6 +1,9 @@
 """HTML report generator for forensic analysis."""
 
+import json
+
 from black_box_unlock.core.models import AnalysisResult
+from black_box_unlock.visualization.treemap import build_treemap_data
 
 HTML_TEMPLATE = """<!DOCTYPE html>
 <html lang="en">
@@ -8,16 +11,18 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Code Forensics: {repo}</title>
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
     <style>
         :root {{
-            --bg: #1a1a2e;
-            --surface: #16213e;
-            --primary: #e94560;
-            --secondary: #0f3460;
-            --text: #eaeaea;
-            --muted: #a0a0a0;
-            --warning: #f39c12;
-            --success: #27ae60;
+            --bg: #f5f5f5;
+            --surface: #ffffff;
+            --primary: #5a5a5a;
+            --secondary: #e0e0e0;
+            --accent: #4a7c59;
+            --text: #333333;
+            --muted: #777777;
+            --warning: #c0392b;
+            --success: #4a7c59;
         }}
         * {{ box-sizing: border-box; margin: 0; padding: 0; }}
         body {{
@@ -29,73 +34,129 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         }}
         .container {{ max-width: 1200px; margin: 0 auto; }}
         h1 {{
-            font-size: 2rem;
+            font-size: 1.75rem;
             margin-bottom: 0.5rem;
-            color: var(--primary);
+            color: var(--text);
+            font-weight: 500;
         }}
         .subtitle {{
             color: var(--muted);
             margin-bottom: 2rem;
+            font-size: 0.9rem;
         }}
         .summary {{
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
             gap: 1rem;
             margin-bottom: 2rem;
         }}
         .stat-card {{
             background: var(--surface);
-            padding: 1.5rem;
-            border-radius: 8px;
-            border-left: 4px solid var(--primary);
+            padding: 1.25rem;
+            border-radius: 6px;
+            border: 1px solid var(--secondary);
         }}
         .stat-value {{
-            font-size: 2rem;
-            font-weight: bold;
-            color: var(--primary);
+            font-size: 1.75rem;
+            font-weight: 600;
+            color: var(--text);
         }}
         .stat-label {{
             color: var(--muted);
-            font-size: 0.875rem;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }}
+        .tabs {{
+            display: flex;
+            gap: 0;
+            margin-bottom: 0;
+            border-bottom: 1px solid var(--secondary);
+        }}
+        .tab {{
+            padding: 0.75rem 1.5rem;
+            background: transparent;
+            border: none;
+            border-bottom: 2px solid transparent;
+            color: var(--muted);
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.2s;
+        }}
+        .tab:hover {{
+            color: var(--text);
+        }}
+        .tab.active {{
+            color: var(--text);
+            border-bottom-color: var(--accent);
+        }}
+        .tab-content {{
+            display: none;
+            padding-top: 1.5rem;
+        }}
+        .tab-content.active {{
+            display: block;
+        }}
+        #treemap {{
+            width: 100%;
+            height: 600px;
+            background: var(--surface);
+            border-radius: 6px;
+            border: 1px solid var(--secondary);
         }}
         table {{
             width: 100%;
             border-collapse: collapse;
             background: var(--surface);
-            border-radius: 8px;
+            border-radius: 6px;
             overflow: hidden;
+            border: 1px solid var(--secondary);
         }}
         th, td {{
-            padding: 1rem;
+            padding: 0.875rem 1rem;
             text-align: left;
             border-bottom: 1px solid var(--secondary);
         }}
         th {{
-            background: var(--secondary);
-            font-weight: 600;
-            color: var(--text);
+            background: var(--primary);
+            font-weight: 500;
+            color: white;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }}
-        tr:hover {{ background: rgba(233, 69, 96, 0.1); }}
+        tr:hover {{ background: #fafafa; }}
         .high-risk {{
             color: var(--warning);
             font-weight: 600;
         }}
         .coupling {{
-            font-size: 0.875rem;
+            font-size: 0.8rem;
             color: var(--muted);
         }}
         .coupling-item {{
             display: inline-block;
             background: var(--secondary);
-            padding: 0.25rem 0.5rem;
-            border-radius: 4px;
-            margin: 0.125rem;
+            padding: 0.2rem 0.5rem;
+            border-radius: 3px;
+            margin: 0.1rem;
             font-size: 0.75rem;
         }}
         .hotspot {{
-            background: linear-gradient(90deg, var(--primary), transparent);
-            padding: 0.25rem 0.5rem;
-            border-radius: 4px;
+            display: inline-block;
+            padding: 0.2rem 0.5rem;
+            border-radius: 3px;
+            font-weight: 500;
+            font-size: 0.85rem;
+        }}
+        .placeholder {{
+            padding: 3rem;
+            text-align: center;
+            color: var(--muted);
+            background: var(--surface);
+            border-radius: 6px;
+            border: 1px solid var(--secondary);
         }}
     </style>
 </head>
@@ -119,22 +180,92 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             </div>
         </div>
 
-        <table>
-            <thead>
-                <tr>
-                    <th>File</th>
-                    <th>Hotspot Score</th>
-                    <th>Commits</th>
-                    <th>Lines Changed</th>
-                    <th>Authors</th>
-                    <th>Coupled With</th>
-                </tr>
-            </thead>
-            <tbody>
+        <div class="tabs">
+            <button class="tab active" data-tab="hotspots">Hotspots</button>
+            <button class="tab" data-tab="table">Table</button>
+            <button class="tab" data-tab="coupling">Coupling</button>
+        </div>
+
+        <div id="hotspots" class="tab-content active">
+            <div id="treemap"></div>
+        </div>
+
+        <div id="table" class="tab-content">
+            <table>
+                <thead>
+                    <tr>
+                        <th>File</th>
+                        <th>Hotspot Score</th>
+                        <th>Commits</th>
+                        <th>Lines Changed</th>
+                        <th>Authors</th>
+                        <th>Coupled With</th>
+                    </tr>
+                </thead>
+                <tbody>
 {file_rows}
-            </tbody>
-        </table>
+                </tbody>
+            </table>
+        </div>
+
+        <div id="coupling" class="tab-content">
+            <div class="placeholder">
+                Temporal coupling graph coming soon
+            </div>
+        </div>
     </div>
+
+    <script>
+        // Tab switching
+        document.querySelectorAll('.tab').forEach(tab => {{
+            tab.addEventListener('click', () => {{
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                tab.classList.add('active');
+                document.getElementById(tab.dataset.tab).classList.add('active');
+            }});
+        }});
+
+        // Treemap data
+        const treemapData = {treemap_json};
+
+        // Render treemap with muted green-yellow-red colorscale
+        Plotly.newPlot('treemap', [{{
+            type: 'treemap',
+            labels: treemapData.labels,
+            parents: treemapData.parents,
+            values: treemapData.values,
+            marker: {{
+                colors: treemapData.colors,
+                colorscale: [
+                    [0, '#63a66c'],
+                    [0.25, '#a4c969'],
+                    [0.5, '#e8d666'],
+                    [0.75, '#e5a549'],
+                    [1, '#c0392b']
+                ],
+                showscale: true,
+                colorbar: {{
+                    title: 'Hotspot',
+                    tickfont: {{ color: '#333' }},
+                    titlefont: {{ color: '#333' }},
+                    len: 0.6
+                }}
+            }},
+            customdata: treemapData.customdata,
+            hovertemplate: '<b>%{{label}}</b><br>Lines: %{{value}}<br>Hotspot: %{{color:,.0f}}<extra></extra>',
+            textinfo: 'label+value',
+            textfont: {{ color: '#333' }},
+            pathbar: {{ visible: true, edgeshape: '>' }}
+        }}], {{
+            margin: {{ t: 40, l: 10, r: 10, b: 10 }},
+            paper_bgcolor: '#ffffff',
+            plot_bgcolor: '#ffffff',
+            font: {{ color: '#333', family: '-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif' }}
+        }}, {{
+            responsive: true
+        }});
+    </script>
 </body>
 </html>
 """
@@ -182,6 +313,9 @@ def generate_html_report(result: AnalysisResult) -> str:
             )
         )
 
+    # Build treemap data
+    treemap_data = build_treemap_data(result.files)
+
     return HTML_TEMPLATE.format(
         repo=result.repo,
         days=result.analyzed_days,
@@ -190,4 +324,5 @@ def generate_html_report(result: AnalysisResult) -> str:
         high_risk=result.summary.high_risk_ownership,
         coupled_pairs=result.summary.coupled_pairs,
         file_rows="\n".join(file_rows),
+        treemap_json=json.dumps(treemap_data),
     )

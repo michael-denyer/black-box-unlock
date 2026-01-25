@@ -147,3 +147,90 @@ class TestGenerateHtmlReport:
 
         assert "src/user.py" in html
         assert "src/token.py" in html
+
+    def test_includes_plotly_cdn(self):
+        """HTML includes Plotly.js CDN script."""
+        result = AnalysisResult(
+            repo="test-repo",
+            analyzed_days=30,
+            generated_at=datetime(2026, 1, 25, 15, 30, 0),
+            files=[],
+            summary=AnalysisSummary(
+                total_files=0,
+                high_risk_ownership=0,
+                coupled_pairs=0,
+            ),
+        )
+
+        html = generate_html_report(result)
+
+        assert "plotly" in html.lower()
+        assert "<script" in html
+
+    def test_includes_tab_navigation(self):
+        """HTML includes tab navigation for Hotspots, Table, Coupling."""
+        result = AnalysisResult(
+            repo="test-repo",
+            analyzed_days=30,
+            generated_at=datetime(2026, 1, 25, 15, 30, 0),
+            files=[],
+            summary=AnalysisSummary(
+                total_files=0,
+                high_risk_ownership=0,
+                coupled_pairs=0,
+            ),
+        )
+
+        html = generate_html_report(result)
+
+        assert "Hotspots" in html
+        assert "Table" in html
+        assert "Coupling" in html
+
+    def test_includes_treemap_container(self):
+        """HTML includes container for Plotly treemap."""
+        result = AnalysisResult(
+            repo="test-repo",
+            analyzed_days=30,
+            generated_at=datetime(2026, 1, 25, 15, 30, 0),
+            files=[],
+            summary=AnalysisSummary(
+                total_files=0,
+                high_risk_ownership=0,
+                coupled_pairs=0,
+            ),
+        )
+
+        html = generate_html_report(result)
+
+        assert 'id="treemap"' in html or "treemap" in html.lower()
+
+    def test_embeds_treemap_data_as_json(self):
+        """Treemap data is embedded as JSON in the HTML."""
+        result = AnalysisResult(
+            repo="test-repo",
+            analyzed_days=30,
+            generated_at=datetime(2026, 1, 25, 15, 30, 0),
+            files=[
+                FileForensics(
+                    path="src/auth.py",
+                    commits=10,
+                    lines_changed=200,
+                    authors=["alice@example.com"],
+                    coupled_with=[],
+                )
+            ],
+            summary=AnalysisSummary(
+                total_files=1,
+                high_risk_ownership=0,
+                coupled_pairs=0,
+            ),
+        )
+
+        html = generate_html_report(result)
+
+        # Treemap data should be embedded as JSON
+        assert '"labels"' in html
+        assert '"parents"' in html
+        assert '"values"' in html
+        assert '"colors"' in html

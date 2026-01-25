@@ -32,7 +32,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             line-height: 1.6;
             padding: 2rem;
         }}
-        .container {{ max-width: 1200px; margin: 0 auto; }}
+        .container {{ max-width: 1400px; margin: 0 auto; }}
         h1 {{
             font-size: 1.75rem;
             margin-bottom: 0.5rem;
@@ -266,7 +266,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     title: 'Hotspot',
                     tickfont: {{ color: '#444' }},
                     titlefont: {{ color: '#444' }},
-                    len: 0.6
+                    len: 0.5,
+                    thickness: 15,
+                    x: 1.02,
+                    xpad: 5
                 }}
             }},
             customdata: treemapData.customdata,
@@ -276,15 +279,18 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             outsidetextfont: {{ color: '#444' }},
             pathbar: {{ visible: true, edgeshape: '>' }}
         }}], {{
-            margin: {{ t: 30, l: 0, r: 0, b: 0 }},
+            margin: {{ t: 30, l: 0, r: 80, b: 0 }},
             paper_bgcolor: '#ffffff',
             plot_bgcolor: '#ffffff',
             font: {{ color: '#444', family: 'Inter, Roboto, Helvetica Neue, Arial, sans-serif' }},
             autosize: true
         }}, {{
-            responsive: true,
-            displayModeBar: false
+            responsive: true
         }});
+
+        // Force resize to fill container
+        window.addEventListener('resize', () => Plotly.Plots.resize('treemap'));
+        setTimeout(() => Plotly.Plots.resize('treemap'), 100);
     </script>
 </body>
 </html>

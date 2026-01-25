@@ -2,7 +2,10 @@
 
 from datetime import datetime
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, computed_field, field_validator
+
+HIGH_RISK_AUTHOR_THRESHOLD = 3
+"""Files with more than this many authors are considered coordination risks."""
 
 
 def _validate_non_empty_path(v: str) -> str:
@@ -85,7 +88,7 @@ class FileOwnership(BaseModel):
     @property
     def is_high_risk(self) -> bool:
         """Files with >3 authors are coordination risks."""
-        return self.author_count > 3
+        return self.author_count > HIGH_RISK_AUTHOR_THRESHOLD
 
     @field_validator("path")
     @classmethod
@@ -114,20 +117,23 @@ class FileForensics(BaseModel):
     authors: list[str]
     coupled_with: list[CouplingInfo]
 
+    @computed_field
     @property
     def hotspot_score(self) -> int:
-        """Hotspot score = commits × lines_changed (Tornhill's formula)."""
+        """Hotspot score = commits x lines_changed (Tornhill's formula)."""
         return self.commits * self.lines_changed
 
+    @computed_field
     @property
     def author_count(self) -> int:
         """Number of unique authors."""
         return len(self.authors)
 
+    @computed_field
     @property
     def is_high_risk(self) -> bool:
         """Files with >3 authors are coordination risks."""
-        return self.author_count > 3
+        return self.author_count > HIGH_RISK_AUTHOR_THRESHOLD
 
 
 class AnalysisSummary(BaseModel):

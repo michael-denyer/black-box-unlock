@@ -336,61 +336,76 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         // Treemap data
         const treemapData = {treemap_json};
 
-        // Render treemap with green-yellow-red colorscale
-        Plotly.newPlot('treemap', [{{
-            type: 'treemap',
-            labels: treemapData.labels,
-            parents: treemapData.parents,
-            values: treemapData.values,
-            marker: {{
-                colors: treemapData.colors,
-                colorscale: [
-                    [0, '#5a9a68'],
-                    [0.3, '#a8c256'],
-                    [0.5, '#d4c34a'],
-                    [0.7, '#e09850'],
-                    [1, '#cb4b3f']
-                ],
-                showscale: false
-            }},
-            hovertext: treemapData.hovertext,
-            hoverinfo: 'text',
-            textinfo: 'label+value',
-            insidetextfont: {{ color: '#fff' }},
-            outsidetextfont: {{ color: '#444' }},
-            pathbar: {{ visible: true, edgeshape: '>' }}
-        }}], {{
-            margin: {{ t: 0, l: 0, r: 0, b: 0 }},
-            paper_bgcolor: '#ffffff',
-            plot_bgcolor: '#ffffff',
-            font: {{ color: '#444', family: 'Inter, Roboto, Helvetica Neue, Arial, sans-serif' }},
-            autosize: true
-        }}, {{
-            responsive: true
-        }});
+        // Defer treemap rendering until tab is visible (Plotly needs visible container)
+        let treemapInitialized = false;
+        function initTreemap() {{
+            if (treemapInitialized) return;
+            treemapInitialized = true;
 
-        // Force resize to fill container
-        function resizeTreemap() {{
-            const container = document.getElementById('treemap');
-            Plotly.relayout('treemap', {{
-                width: container.clientWidth,
-                height: container.clientHeight
+            Plotly.newPlot('treemap', [{{
+                type: 'treemap',
+                labels: treemapData.labels,
+                parents: treemapData.parents,
+                values: treemapData.values,
+                marker: {{
+                    colors: treemapData.colors,
+                    colorscale: [
+                        [0, '#5a9a68'],
+                        [0.3, '#a8c256'],
+                        [0.5, '#d4c34a'],
+                        [0.7, '#e09850'],
+                        [1, '#cb4b3f']
+                    ],
+                    showscale: false
+                }},
+                hovertext: treemapData.hovertext,
+                hoverinfo: 'text',
+                textinfo: 'label+value',
+                insidetextfont: {{ color: '#fff' }},
+                outsidetextfont: {{ color: '#444' }},
+                pathbar: {{ visible: true, edgeshape: '>' }}
+            }}], {{
+                margin: {{ t: 0, l: 0, r: 0, b: 0 }},
+                paper_bgcolor: '#ffffff',
+                plot_bgcolor: '#ffffff',
+                font: {{ color: '#444', family: 'Inter, Roboto, Helvetica Neue, Arial, sans-serif' }},
+                autosize: true
+            }}, {{
+                responsive: true
             }});
+
+            // Prevent drilling into files (leaf nodes)
+            document.getElementById('treemap').on('plotly_treemapclick', function(data) {{
+                const idx = data.points[0].pointNumber;
+                const value = treemapData.values[idx];
+                if (value > 0) {{
+                    return false;
+                }}
+            }});
+
+            // Resize after init
+            setTimeout(() => {{
+                const container = document.getElementById('treemap');
+                Plotly.relayout('treemap', {{
+                    width: container.clientWidth,
+                    height: container.clientHeight
+                }});
+            }}, 100);
         }}
-        window.addEventListener('resize', resizeTreemap);
-        setTimeout(resizeTreemap, 100);
-        // Also resize when switching to hotspots tab
+
+        // Initialize when hotspots tab is clicked
         document.querySelector('[data-tab="hotspots"]').addEventListener('click', () => {{
-            setTimeout(resizeTreemap, 50);
+            setTimeout(initTreemap, 50);
         }});
 
-        // Prevent drilling into files (leaf nodes)
-        document.getElementById('treemap').on('plotly_treemapclick', function(data) {{
-            const idx = data.points[0].pointNumber;
-            const value = treemapData.values[idx];
-            // Files have non-zero values, directories have 0
-            if (value > 0) {{
-                return false;  // Cancel the click
+        // Also handle resize
+        window.addEventListener('resize', () => {{
+            if (treemapInitialized) {{
+                const container = document.getElementById('treemap');
+                Plotly.relayout('treemap', {{
+                    width: container.clientWidth,
+                    height: container.clientHeight
+                }});
             }}
         }});
 

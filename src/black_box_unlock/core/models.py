@@ -32,3 +32,25 @@ class FileChurn(BaseModel):
         if v < 0:
             raise ValueError("commits must be non-negative")
         return v
+
+
+class TemporalCoupling(BaseModel):
+    """Two files that change together frequently.
+
+    Coupling ratio uses Tornhill's formula: co_change_count / min(commits_a, commits_b).
+    A ratio >= 0.3 (30%) indicates a hidden dependency worth investigating.
+    """
+
+    file_a: str
+    file_b: str
+    co_change_count: int
+    commits_a: int
+    commits_b: int
+
+    @property
+    def coupling_ratio(self) -> float:
+        """Ratio of co-changes to minimum commit count (Tornhill's formula)."""
+        min_commits = min(self.commits_a, self.commits_b)
+        if min_commits == 0:
+            return 0.0
+        return self.co_change_count / min_commits

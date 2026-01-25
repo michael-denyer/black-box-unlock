@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - File churn extraction from git history using gmap (BBU-8b03)
-- Temporal coupling detection design (BBU-f3v2)
+- Temporal coupling detection from git commits (BBU-f3v2)
 - Core data models: `FileChurn`, `TemporalCoupling`
 - Custom exceptions: `NotAGitRepoError`, `GitToolNotFoundError`
 - Integration tests for git churn extraction

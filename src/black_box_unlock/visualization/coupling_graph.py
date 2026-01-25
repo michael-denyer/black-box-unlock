@@ -3,7 +3,7 @@
 from black_box_unlock.core.models import FileForensics
 
 
-def _get_directory(path: str) -> str:
+def _get_directory(path: str) -> str:  # [5c.1] Extract top-level dir
     """Extract top-level directory from path.
 
     Args:
@@ -17,7 +17,7 @@ def _get_directory(path: str) -> str:
     return path.split("/")[0]
 
 
-def _make_node(path: str, churn: int) -> dict:
+def _make_node(path: str, churn: int) -> dict:  # [5c.2] Create graph node
     """Create a Cytoscape.js node for a file.
 
     Args:
@@ -37,7 +37,7 @@ def _make_node(path: str, churn: int) -> dict:
     }
 
 
-def build_coupling_graph_data(files: list[FileForensics]) -> dict:
+def build_coupling_graph_data(files: list[FileForensics]) -> dict:  # [5c] Cytoscape.js graph format
     """Transform file forensics to Cytoscape.js graph format.
 
     Args:

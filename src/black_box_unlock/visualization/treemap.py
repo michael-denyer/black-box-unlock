@@ -3,7 +3,7 @@
 from black_box_unlock.core.models import FileForensics
 
 
-def build_treemap_data(files: list[FileForensics]) -> dict:
+def build_treemap_data(files: list[FileForensics]) -> dict:  # [5b] Plotly treemap format
     """Transform flat file list to Plotly treemap hierarchical format.
 
     Args:

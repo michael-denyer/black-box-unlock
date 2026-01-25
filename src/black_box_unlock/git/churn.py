@@ -12,7 +12,7 @@ from ..core.exceptions import NotAGitRepoError
 from ..core.models import FileChurn
 
 
-def parse_gmap_output(data: dict[str, Any]) -> list[FileChurn]:
+def parse_gmap_output(data: dict[str, Any]) -> list[FileChurn]:  # [3a] Parse gmap JSON to FileChurn
     """Parse gmap JSON output into FileChurn models.
 
     Aggregates commits and line changes per file across all entries.
@@ -49,7 +49,7 @@ def parse_gmap_output(data: dict[str, Any]) -> list[FileChurn]:
     ]
 
 
-def extract_file_churn(repo_path: Path, since_days: int = 30) -> list[FileChurn]:
+def extract_file_churn(repo_path: Path, since_days: int = 30) -> list[FileChurn]:  # [3a.1] Extract churn from git
     """Extract file churn metrics from git history.
 
     Uses gmap for performance if available.

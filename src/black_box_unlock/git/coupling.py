@@ -7,7 +7,7 @@ from typing import Any
 from ..core.models import TemporalCoupling
 
 
-def detect_temporal_coupling(
+def detect_temporal_coupling(  # [3b] Find co-changing files
     gmap_data: dict[str, Any],
     min_ratio: float = 0.3,
 ) -> list[TemporalCoupling]:

@@ -17,7 +17,7 @@ from .git.coupling import detect_temporal_coupling
 from .git.ownership import parse_ownership_from_gmap
 
 
-def _fetch_gmap_data(repo_path: Path, days: int) -> dict:
+def _fetch_gmap_data(repo_path: Path, days: int) -> dict:  # [2a.1] Fetch git history via gmap
     """Fetch git history data using gmap CLI."""
     cmd = [
         "gmap",
@@ -32,7 +32,7 @@ def _fetch_gmap_data(repo_path: Path, days: int) -> dict:
     return json.loads(result.stdout)
 
 
-def run_analysis(
+def run_analysis(  # [2a] Main analysis pipeline
     repo_path: Path,
     days: int = 30,
     min_coupling: float = 0.3,
@@ -109,7 +109,7 @@ def run_analysis(
     )
 
 
-def export_to_json(result: AnalysisResult) -> str:
+def export_to_json(result: AnalysisResult) -> str:  # [2b] Serialize result to JSON
     """Export analysis result to JSON string.
 
     Computed properties (hotspot_score, author_count, is_high_risk) are

@@ -103,6 +103,7 @@ bbu version                   # Show version
 - `uv run ruff check . && uv run ruff format .` - lint and format
 
 ### Completion
+- Run `code-simplifier:code-simplifier` agent on changed files before commit
 - Invoke `verification-before-completion` skill before claiming done
 - Invoke `requesting-code-review` skill after major features
 - `bd close <id>` - mark issue complete

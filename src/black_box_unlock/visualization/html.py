@@ -260,8 +260,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 ],
                 showscale: false
             }},
-            customdata: treemapData.customdata,
-            hovertemplate: '%{{customdata.hover}}<extra></extra>',
+            hovertext: treemapData.hovertext,
+            hoverinfo: 'text',
             textinfo: 'label+value',
             insidetextfont: {{ color: '#fff' }},
             outsidetextfont: {{ color: '#444' }},
@@ -277,8 +277,19 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         }});
 
         // Force resize to fill container
-        window.addEventListener('resize', () => Plotly.Plots.resize('treemap'));
-        setTimeout(() => Plotly.Plots.resize('treemap'), 100);
+        function resizeTreemap() {{
+            const container = document.getElementById('treemap');
+            Plotly.relayout('treemap', {{
+                width: container.clientWidth,
+                height: container.clientHeight
+            }});
+        }}
+        window.addEventListener('resize', resizeTreemap);
+        setTimeout(resizeTreemap, 100);
+        // Also resize when switching to hotspots tab
+        document.querySelector('[data-tab="hotspots"]').addEventListener('click', () => {{
+            setTimeout(resizeTreemap, 50);
+        }});
     </script>
 </body>
 </html>

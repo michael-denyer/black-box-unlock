@@ -76,6 +76,26 @@ class TestBuildTreemapData:
         src_idx = result["labels"].index("src")
         assert result["values"][src_idx] == 0
 
+    def test_directory_customdata_is_minimal(self):
+        """Directory nodes have minimal customdata for hover."""
+        files = [
+            FileForensics(
+                path="src/auth.py",
+                commits=10,
+                lines_changed=200,
+                authors=["alice@example.com"],
+                coupled_with=[],
+            )
+        ]
+
+        result = build_treemap_data(files)
+
+        src_idx = result["labels"].index("src")
+        customdata = result["customdata"][src_idx]
+        assert customdata["is_dir"] is True
+        assert customdata["path"] == "src"
+        assert customdata["hover"] == "src"
+
     def test_colors_are_hotspot_scores(self):
         """Colors array contains hotspot scores for files."""
         files = [
@@ -169,3 +189,5 @@ class TestBuildTreemapData:
         assert customdata["author_count"] == 2
         assert customdata["is_high_risk"] is False
         assert len(customdata["coupled_with"]) == 1
+        assert "hover" in customdata
+        assert "src/auth.py" in customdata["hover"]

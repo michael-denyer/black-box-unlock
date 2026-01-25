@@ -105,9 +105,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             width: 100%;
             min-height: 600px;
             height: calc(100vh - 350px);
-            background: var(--surface);
-            border-radius: 6px;
-            border: 1px solid var(--secondary);
         }}
         table {{
             width: 100%;
@@ -261,25 +258,16 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     [0.7, '#e09850'],
                     [1, '#cb4b3f']
                 ],
-                showscale: true,
-                colorbar: {{
-                    title: 'Hotspot',
-                    tickfont: {{ color: '#444' }},
-                    titlefont: {{ color: '#444' }},
-                    len: 0.5,
-                    thickness: 15,
-                    x: 1.02,
-                    xpad: 5
-                }}
+                showscale: false
             }},
             customdata: treemapData.customdata,
-            hovertemplate: '<b>%{{label}}</b><br>Lines: %{{value}}<br>Hotspot: %{{color:,.0f}}<extra></extra>',
+            hovertemplate: '%{{customdata.hover}}<extra></extra>',
             textinfo: 'label+value',
             insidetextfont: {{ color: '#fff' }},
             outsidetextfont: {{ color: '#444' }},
             pathbar: {{ visible: true, edgeshape: '>' }}
         }}], {{
-            margin: {{ t: 30, l: 0, r: 80, b: 0 }},
+            margin: {{ t: 0, l: 0, r: 0, b: 0 }},
             paper_bgcolor: '#ffffff',
             plot_bgcolor: '#ffffff',
             font: {{ color: '#444', family: 'Inter, Roboto, Helvetica Neue, Arial, sans-serif' }},

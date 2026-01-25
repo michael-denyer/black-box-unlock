@@ -36,7 +36,7 @@ def build_treemap_data(files: list[FileForensics]) -> dict:
                 parents.append(current_parent if current_parent else "")
                 values.append(0)  # Directories have 0 value
                 colors.append(0)  # Directories have 0 color
-                customdata.append(None)
+                customdata.append({"is_dir": True, "path": dir_path, "hover": dir_path})
 
             # Update parent for next level - use just the directory name
             current_parent = part
@@ -47,9 +47,16 @@ def build_treemap_data(files: list[FileForensics]) -> dict:
         parents.append(current_parent if current_parent else "")
         values.append(file.lines_changed)
         colors.append(file.hotspot_score)
+        hover_text = (
+            f"{file.path}<br>"
+            f"Lines: {file.lines_changed:,}<br>"
+            f"Hotspot: {file.hotspot_score:,}<br>"
+            f"Commits: {file.commits}"
+        )
         customdata.append(
             {
                 "path": file.path,
+                "hover": hover_text,
                 "commits": file.commits,
                 "author_count": file.author_count,
                 "is_high_risk": file.is_high_risk,

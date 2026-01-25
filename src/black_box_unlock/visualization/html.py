@@ -420,8 +420,20 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             legendEl.appendChild(item);
         }});
 
-        // Render coupling graph if there are edges
-        if (couplingData.edges.length > 0) {{
+        // Defer coupling graph initialization until tab is visible
+        let cyInitialized = false;
+        function initCouplingGraph() {{
+            if (cyInitialized) return;
+            cyInitialized = true;
+
+            if (couplingData.edges.length === 0) {{
+                const msgDiv = document.createElement('div');
+                msgDiv.className = 'no-coupling';
+                msgDiv.textContent = 'No temporal coupling detected above threshold';
+                document.getElementById('coupling-graph').appendChild(msgDiv);
+                return;
+            }}
+
             const cy = cytoscape({{
                 container: document.getElementById('coupling-graph'),
                 elements: {{
@@ -433,8 +445,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                         selector: 'node',
                         style: {{
                             'label': 'data(label)',
-                            'width': `mapData(churn, 0, ${{couplingData.maxChurn || 1}}, 30, 80)`,
-                            'height': `mapData(churn, 0, ${{couplingData.maxChurn || 1}}, 30, 80)`,
+                            'width': 40,
+                            'height': 40,
                             'background-color': function(ele) {{
                                 return dirColorMap[ele.data('directory')] || '#888';
                             }},
@@ -447,8 +459,14 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     {{
                         selector: 'edge',
                         style: {{
-                            'width': 'mapData(coupling, 0.3, 1.0, 1, 8)',
-                            'opacity': 'mapData(coupling, 0.3, 1.0, 0.3, 1.0)',
+                            'width': function(ele) {{
+                                const c = ele.data('coupling');
+                                return 1 + (c - 0.3) / 0.7 * 7;
+                            }},
+                            'opacity': function(ele) {{
+                                const c = ele.data('coupling');
+                                return 0.3 + (c - 0.3) / 0.7 * 0.7;
+                            }},
                             'line-color': function(ele) {{
                                 return ele.data('crossModule') ? '#cb4b3f' : '#888';
                             }},
@@ -465,16 +483,13 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 wheelSensitivity: 0.3
             }});
 
-            // Resize on tab switch
-            document.querySelector('[data-tab="coupling"]').addEventListener('click', () => {{
-                setTimeout(() => cy.resize().fit(), 50);
-            }});
-        }} else {{
-            const msgDiv = document.createElement('div');
-            msgDiv.className = 'no-coupling';
-            msgDiv.textContent = 'No temporal coupling detected above threshold';
-            document.getElementById('coupling-graph').appendChild(msgDiv);
+            setTimeout(() => cy.resize().fit(), 100);
         }}
+
+        // Initialize when coupling tab is clicked
+        document.querySelector('[data-tab="coupling"]').addEventListener('click', () => {{
+            setTimeout(initCouplingGraph, 50);
+        }});
     </script>
 </body>
 </html>

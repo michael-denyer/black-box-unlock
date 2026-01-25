@@ -156,13 +156,14 @@ class TestBuildTreemapData:
         result = build_treemap_data(files)
 
         # Check hierarchy: root -> src -> auth -> handlers -> login.py
-        login_idx = result["labels"].index("login.py")
-        assert result["parents"][login_idx] == "handlers"
+        # Parents use full paths for unique identification
+        login_idx = result["ids"].index("src/auth/handlers/login.py")
+        assert result["parents"][login_idx] == "src/auth/handlers"
 
-        handlers_idx = result["labels"].index("handlers")
-        assert result["parents"][handlers_idx] == "auth"
+        handlers_idx = result["ids"].index("src/auth/handlers")
+        assert result["parents"][handlers_idx] == "src/auth"
 
-        auth_idx = result["labels"].index("auth")
+        auth_idx = result["ids"].index("src/auth")
         assert result["parents"][auth_idx] == "src"
 
     def test_hovertext_includes_file_details(self):

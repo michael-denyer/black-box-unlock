@@ -45,6 +45,7 @@ def build_coupling_graph_data(files: list[FileForensics]) -> dict:  # [5c] Cytos
 
     Returns:
         Dict with nodes, edges, directories, and maxChurn for Cytoscape.js.
+        Keys use camelCase (maxChurn, crossModule) for JavaScript consumption.
     """
     if not files:
         return {"nodes": [], "edges": [], "directories": [], "maxChurn": 0}

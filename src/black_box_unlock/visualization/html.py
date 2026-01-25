@@ -378,13 +378,22 @@ def _get_severity_class(value: int, max_val: int, prefix: str) -> str:
     if max_val == 0:
         return ""
     ratio = value / max_val
+
+    if prefix == "hotspot":
+        if ratio >= 0.75:
+            return "hotspot-critical"
+        if ratio >= 0.5:
+            return "hotspot-high"
+        if ratio >= 0.25:
+            return "hotspot-med"
+        return "hotspot-low"
+
+    # metric prefix
     if ratio >= 0.75:
-        return f"{prefix}-critical" if prefix == "hotspot" else f"{prefix}-high"
+        return "metric-high"
     if ratio >= 0.5:
-        return f"{prefix}-high" if prefix == "hotspot" else f"{prefix}-med"
-    if ratio >= 0.25:
-        return f"{prefix}-med" if prefix == "hotspot" else ""
-    return f"{prefix}-low" if prefix == "hotspot" else ""
+        return "metric-med"
+    return ""
 
 
 def generate_html_report(result: AnalysisResult) -> str:

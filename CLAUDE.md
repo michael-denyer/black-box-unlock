@@ -115,3 +115,6 @@ bbu version                   # Show version
 - **Lazy-load MCPs**: Never initialize MCP clients at module import
 - **Git commands**: Always handle missing git repos gracefully
 - **File paths**: Normalize paths for cross-platform compatibility
+- **Rich console.print() strips brackets**: Use `print()` for HTML output - Rich interprets `[text]` as markup tags
+- **Plotly/Cytoscape hidden containers**: Can't render to `display: none` - defer init until tab visible
+- **Plotly treemap duplicate labels**: Use unique `ids` (full paths) when labels repeat across directories

@@ -85,22 +85,28 @@ bbu analyze-repo --hotspots   # Show file hotspots
 bbu version                   # Show version
 ```
 
-## Testing
-
-```bash
-uv run pytest -v              # All tests
-uv run ruff check .           # Lint
-uv run ruff format .          # Format
-```
-
 ## Development Workflow
 
-1. Check `bd ready` for available work
-2. Start with tests (TDD)
-3. Implement feature
-4. Run tests and lint
-5. Close beads issue with `bd close <id>`
-6. Sync with `bd sync`
+### Finding Work
+- `bd ready` - tasks with no blockers
+- `bd show <id>` - review issue details
+- `bd update <id> --status=in_progress` - claim work
+
+### Planning
+- Invoke `brainstorming` skill before creative/feature work
+- Invoke `writing-plans` skill for multi-step implementation
+
+### Implementation
+- Invoke `test-driven-development` skill - write tests first
+- Invoke `systematic-debugging` skill when bugs arise
+- `uv run pytest -v` - run tests
+- `uv run ruff check . && uv run ruff format .` - lint and format
+
+### Completion
+- Invoke `verification-before-completion` skill before claiming done
+- Invoke `requesting-code-review` skill after major features
+- `bd close <id>` - mark issue complete
+- `bd sync` - push to remote
 
 ## Gotchas
 

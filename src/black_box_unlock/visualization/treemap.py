@@ -33,18 +33,17 @@ def build_treemap_data(files: list[FileForensics]) -> dict:
             if dir_path not in seen_dirs:
                 seen_dirs.add(dir_path)
                 labels.append(part)
-                parents.append(current_parent if current_parent else "")
-                values.append(0)  # Directories have 0 value
-                colors.append(0)  # Directories have 0 color
+                parents.append(current_parent)
+                values.append(0)
+                colors.append(0)
                 hovertext.append(dir_path)
 
             # Update parent for next level - use just the directory name
             current_parent = part
 
-        # Add the file itself
         filename = parts[-1]
         labels.append(filename)
-        parents.append(current_parent if current_parent else "")
+        parents.append(current_parent)
         values.append(file.lines_changed)
         colors.append(file.hotspot_score)
         hover_text = (

@@ -8,7 +8,7 @@ Based on Adam Tornhill's "Your Code as a Crime Scene" - using forensic technique
 
 ## Architecture
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for full details including module organization, data models, and implementation roadmap.
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for full details including module organization, data models, and implementation roadmap. See [docs/CODEMAP.md](docs/CODEMAP.md) for bidirectional navigation between architecture and source code.
 
 ```mermaid
 flowchart TD
@@ -50,7 +50,8 @@ flowchart TD
 
 | Path | Purpose |
 |------|---------|
-| `ARCHITECTURE.md` | Full architecture, data models, roadmap |
+| `docs/ARCHITECTURE.md` | Full architecture, data models, roadmap |
+| `docs/CODEMAP.md` | Bidirectional code map with `[ID]` annotations |
 | `.claude-plugin/` | Claude Code plugin (commands, agents) |
 | `src/black_box_unlock/cli.py` | CLI commands (`bbu`) |
 | `src/black_box_unlock/core/` | Pydantic models, protocols, exceptions |
@@ -107,6 +108,7 @@ bbu version                   # Show version
 - Update `CHANGELOG.md` with new features/fixes before closing issues
 - Invoke `verification-before-completion` skill before claiming done
 - Invoke `requesting-code-review` skill after major features
+- Invoke `/codemap` skill when architecture changes significantly
 - `bd close <id>` - mark issue complete
 - `bd sync` - push to remote
 

@@ -104,6 +104,7 @@ bbu version                   # Show version
 
 ### Completion
 - Run `code-simplifier:code-simplifier` agent on changed files before commit
+- Update `CHANGELOG.md` with new features/fixes before closing issues
 - Invoke `verification-before-completion` skill before claiming done
 - Invoke `requesting-code-review` skill after major features
 - `bd close <id>` - mark issue complete

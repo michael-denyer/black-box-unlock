@@ -7,12 +7,33 @@ import typer
 from rich.console import Console
 
 from black_box_unlock.analysis import export_to_json, run_analysis
+from black_box_unlock.core.logging import configure_logging
 from black_box_unlock.visualization.html import generate_html_report
+
+
+def _version_callback(value: bool) -> None:
+    if value:
+        from black_box_unlock import __version__
+
+        print(f"Black Box Unlock v{__version__}")
+        raise typer.Exit()
+
+
+def _main_callback(
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable verbose output"),
+    version: bool | None = typer.Option(
+        None, "--version", callback=_version_callback, is_eager=True
+    ),
+) -> None:
+    """Configure logging based on verbose flag."""
+    configure_logging(verbose=verbose)
+
 
 app = typer.Typer(
     name="bbu",
     help="Black Box Unlock - Code forensics tool. Investigate your codebase like a crime scene.",
     no_args_is_help=True,
+    callback=_main_callback,
 )
 console = Console()
 
@@ -46,9 +67,7 @@ def analyze_repo(
 @app.command()
 def version() -> None:
     """Show version information."""
-    from black_box_unlock import __version__
-
-    console.print(f"Black Box Unlock v{__version__}")
+    _version_callback(True)
 
 
 if __name__ == "__main__":

@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Loguru logging with `--verbose` flag for debug output
+
 ## [0.2.0] - 2026-01-25
 
 ### Added

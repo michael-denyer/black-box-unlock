@@ -47,22 +47,18 @@ jobs:
       - name: Install dependencies
         run: uv sync --extra dev
 
-      - name: Cache cargo
+      - name: Cache cargo binaries
         uses: actions/cache@v4
         with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/
-            ~/.cargo/git/
-          key: cargo-gmap-${{ runner.os }}
+          path: ~/.cargo/bin/
+          key: cargo-bin-gmap-${{ runner.os }}-v1
 
       - name: Install gmap
         run: |
-          if ! command -v gmap &> /dev/null; then
-            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-            source "$HOME/.cargo/env"
-            cargo install gmap
-          fi
+          command -v gmap && exit 0
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+          . "$HOME/.cargo/env"
+          cargo install gmap
 
       - name: Run tests
         run: |

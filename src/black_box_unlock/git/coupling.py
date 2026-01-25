@@ -32,16 +32,15 @@ def detect_temporal_coupling(
         for file_a, file_b in combinations(sorted(files), 2):
             co_change_counts[(file_a, file_b)] += 1
 
-    couplings = []
-    for (file_a, file_b), co_changes in co_change_counts.items():
-        coupling = TemporalCoupling(
+    couplings = [
+        TemporalCoupling(
             file_a=file_a,
             file_b=file_b,
             co_change_count=co_changes,
             commits_a=commit_counts[file_a],
             commits_b=commit_counts[file_b],
         )
-        if coupling.coupling_ratio >= min_ratio:
-            couplings.append(coupling)
+        for (file_a, file_b), co_changes in co_change_counts.items()
+    ]
 
-    return couplings
+    return [c for c in couplings if c.coupling_ratio >= min_ratio]

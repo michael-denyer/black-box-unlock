@@ -5,6 +5,20 @@ from datetime import datetime
 from pydantic import BaseModel, field_validator
 
 
+def _validate_non_empty_path(v: str) -> str:
+    """Validate that path is not empty or whitespace."""
+    if not v.strip():
+        raise ValueError("path must not be empty")
+    return v
+
+
+def _validate_non_negative_commits(v: int) -> int:
+    """Validate that commits is non-negative."""
+    if v < 0:
+        raise ValueError("commits must be non-negative")
+    return v
+
+
 class FileChurn(BaseModel):
     """Churn metrics for a single file."""
 
@@ -22,16 +36,12 @@ class FileChurn(BaseModel):
     @field_validator("path")
     @classmethod
     def path_must_not_be_empty(cls, v: str) -> str:
-        if not v.strip():
-            raise ValueError("path must not be empty")
-        return v
+        return _validate_non_empty_path(v)
 
     @field_validator("commits")
     @classmethod
     def commits_must_be_non_negative(cls, v: int) -> int:
-        if v < 0:
-            raise ValueError("commits must be non-negative")
-        return v
+        return _validate_non_negative_commits(v)
 
 
 class TemporalCoupling(BaseModel):
@@ -80,13 +90,9 @@ class FileOwnership(BaseModel):
     @field_validator("path")
     @classmethod
     def path_must_not_be_empty(cls, v: str) -> str:
-        if not v.strip():
-            raise ValueError("path must not be empty")
-        return v
+        return _validate_non_empty_path(v)
 
     @field_validator("commits")
     @classmethod
     def commits_must_be_non_negative(cls, v: int) -> int:
-        if v < 0:
-            raise ValueError("commits must be non-negative")
-        return v
+        return _validate_non_negative_commits(v)

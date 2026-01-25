@@ -84,88 +84,39 @@ class TestDetectTemporalCoupling:
         assert coupling.commits_b == 2
         assert coupling.coupling_ratio == 1.0
 
-    def test_filters_by_min_ratio_threshold(self):
-        """Excludes pairs below the minimum ratio threshold."""
+    def test_includes_pairs_above_threshold(self):
+        """Includes pairs at or above the minimum ratio threshold."""
+        # a.py: 2 commits, b.py: 4 commits, co-changes: 1
+        # coupling_ratio = 1 / min(2, 4) = 0.5
         gmap_data = {
             "entries": [
-                {
-                    "timestamp": "2025-01-01T10:00:00Z",
-                    "files": [
-                        {"path": "a.py", "added_lines": 10, "deleted_lines": 0},
-                        {"path": "b.py", "added_lines": 5, "deleted_lines": 0},
-                    ],
-                },
-                {
-                    "timestamp": "2025-01-02T10:00:00Z",
-                    "files": [
-                        {"path": "a.py", "added_lines": 3, "deleted_lines": 1},
-                    ],
-                },
-                {
-                    "timestamp": "2025-01-03T10:00:00Z",
-                    "files": [
-                        {"path": "a.py", "added_lines": 2, "deleted_lines": 0},
-                    ],
-                },
-                {
-                    "timestamp": "2025-01-04T10:00:00Z",
-                    "files": [
-                        {"path": "a.py", "added_lines": 1, "deleted_lines": 0},
-                    ],
-                },
+                {"files": [{"path": "a.py"}, {"path": "b.py"}]},
+                {"files": [{"path": "a.py"}]},
+                {"files": [{"path": "b.py"}]},
+                {"files": [{"path": "b.py"}]},
+                {"files": [{"path": "b.py"}]},
             ]
         }
-        # a.py: 4 commits, b.py: 1 commit, co-changes: 1
-        # coupling_ratio = 1 / min(4, 1) = 1/1 = 1.0
 
-        # With high threshold, should still include
-        result_high = detect_temporal_coupling(gmap_data, min_ratio=0.9)
-        assert len(result_high) == 1
+        result = detect_temporal_coupling(gmap_data, min_ratio=0.5)
+        assert len(result) == 1
 
-        # Create data with lower coupling
-        gmap_data_low = {
-            "entries": [
-                {
-                    "timestamp": "2025-01-01T10:00:00Z",
-                    "files": [
-                        {"path": "a.py", "added_lines": 10, "deleted_lines": 0},
-                        {"path": "b.py", "added_lines": 5, "deleted_lines": 0},
-                    ],
-                },
-                {
-                    "timestamp": "2025-01-02T10:00:00Z",
-                    "files": [
-                        {"path": "a.py", "added_lines": 3, "deleted_lines": 1},
-                    ],
-                },
-                {
-                    "timestamp": "2025-01-03T10:00:00Z",
-                    "files": [
-                        {"path": "b.py", "added_lines": 2, "deleted_lines": 0},
-                    ],
-                },
-                {
-                    "timestamp": "2025-01-04T10:00:00Z",
-                    "files": [
-                        {"path": "b.py", "added_lines": 1, "deleted_lines": 0},
-                    ],
-                },
-                {
-                    "timestamp": "2025-01-05T10:00:00Z",
-                    "files": [
-                        {"path": "b.py", "added_lines": 1, "deleted_lines": 0},
-                    ],
-                },
-            ]
-        }
+    def test_excludes_pairs_below_threshold(self):
+        """Excludes pairs below the minimum ratio threshold."""
         # a.py: 2 commits, b.py: 4 commits, co-changes: 1
-        # coupling_ratio = 1 / min(2, 4) = 1/2 = 0.5
+        # coupling_ratio = 1 / min(2, 4) = 0.5
+        gmap_data = {
+            "entries": [
+                {"files": [{"path": "a.py"}, {"path": "b.py"}]},
+                {"files": [{"path": "a.py"}]},
+                {"files": [{"path": "b.py"}]},
+                {"files": [{"path": "b.py"}]},
+                {"files": [{"path": "b.py"}]},
+            ]
+        }
 
-        result_filtered = detect_temporal_coupling(gmap_data_low, min_ratio=0.6)
-        assert len(result_filtered) == 0
-
-        result_included = detect_temporal_coupling(gmap_data_low, min_ratio=0.5)
-        assert len(result_included) == 1
+        result = detect_temporal_coupling(gmap_data, min_ratio=0.6)
+        assert len(result) == 0
 
     def test_alphabetical_ordering_avoids_duplicates(self):
         """Files are ordered alphabetically so (b, a) becomes (a, b)."""

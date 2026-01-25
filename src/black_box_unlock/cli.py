@@ -61,7 +61,9 @@ def analyze_repo(
         case OutputFormat.json:
             console.print(export_to_json(result))
         case OutputFormat.html:
-            console.print(generate_html_report(result))
+            # Use print() instead of console.print() to avoid Rich markup interpretation
+            # Rich would strip [dir], [data-tab=...] etc. as invalid markup tags
+            print(generate_html_report(result))
 
 
 @app.command()

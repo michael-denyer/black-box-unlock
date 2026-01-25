@@ -54,3 +54,39 @@ class TemporalCoupling(BaseModel):
         if min_commits == 0:
             return 0.0
         return self.co_change_count / min_commits
+
+
+class FileOwnership(BaseModel):
+    """Ownership metrics for a single file.
+
+    Files with many authors (>3) are coordination risks that often correlate
+    with higher defect rates due to diffuse ownership.
+    """
+
+    path: str
+    authors: list[str]
+    commits: int
+
+    @property
+    def author_count(self) -> int:
+        """Number of unique authors."""
+        return len(self.authors)
+
+    @property
+    def is_high_risk(self) -> bool:
+        """Files with >3 authors are coordination risks."""
+        return self.author_count > 3
+
+    @field_validator("path")
+    @classmethod
+    def path_must_not_be_empty(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("path must not be empty")
+        return v
+
+    @field_validator("commits")
+    @classmethod
+    def commits_must_be_non_negative(cls, v: int) -> int:
+        if v < 0:
+            raise ValueError("commits must be non-negative")
+        return v

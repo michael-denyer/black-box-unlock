@@ -233,4 +233,4 @@ class TestGenerateHtmlReport:
         assert '"labels"' in html
         assert '"parents"' in html
         assert '"values"' in html
-        assert '"colors"' in html
+        assert '"hovertext"' in html

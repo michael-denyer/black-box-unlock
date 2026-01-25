@@ -16,7 +16,7 @@ def build_treemap_data(files: list[FileForensics]) -> dict:
     parents: list[str] = [""]  # Root has no parent
     values: list[int] = [0]  # Root value
     colors: list[int] = [0]  # Root color
-    customdata: list[dict | None] = [None]  # Root has no metadata
+    hovertext: list[str] = [""]  # Root has no hover
 
     # Track directories we've already added
     seen_dirs: set[str] = set()
@@ -36,7 +36,7 @@ def build_treemap_data(files: list[FileForensics]) -> dict:
                 parents.append(current_parent if current_parent else "")
                 values.append(0)  # Directories have 0 value
                 colors.append(0)  # Directories have 0 color
-                customdata.append({"is_dir": True, "path": dir_path, "hover": dir_path})
+                hovertext.append(dir_path)
 
             # Update parent for next level - use just the directory name
             current_parent = part
@@ -53,21 +53,12 @@ def build_treemap_data(files: list[FileForensics]) -> dict:
             f"Hotspot: {file.hotspot_score:,}<br>"
             f"Commits: {file.commits}"
         )
-        customdata.append(
-            {
-                "path": file.path,
-                "hover": hover_text,
-                "commits": file.commits,
-                "author_count": file.author_count,
-                "is_high_risk": file.is_high_risk,
-                "coupled_with": [{"file": c.file, "ratio": c.ratio} for c in file.coupled_with],
-            }
-        )
+        hovertext.append(hover_text)
 
     return {
         "labels": labels,
         "parents": parents,
         "values": values,
         "colors": colors,
-        "customdata": customdata,
+        "hovertext": hovertext,
     }

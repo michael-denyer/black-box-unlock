@@ -76,8 +76,8 @@ class TestBuildTreemapData:
         src_idx = result["labels"].index("src")
         assert result["values"][src_idx] == 0
 
-    def test_directory_customdata_is_minimal(self):
-        """Directory nodes have minimal customdata for hover."""
+    def test_directory_hovertext_shows_path(self):
+        """Directory nodes have hovertext showing directory path."""
         files = [
             FileForensics(
                 path="src/auth.py",
@@ -91,10 +91,7 @@ class TestBuildTreemapData:
         result = build_treemap_data(files)
 
         src_idx = result["labels"].index("src")
-        customdata = result["customdata"][src_idx]
-        assert customdata["is_dir"] is True
-        assert customdata["path"] == "src"
-        assert customdata["hover"] == "src"
+        assert result["hovertext"][src_idx] == "src"
 
     def test_colors_are_hotspot_scores(self):
         """Colors array contains hotspot scores for files."""
@@ -168,8 +165,8 @@ class TestBuildTreemapData:
         auth_idx = result["labels"].index("auth")
         assert result["parents"][auth_idx] == "src"
 
-    def test_customdata_includes_file_details(self):
-        """Customdata contains file metadata for tooltips."""
+    def test_hovertext_includes_file_details(self):
+        """Hovertext contains file metadata for tooltips."""
         files = [
             FileForensics(
                 path="src/auth.py",
@@ -183,11 +180,9 @@ class TestBuildTreemapData:
         result = build_treemap_data(files)
 
         auth_idx = result["labels"].index("auth.py")
-        customdata = result["customdata"][auth_idx]
+        hovertext = result["hovertext"][auth_idx]
 
-        assert customdata["commits"] == 10
-        assert customdata["author_count"] == 2
-        assert customdata["is_high_risk"] is False
-        assert len(customdata["coupled_with"]) == 1
-        assert "hover" in customdata
-        assert "src/auth.py" in customdata["hover"]
+        assert "src/auth.py" in hovertext
+        assert "Lines: 200" in hovertext
+        assert "Hotspot: 2,000" in hovertext
+        assert "Commits: 10" in hovertext

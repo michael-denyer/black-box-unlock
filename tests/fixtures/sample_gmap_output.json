@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "generated_at": "2026-01-25T13:00:00.000000Z",
+  "repository_path": "/test/repo",
+  "since": "30 days ago",
+  "until": null,
+  "entries": [
+    {
+      "commit_id": "abc123",
+      "author_name": "Test User",
+      "author_email": "test@example.com",
+      "timestamp": "2026-01-20T10:00:00Z",
+      "message": "First commit",
+      "files": [
+        {
+          "path": "src/main.py",
+          "added_lines": 50,
+          "deleted_lines": 10,
+          "is_binary": false
+        },
+        {
+          "path": "src/utils.py",
+          "added_lines": 30,
+          "deleted_lines": 0,
+          "is_binary": false
+        }
+      ]
+    },
+    {
+      "commit_id": "def456",
+      "author_name": "Test User",
+      "author_email": "test@example.com",
+      "timestamp": "2026-01-25T10:00:00Z",
+      "message": "Second commit",
+      "files": [
+        {
+          "path": "src/main.py",
+          "added_lines": 20,
+          "deleted_lines": 5,
+          "is_binary": false
+        }
+      ]
+    }
+  ]
+}

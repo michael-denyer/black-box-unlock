@@ -290,6 +290,16 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         document.querySelector('[data-tab="hotspots"]').addEventListener('click', () => {{
             setTimeout(resizeTreemap, 50);
         }});
+
+        // Prevent drilling into files (leaf nodes)
+        document.getElementById('treemap').on('plotly_treemapclick', function(data) {{
+            const idx = data.points[0].pointNumber;
+            const value = treemapData.values[idx];
+            // Files have non-zero values, directories have 0
+            if (value > 0) {{
+                return false;  // Cancel the click
+            }}
+        }});
     </script>
 </body>
 </html>

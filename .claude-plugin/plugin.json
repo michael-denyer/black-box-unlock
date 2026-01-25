@@ -1,0 +1,25 @@
+{
+  "name": "black-box-unlock",
+  "version": "0.1.0",
+  "description": "Code forensics tool - investigate your codebase like a crime scene",
+  "commands": [
+    {
+      "name": "analyze",
+      "description": "Analyze repository for code hotspots and forensics",
+      "path": "commands/analyze.md"
+    },
+    {
+      "name": "hotspots",
+      "description": "Show file hotspots (high churn + complexity)",
+      "path": "commands/hotspots.md"
+    }
+  ],
+  "hooks": [],
+  "agents": [
+    {
+      "name": "git-forensics",
+      "description": "Analyze git history for code health signals",
+      "path": "agents/git-forensics.md"
+    }
+  ]
+}

@@ -1,7 +1,13 @@
 """Black Box Unlock CLI - Code forensics commands."""
 
+from enum import Enum
+from pathlib import Path
+
 import typer
 from rich.console import Console
+
+from black_box_unlock.analysis import export_to_json, run_analysis
+from black_box_unlock.visualization.html import generate_html_report
 
 app = typer.Typer(
     name="bbu",
@@ -11,19 +17,30 @@ app = typer.Typer(
 console = Console()
 
 
+class OutputFormat(str, Enum):
+    json = "json"
+    html = "html"
+
+
 @app.command()
 def analyze_repo(
     days: int = typer.Option(30, help="Days of git history to analyze"),
-    hotspots: bool = typer.Option(False, "--hotspots", help="Show file hotspots"),
-    output: str = typer.Option("text", help="Output format: text, json, markdown"),
+    output: OutputFormat = typer.Option(OutputFormat.json, help="Output format: json, html"),
+    min_coupling: float = typer.Option(0.3, help="Minimum coupling ratio to include"),
 ) -> None:
     """Analyze repository git history for code forensics.
 
     Extracts file churn, temporal coupling, and ownership patterns
     from git history. Based on 'Your Code as a Crime Scene' methodology.
     """
-    console.print(f"[bold]Analyzing repository (last {days} days)...[/bold]")
-    console.print("[yellow]Not yet implemented - see BBU-t40 epic[/yellow]")
+    repo_path = Path(".")
+    result = run_analysis(repo_path, days=days, min_coupling=min_coupling)
+
+    match output:
+        case OutputFormat.json:
+            console.print(export_to_json(result))
+        case OutputFormat.html:
+            console.print(generate_html_report(result))
 
 
 @app.command()

@@ -55,7 +55,7 @@ target-version = "py310"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP"]
-ignore = ["E501"]
+ignore = ["E501", "B008"]  # B008: typer.Option in function defaults is idiomatic
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

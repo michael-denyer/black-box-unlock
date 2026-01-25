@@ -55,7 +55,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             padding: 1.25rem;
             border-radius: 6px;
             border: 1px solid var(--secondary);
+            border-left: 3px solid var(--accent);
         }}
+        .stat-card:nth-child(2) {{ border-left-color: #e09850; }}
+        .stat-card:nth-child(3) {{ border-left-color: #6b8cae; }}
         .stat-value {{
             font-size: 1.75rem;
             font-weight: 600;
@@ -149,9 +152,20 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             border-radius: 4px;
             font-weight: 600;
             font-size: 0.85rem;
-            background: linear-gradient(90deg, #e09850, #cb4b3f);
             color: white;
         }}
+        .hotspot-low {{ background: #5a9a68; }}
+        .hotspot-med {{ background: #d4c34a; color: #333; }}
+        .hotspot-high {{ background: #e09850; }}
+        .hotspot-critical {{ background: #cb4b3f; }}
+        .metric {{
+            display: inline-block;
+            padding: 0.15rem 0.4rem;
+            border-radius: 3px;
+            font-size: 0.85rem;
+        }}
+        .metric-high {{ background: rgba(203, 75, 63, 0.15); color: #a33; font-weight: 500; }}
+        .metric-med {{ background: rgba(224, 152, 80, 0.15); color: #965; }}
         .placeholder {{
             padding: 3rem;
             text-align: center;
@@ -275,12 +289,26 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
 FILE_ROW_TEMPLATE = """                <tr>
                     <td>{path}</td>
-                    <td><span class="hotspot">{hotspot_score}</span></td>
-                    <td>{commits}</td>
-                    <td>{lines_changed}</td>
+                    <td><span class="hotspot {hotspot_class}">{hotspot_score:,}</span></td>
+                    <td><span class="metric {commits_class}">{commits}</span></td>
+                    <td><span class="metric {lines_class}">{lines_changed:,}</span></td>
                     <td class="{risk_class}">{author_count}</td>
                     <td class="coupling">{coupling_html}</td>
                 </tr>"""
+
+
+def _get_severity_class(value: int, max_val: int, prefix: str) -> str:
+    """Return CSS class based on value relative to max."""
+    if max_val == 0:
+        return ""
+    ratio = value / max_val
+    if ratio >= 0.75:
+        return f"{prefix}-critical" if prefix == "hotspot" else f"{prefix}-high"
+    if ratio >= 0.5:
+        return f"{prefix}-high" if prefix == "hotspot" else f"{prefix}-med"
+    if ratio >= 0.25:
+        return f"{prefix}-med" if prefix == "hotspot" else ""
+    return f"{prefix}-low" if prefix == "hotspot" else ""
 
 
 def generate_html_report(result: AnalysisResult) -> str:
@@ -292,6 +320,11 @@ def generate_html_report(result: AnalysisResult) -> str:
     Returns:
         Complete HTML document as string.
     """
+    # Calculate max values for severity thresholds
+    max_hotspot = max((f.hotspot_score for f in result.files), default=0)
+    max_commits = max((f.commits for f in result.files), default=0)
+    max_lines = max((f.lines_changed for f in result.files), default=0)
+
     file_rows = []
     for file in result.files:
         coupling_html = ""
@@ -308,8 +341,11 @@ def generate_html_report(result: AnalysisResult) -> str:
             FILE_ROW_TEMPLATE.format(
                 path=file.path,
                 hotspot_score=file.hotspot_score,
+                hotspot_class=_get_severity_class(file.hotspot_score, max_hotspot, "hotspot"),
                 commits=file.commits,
+                commits_class=_get_severity_class(file.commits, max_commits, "metric"),
                 lines_changed=file.lines_changed,
+                lines_class=_get_severity_class(file.lines_changed, max_lines, "metric"),
                 author_count=file.author_count,
                 risk_class=risk_class,
                 coupling_html=coupling_html,

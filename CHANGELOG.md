@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-01-25
+
 ### Added
 - Interactive Plotly treemap visualization for file hotspots (BBU-6335)
 - Tabbed HTML report with Table, Hotspots, and Coupling views

@@ -1,7 +1,7 @@
 """Custom exceptions for black-box-unlock."""
 
 
-class BlackBoxUnlockError(Exception):
+class BlackBoxUnlockError(Exception):  # [4b] Custom exception classes
     """Base exception for all black-box-unlock errors."""
 
 

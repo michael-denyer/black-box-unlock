@@ -29,6 +29,7 @@ def _main_callback(
     configure_logging(verbose=verbose)
 
 
+# [1a] CLI App - Typer application with `bbu` command
 app = typer.Typer(
     name="bbu",
     help="Black Box Unlock - Code forensics tool. Investigate your codebase like a crime scene.",
@@ -44,7 +45,7 @@ class OutputFormat(str, Enum):
 
 
 @app.command()
-def analyze_repo(
+def analyze_repo(  # [1a.1] Main analysis command
     days: int = typer.Option(30, help="Days of git history to analyze"),
     output: OutputFormat = typer.Option(OutputFormat.json, help="Output format: json, html"),
     min_coupling: float = typer.Option(0.3, help="Minimum coupling ratio to include"),
@@ -67,7 +68,7 @@ def analyze_repo(
 
 
 @app.command()
-def version() -> None:
+def version() -> None:  # [1a.2] Version info command
     """Show version information."""
     _version_callback(True)
 

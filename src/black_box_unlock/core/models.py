@@ -22,7 +22,7 @@ def _validate_non_negative_commits(v: int) -> int:
     return v
 
 
-class FileChurn(BaseModel):
+class FileChurn(BaseModel):  # [4a] Churn metrics per file
     """Churn metrics for a single file."""
 
     path: str
@@ -47,7 +47,7 @@ class FileChurn(BaseModel):
         return _validate_non_negative_commits(v)
 
 
-class TemporalCoupling(BaseModel):
+class TemporalCoupling(BaseModel):  # [4a.1] File pair co-change
     """Two files that change together frequently.
 
     Coupling ratio uses Tornhill's formula: co_change_count / min(commits_a, commits_b).
@@ -69,7 +69,7 @@ class TemporalCoupling(BaseModel):
         return self.co_change_count / min_commits
 
 
-class FileOwnership(BaseModel):
+class FileOwnership(BaseModel):  # [4a.2] Authors per file
     """Ownership metrics for a single file.
 
     Files with many authors (>3) are coordination risks that often correlate
@@ -108,7 +108,7 @@ class CouplingInfo(BaseModel):
     ratio: float
 
 
-class FileForensics(BaseModel):
+class FileForensics(BaseModel):  # [4a.3] Combined forensics
     """Combined forensics for a single file."""
 
     path: str
@@ -144,7 +144,7 @@ class AnalysisSummary(BaseModel):
     coupled_pairs: int
 
 
-class AnalysisResult(BaseModel):
+class AnalysisResult(BaseModel):  # [4a.4] Complete analysis output
     """Complete analysis output."""
 
     repo: str

@@ -6,6 +6,7 @@ from black_box_unlock.core.models import AnalysisResult
 from black_box_unlock.visualization.coupling_graph import build_coupling_graph_data
 from black_box_unlock.visualization.treemap import build_treemap_data
 
+# [5a.2] Full HTML page template
 HTML_TEMPLATE = """<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -521,7 +522,7 @@ FILE_ROW_TEMPLATE = """                <tr>
                 </tr>"""
 
 
-def _get_severity_class(value: int, max_val: int, prefix: str) -> str:
+def _get_severity_class(value: int, max_val: int, prefix: str) -> str:  # [5a.1] Severity CSS class mapping
     """Return CSS class based on value relative to max."""
     if max_val == 0:
         return ""
@@ -544,7 +545,7 @@ def _get_severity_class(value: int, max_val: int, prefix: str) -> str:
     return ""
 
 
-def generate_html_report(result: AnalysisResult) -> str:
+def generate_html_report(result: AnalysisResult) -> str:  # [5a] Generate complete HTML report
     """Generate HTML report from analysis result.
 
     Args:

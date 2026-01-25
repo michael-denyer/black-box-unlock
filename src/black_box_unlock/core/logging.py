@@ -5,7 +5,7 @@ import sys
 from loguru import logger
 
 
-def configure_logging(verbose: bool = False) -> None:
+def configure_logging(verbose: bool = False) -> None:  # [4c] Loguru configuration
     """Configure loguru for CLI usage.
 
     Args:

@@ -26,7 +26,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         }}
         * {{ box-sizing: border-box; margin: 0; padding: 0; }}
         body {{
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-family: Inter, -apple-system, BlinkMacSystemFont, Helvetica Neue, Arial, sans-serif;
             background: var(--bg);
             color: var(--text);
             line-height: 1.6;
@@ -229,7 +229,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         // Treemap data
         const treemapData = {treemap_json};
 
-        // Render treemap with muted green-yellow-red colorscale
+        // Render treemap with green-yellow-red colorscale
         Plotly.newPlot('treemap', [{{
             type: 'treemap',
             labels: treemapData.labels,
@@ -238,30 +238,31 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             marker: {{
                 colors: treemapData.colors,
                 colorscale: [
-                    [0, '#63a66c'],
-                    [0.25, '#a4c969'],
-                    [0.5, '#e8d666'],
-                    [0.75, '#e5a549'],
-                    [1, '#c0392b']
+                    [0, '#5a9a68'],
+                    [0.3, '#a8c256'],
+                    [0.5, '#d4c34a'],
+                    [0.7, '#e09850'],
+                    [1, '#cb4b3f']
                 ],
                 showscale: true,
                 colorbar: {{
                     title: 'Hotspot',
-                    tickfont: {{ color: '#333' }},
-                    titlefont: {{ color: '#333' }},
+                    tickfont: {{ color: '#444' }},
+                    titlefont: {{ color: '#444' }},
                     len: 0.6
                 }}
             }},
             customdata: treemapData.customdata,
             hovertemplate: '<b>%{{label}}</b><br>Lines: %{{value}}<br>Hotspot: %{{color:,.0f}}<extra></extra>',
             textinfo: 'label+value',
-            textfont: {{ color: '#333' }},
+            insidetextfont: {{ color: '#fff' }},
+            outsidetextfont: {{ color: '#444' }},
             pathbar: {{ visible: true, edgeshape: '>' }}
         }}], {{
             margin: {{ t: 40, l: 10, r: 10, b: 10 }},
             paper_bgcolor: '#ffffff',
             plot_bgcolor: '#ffffff',
-            font: {{ color: '#333', family: '-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif' }}
+            font: {{ color: '#444', family: 'Inter, Roboto, Helvetica Neue, Arial, sans-serif' }}
         }}, {{
             responsive: true
         }});

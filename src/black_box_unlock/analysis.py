@@ -112,7 +112,8 @@ def run_analysis(
 def export_to_json(result: AnalysisResult) -> str:
     """Export analysis result to JSON string.
 
-    Includes computed properties (hotspot_score, author_count, is_high_risk).
+    Computed properties (hotspot_score, author_count, is_high_risk) are
+    automatically included via Pydantic's @computed_field decorator.
 
     Args:
         result: The analysis result to export.
@@ -120,13 +121,4 @@ def export_to_json(result: AnalysisResult) -> str:
     Returns:
         JSON string representation.
     """
-    # Build dict with computed properties included
-    data = result.model_dump(mode="json")
-
-    # Add computed properties to each file
-    for i, file_forensics in enumerate(result.files):
-        data["files"][i]["hotspot_score"] = file_forensics.hotspot_score
-        data["files"][i]["author_count"] = file_forensics.author_count
-        data["files"][i]["is_high_risk"] = file_forensics.is_high_risk
-
-    return json.dumps(data, indent=2)
+    return json.dumps(result.model_dump(mode="json"), indent=2)

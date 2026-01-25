@@ -8,32 +8,32 @@ Based on Adam Tornhill's "Your Code as a Crime Scene" - using forensic technique
 
 ## Architecture
 
+See [ARCHITECTURE.md](ARCHITECTURE.md) for full details including module organization, data models, and implementation roadmap.
+
 ```mermaid
 flowchart TD
-    subgraph Plugin["Claude Code Plugin"]
-        CMD[Slash Commands]
-        HOOK[Hooks]
-        AGT[Sub-Agents]
+    subgraph Interface["User Interface"]
+        CLI[CLI: bbu]
+        Plugin[Claude Code Plugin]
     end
 
     subgraph Core["Core Analysis"]
-        GIT[Git Forensics]
-        GH[GitHub Forensics]
-        CICD[CI/CD Forensics]
-        IDE[IDE Telemetry]
+        GIT[git/ - Git Forensics]
+        GH[github/ - GitHub Forensics]
+        CICD[cicd/ - CI/CD Forensics]
+        IDE[ide/ - IDE Telemetry]
     end
 
-    subgraph MCP["MCP Clients - Lazy Loaded"]
-        GHMCP[GitHub MCP]
-        GITMCP[Git CLI]
+    subgraph Output["Output"]
+        Console[visualization/console.py]
+        HTML[visualization/html.py]
     end
 
-    CMD --> AGT
-    HOOK --> AGT
-    AGT --> GIT
-    AGT --> GH
-    GH -->|lazy| GHMCP
-    GIT --> GITMCP
+    CLI --> GIT
+    Plugin --> GIT
+    GIT --> Console
+    GH --> Console
+    Console --> HTML
 ```
 
 ## Key Design Decisions
@@ -50,9 +50,12 @@ flowchart TD
 
 | Path | Purpose |
 |------|---------|
+| `ARCHITECTURE.md` | Full architecture, data models, roadmap |
 | `.claude-plugin/` | Claude Code plugin (commands, agents) |
 | `src/black_box_unlock/cli.py` | CLI commands (`bbu`) |
-| `src/black_box_unlock/analysis.py` | Core analysis functions (TBD) |
+| `src/black_box_unlock/core/` | Pydantic models, protocols, exceptions |
+| `src/black_box_unlock/git/` | Git forensics (churn, coupling, ownership) |
+| `tests/` | TDD test suite |
 | `.beads/` | Issue tracking for multi-session work |
 
 ## Forensic Signals

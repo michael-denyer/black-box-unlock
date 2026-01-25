@@ -96,3 +96,53 @@ class FileOwnership(BaseModel):
     @classmethod
     def commits_must_be_non_negative(cls, v: int) -> int:
         return _validate_non_negative_commits(v)
+
+
+class CouplingInfo(BaseModel):
+    """Coupling relationship for display."""
+
+    file: str
+    ratio: float
+
+
+class FileForensics(BaseModel):
+    """Combined forensics for a single file."""
+
+    path: str
+    commits: int
+    lines_changed: int
+    authors: list[str]
+    coupled_with: list[CouplingInfo]
+
+    @property
+    def hotspot_score(self) -> int:
+        """Hotspot score = commits × lines_changed (Tornhill's formula)."""
+        return self.commits * self.lines_changed
+
+    @property
+    def author_count(self) -> int:
+        """Number of unique authors."""
+        return len(self.authors)
+
+    @property
+    def is_high_risk(self) -> bool:
+        """Files with >3 authors are coordination risks."""
+        return self.author_count > 3
+
+
+class AnalysisSummary(BaseModel):
+    """Summary statistics for analysis."""
+
+    total_files: int
+    high_risk_ownership: int
+    coupled_pairs: int
+
+
+class AnalysisResult(BaseModel):
+    """Complete analysis output."""
+
+    repo: str
+    analyzed_days: int
+    generated_at: datetime
+    files: list[FileForensics]
+    summary: AnalysisSummary

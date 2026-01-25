@@ -43,6 +43,9 @@ htmlcov/
 .mypy_cache/
 .pytype/
 
+# Linting
+.ruff_cache/
+
 # Jupyter
 .ipynb_checkpoints/
 

@@ -234,3 +234,69 @@ class TestGenerateHtmlReport:
         assert '"parents"' in html
         assert '"values"' in html
         assert '"hovertext"' in html
+
+    def test_includes_cytoscape_cdn(self):
+        """HTML includes Cytoscape.js CDN script."""
+        result = AnalysisResult(
+            repo="test-repo",
+            analyzed_days=30,
+            generated_at=datetime(2026, 1, 25, 15, 30, 0),
+            files=[],
+            summary=AnalysisSummary(
+                total_files=0,
+                high_risk_ownership=0,
+                coupled_pairs=0,
+            ),
+        )
+
+        html = generate_html_report(result)
+
+        assert "cytoscape" in html.lower()
+
+    def test_includes_coupling_graph_container(self):
+        """HTML includes container for Cytoscape coupling graph."""
+        result = AnalysisResult(
+            repo="test-repo",
+            analyzed_days=30,
+            generated_at=datetime(2026, 1, 25, 15, 30, 0),
+            files=[],
+            summary=AnalysisSummary(
+                total_files=0,
+                high_risk_ownership=0,
+                coupled_pairs=0,
+            ),
+        )
+
+        html = generate_html_report(result)
+
+        assert 'id="coupling-graph"' in html
+
+    def test_embeds_coupling_data_as_json(self):
+        """Coupling graph data is embedded as JSON in the HTML."""
+        result = AnalysisResult(
+            repo="test-repo",
+            analyzed_days=30,
+            generated_at=datetime(2026, 1, 25, 15, 30, 0),
+            files=[
+                FileForensics(
+                    path="src/auth.py",
+                    commits=10,
+                    lines_changed=200,
+                    authors=["alice@example.com"],
+                    coupled_with=[CouplingInfo(file="src/user.py", ratio=0.8)],
+                )
+            ],
+            summary=AnalysisSummary(
+                total_files=1,
+                high_risk_ownership=0,
+                coupled_pairs=1,
+            ),
+        )
+
+        html = generate_html_report(result)
+
+        # Coupling graph data should be embedded as JSON
+        assert '"nodes"' in html
+        assert '"edges"' in html
+        assert '"directories"' in html
+        assert '"maxChurn"' in html

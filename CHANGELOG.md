@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Cytoscape.js network graph for temporal coupling visualization (BBU-ex2p)
+  - Nodes colored by directory to reveal cross-module coupling
+  - Red edges highlight hidden dependencies between modules
+  - Interactive pan/zoom with force-directed layout
 - Loguru logging with `--verbose` flag for debug output
 
 ## [0.2.0] - 2026-01-25

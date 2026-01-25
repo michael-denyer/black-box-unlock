@@ -3,6 +3,7 @@
 import json
 
 from black_box_unlock.core.models import AnalysisResult
+from black_box_unlock.visualization.coupling_graph import build_coupling_graph_data
 from black_box_unlock.visualization.treemap import build_treemap_data
 
 HTML_TEMPLATE = """<!DOCTYPE html>
@@ -12,6 +13,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Code Forensics: {repo}</title>
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.28.1/cytoscape.min.js"></script>
     <style>
         :root {{
             --bg: #f5f5f5;
@@ -105,6 +107,40 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             width: 100%;
             min-height: 600px;
             height: calc(100vh - 350px);
+        }}
+        #coupling-graph {{
+            width: 100%;
+            min-height: 600px;
+            height: calc(100vh - 350px);
+            background: var(--surface);
+            border: 1px solid var(--secondary);
+            border-radius: 6px;
+        }}
+        .coupling-legend {{
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }}
+        .legend-item {{
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.8rem;
+            color: var(--muted);
+        }}
+        .legend-color {{
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+        }}
+        .no-coupling {{
+            padding: 3rem;
+            text-align: center;
+            color: var(--muted);
+            background: var(--surface);
+            border-radius: 6px;
+            border: 1px solid var(--secondary);
         }}
         table {{
             width: 100%;
@@ -281,9 +317,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         </div>
 
         <div id="coupling" class="tab-content">
-            <div class="placeholder">
-                Temporal coupling graph coming soon
-            </div>
+            <div class="coupling-legend" id="coupling-legend"></div>
+            <div id="coupling-graph"></div>
         </div>
     </div>
 
@@ -358,6 +393,88 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 return false;  // Cancel the click
             }}
         }});
+
+        // Coupling graph data
+        const couplingData = {coupling_json};
+
+        // Directory colors for nodes
+        const dirColors = [
+            '#5a9a68', '#6b8cae', '#e09850', '#9b59b6', '#3498db',
+            '#e74c3c', '#1abc9c', '#f39c12', '#8e44ad', '#2ecc71'
+        ];
+        const dirColorMap = {{}};
+        couplingData.directories.forEach((dir, i) => {{
+            dirColorMap[dir] = dirColors[i % dirColors.length];
+        }});
+
+        // Build legend
+        const legendEl = document.getElementById('coupling-legend');
+        couplingData.directories.forEach(dir => {{
+            const item = document.createElement('div');
+            item.className = 'legend-item';
+            const colorSpan = document.createElement('span');
+            colorSpan.className = 'legend-color';
+            colorSpan.style.background = dirColorMap[dir];
+            item.appendChild(colorSpan);
+            item.appendChild(document.createTextNode(dir));
+            legendEl.appendChild(item);
+        }});
+
+        // Render coupling graph if there are edges
+        if (couplingData.edges.length > 0) {{
+            const cy = cytoscape({{
+                container: document.getElementById('coupling-graph'),
+                elements: {{
+                    nodes: couplingData.nodes,
+                    edges: couplingData.edges
+                }},
+                style: [
+                    {{
+                        selector: 'node',
+                        style: {{
+                            'label': 'data(label)',
+                            'width': `mapData(churn, 0, ${{couplingData.maxChurn || 1}}, 30, 80)`,
+                            'height': `mapData(churn, 0, ${{couplingData.maxChurn || 1}}, 30, 80)`,
+                            'background-color': function(ele) {{
+                                return dirColorMap[ele.data('directory')] || '#888';
+                            }},
+                            'color': '#333',
+                            'font-size': '10px',
+                            'text-valign': 'bottom',
+                            'text-margin-y': 5
+                        }}
+                    }},
+                    {{
+                        selector: 'edge',
+                        style: {{
+                            'width': 'mapData(coupling, 0.3, 1.0, 1, 8)',
+                            'opacity': 'mapData(coupling, 0.3, 1.0, 0.3, 1.0)',
+                            'line-color': function(ele) {{
+                                return ele.data('crossModule') ? '#cb4b3f' : '#888';
+                            }},
+                            'curve-style': 'bezier'
+                        }}
+                    }}
+                ],
+                layout: {{
+                    name: 'cose',
+                    animate: false,
+                    nodeDimensionsIncludeLabels: true,
+                    padding: 50
+                }},
+                wheelSensitivity: 0.3
+            }});
+
+            // Resize on tab switch
+            document.querySelector('[data-tab="coupling"]').addEventListener('click', () => {{
+                setTimeout(() => cy.resize().fit(), 50);
+            }});
+        }} else {{
+            const msgDiv = document.createElement('div');
+            msgDiv.className = 'no-coupling';
+            msgDiv.textContent = 'No temporal coupling detected above threshold';
+            document.getElementById('coupling-graph').appendChild(msgDiv);
+        }}
     </script>
 </body>
 </html>
@@ -440,6 +557,9 @@ def generate_html_report(result: AnalysisResult) -> str:
     # Build treemap data
     treemap_data = build_treemap_data(result.files)
 
+    # Build coupling graph data
+    coupling_data = build_coupling_graph_data(result.files)
+
     return HTML_TEMPLATE.format(
         repo=result.repo,
         days=result.analyzed_days,
@@ -449,4 +569,5 @@ def generate_html_report(result: AnalysisResult) -> str:
         coupled_pairs=result.summary.coupled_pairs,
         file_rows="\n".join(file_rows),
         treemap_json=json.dumps(treemap_data),
+        coupling_json=json.dumps(coupling_data),
     )

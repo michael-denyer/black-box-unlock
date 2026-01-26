@@ -2,6 +2,7 @@
 
 import json
 import subprocess
+from collections import Counter
 from datetime import datetime
 
 from .models import BuildFailure, WorkflowRun
@@ -108,3 +109,19 @@ def build_failures_from_runs(runs: list[WorkflowRun]) -> list[BuildFailure]:
             )
         )
     return failures
+
+
+def aggregate_file_failures(failures: list[BuildFailure]) -> dict[str, int]:
+    """Aggregate failure counts per file.
+
+    Args:
+        failures: List of build failures.
+
+    Returns:
+        Dict mapping file path to failure count.
+    """
+    counts: Counter[str] = Counter()
+    for failure in failures:
+        for file in failure.files_changed:
+            counts[file] += 1
+    return dict(counts)

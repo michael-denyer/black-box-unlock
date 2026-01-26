@@ -8,12 +8,13 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from black_box_unlock.cicd.github_actions import (
+    aggregate_file_failures,
     build_failures_from_runs,
     fetch_workflow_runs,
     get_files_changed,
     parse_workflow_runs,
 )
-from black_box_unlock.cicd.models import WorkflowRun
+from black_box_unlock.cicd.models import BuildFailure, WorkflowRun
 
 
 class TestParseWorkflowRuns:
@@ -240,3 +241,36 @@ class TestBuildFailuresFromRuns:
         ]
         with pytest.raises(subprocess.CalledProcessError):
             build_failures_from_runs(runs)
+
+
+class TestAggregateFileFailures:
+    """Tests for aggregating failures per file."""
+
+    def test_counts_failures_per_file(self):
+        """Counts how many failures touched each file."""
+        failures = [
+            BuildFailure(
+                run_id=1,
+                workflow_name="CI",
+                commit_sha="a",
+                files_changed=["src/a.py", "src/b.py"],
+                failed_at=datetime.now(timezone.utc),
+                conclusion="failure",
+            ),
+            BuildFailure(
+                run_id=2,
+                workflow_name="CI",
+                commit_sha="b",
+                files_changed=["src/a.py"],
+                failed_at=datetime.now(timezone.utc),
+                conclusion="failure",
+            ),
+        ]
+        stats = aggregate_file_failures(failures)
+        assert stats["src/a.py"] == 2
+        assert stats["src/b.py"] == 1
+
+    def test_empty_failures_returns_empty_dict(self):
+        """Empty failures list returns empty dict."""
+        stats = aggregate_file_failures([])
+        assert stats == {}

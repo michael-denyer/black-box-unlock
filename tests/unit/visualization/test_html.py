@@ -356,3 +356,21 @@ class TestGenerateHtmlReport:
 
         assert "function focusNode(" in html
         assert "function clearFocus(" in html
+
+    def test_tooltip_element_present(self):
+        """Coupling tab has tooltip element."""
+        result = AnalysisResult(
+            repo="test-repo",
+            analyzed_days=30,
+            generated_at=datetime(2026, 1, 25, 15, 30, 0),
+            files=[],
+            summary=AnalysisSummary(
+                total_files=0,
+                high_risk_ownership=0,
+                coupled_pairs=0,
+            ),
+        )
+
+        html = generate_html_report(result)
+
+        assert 'id="coupling-tooltip"' in html

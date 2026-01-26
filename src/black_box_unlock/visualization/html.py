@@ -167,6 +167,18 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             border-radius: 6px;
             border: 1px solid var(--secondary);
         }}
+        .tooltip {{
+            position: absolute;
+            background: rgba(0, 0, 0, 0.85);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            pointer-events: none;
+            display: none;
+            z-index: 1000;
+            max-width: 300px;
+        }}
         table {{
             width: 100%;
             border-collapse: collapse;
@@ -348,6 +360,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             </div>
             <div class="coupling-legend" id="coupling-legend"></div>
             <div id="coupling-graph"></div>
+            <div id="coupling-tooltip" class="tooltip"></div>
         </div>
     </div>
 
@@ -565,6 +578,36 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             }});
         }}
 
+        const tooltip = document.getElementById('coupling-tooltip');
+
+        function showTooltip(node, event) {{
+            const data = node.data();
+            const edgeCount = cy.edges().filter(e =>
+                e.style('display') !== 'none' &&
+                (e.data('source') === data.id || e.data('target') === data.id)
+            ).length;
+
+            // Build tooltip content safely (no innerHTML)
+            tooltip.textContent = '';
+            const strong = document.createElement('strong');
+            strong.textContent = data.id;
+            tooltip.appendChild(strong);
+            tooltip.appendChild(document.createElement('br'));
+            tooltip.appendChild(document.createTextNode('Directory: ' + data.directory));
+            tooltip.appendChild(document.createElement('br'));
+            tooltip.appendChild(document.createTextNode('Churn: ' + data.churn));
+            tooltip.appendChild(document.createElement('br'));
+            tooltip.appendChild(document.createTextNode('Connections: ' + edgeCount));
+
+            tooltip.style.left = (event.originalEvent.pageX + 10) + 'px';
+            tooltip.style.top = (event.originalEvent.pageY + 10) + 'px';
+            tooltip.style.display = 'block';
+        }}
+
+        function hideTooltip() {{
+            tooltip.style.display = 'none';
+        }}
+
         function initCouplingGraph() {{
             if (cy) return;
 
@@ -654,6 +697,14 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
             // Clear focus button
             document.getElementById('clear-focus').addEventListener('click', clearFocus);
+
+            // Tooltip on hover
+            cy.on('mouseover', 'node', (e) => showTooltip(e.target, e));
+            cy.on('mouseout', 'node', hideTooltip);
+            cy.on('mousemove', 'node', (e) => {{
+                tooltip.style.left = (e.originalEvent.pageX + 10) + 'px';
+                tooltip.style.top = (e.originalEvent.pageY + 10) + 'px';
+            }});
         }}
 
         // Initialize when coupling tab is clicked

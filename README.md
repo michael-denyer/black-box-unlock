@@ -7,7 +7,7 @@
 
 # Black Box Unlock
 
-*Mischief. Mayhem. Merge conflicts. Exposed.*
+<h4><i>Mischief. Mayhem. Merge conflicts. Exposed.</i></h4>
 
 </td>
 </tr>

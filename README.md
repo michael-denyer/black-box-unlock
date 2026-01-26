@@ -1,4 +1,4 @@
-<table>
+<table width="100%">
 <tr>
 <td width="190">
 <img src="assets/logo.png" alt="Black Box Unlock" width="190">

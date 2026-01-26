@@ -7,60 +7,29 @@ on:
     branches: [main]
 
 jobs:
-  lint:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v4
-        with:
-          enable-cache: true
-
-      - name: Set up Python
-        run: uv python install 3.11
-
-      - name: Install dependencies
-        run: uv sync --extra dev
-
-      - name: Check formatting
-        run: uv run ruff format --check .
-
-      - name: Check linting
-        run: uv run ruff check .
-
   test:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0  # Full history needed for gmap git analysis
 
       - name: Install uv
         uses: astral-sh/setup-uv@v4
-        with:
-          enable-cache: true
 
-      - name: Set up Python
-        run: uv python install 3.11
+      - name: Set up Python ${{ matrix.python-version }}
+        run: uv python install ${{ matrix.python-version }}
 
       - name: Install dependencies
-        run: uv sync --extra dev
+        run: uv sync --all-extras --dev
 
-      - name: Cache cargo binaries
-        uses: actions/cache@v4
-        with:
-          path: ~/.cargo/bin/
-          key: cargo-bin-gmap-${{ runner.os }}-v1
+      - name: Run linting
+        run: uv run ruff check .
 
-      - name: Install gmap
-        run: |
-          command -v gmap && exit 0
-          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-          . "$HOME/.cargo/env"
-          cargo install gmap
+      - name: Run formatting check
+        run: uv run ruff format --check .
 
       - name: Run tests
-        run: |
-          export PATH="$HOME/.cargo/bin:$PATH"
-          uv run pytest -v
+        run: uv run pytest -v

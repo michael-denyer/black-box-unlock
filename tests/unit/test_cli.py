@@ -77,3 +77,35 @@ class TestAnalyzeRepoCommand:
         call_args = mock_analysis.call_args
         # First positional arg is repo_path
         assert call_args[0][0] == Path(".")
+
+    def test_no_ci_flag_skips_ci_analysis(self):
+        """--no-ci flag passes include_ci=False to run_analysis."""
+        mock_result = MagicMock()
+        mock_result.files = []
+
+        with patch("black_box_unlock.cli.run_analysis") as mock_run_analysis:
+            mock_run_analysis.return_value = mock_result
+            with patch("black_box_unlock.cli.export_to_json") as mock_export:
+                mock_export.return_value = "{}"
+                result = runner.invoke(app, ["analyze-repo", "--no-ci"])
+
+        assert result.exit_code == 0
+        mock_run_analysis.assert_called_once()
+        call_kwargs = mock_run_analysis.call_args[1]
+        assert call_kwargs.get("include_ci") is False
+
+    def test_ci_included_by_default(self):
+        """Without --no-ci, include_ci defaults to True."""
+        mock_result = MagicMock()
+        mock_result.files = []
+
+        with patch("black_box_unlock.cli.run_analysis") as mock_run_analysis:
+            mock_run_analysis.return_value = mock_result
+            with patch("black_box_unlock.cli.export_to_json") as mock_export:
+                mock_export.return_value = "{}"
+                result = runner.invoke(app, ["analyze-repo"])
+
+        assert result.exit_code == 0
+        mock_run_analysis.assert_called_once()
+        call_kwargs = mock_run_analysis.call_args[1]
+        assert call_kwargs.get("include_ci") is True

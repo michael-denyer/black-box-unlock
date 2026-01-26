@@ -19,9 +19,7 @@ flowchart TD
 
     subgraph Core["Core Analysis"]
         GIT[git/ - Git Forensics]
-        GH[github/ - GitHub Forensics]
         CICD[cicd/ - CI/CD Forensics]
-        IDE[ide/ - IDE Telemetry]
     end
 
     subgraph Output["Output"]
@@ -32,7 +30,7 @@ flowchart TD
     CLI --> GIT
     Plugin --> GIT
     GIT --> Console
-    GH --> Console
+    CICD --> Console
     Console --> HTML
 ```
 
@@ -57,6 +55,7 @@ flowchart TD
 | `src/black_box_unlock/core/` | Pydantic models, protocols, exceptions |
 | `src/black_box_unlock/git/` | Git forensics (churn, coupling, ownership) |
 | `src/black_box_unlock/cicd/` | CI/CD forensics (build failures via gh CLI) |
+| `src/black_box_unlock/visualization/` | Output formatters (console, HTML) |
 | `tests/` | TDD test suite |
 | `.beads/` | Issue tracking for multi-session work |
 
@@ -84,7 +83,8 @@ flowchart TD
 ```bash
 bbu analyze-repo --days=30    # Analyze git history
 bbu analyze-repo --no-ci      # Skip CI failure analysis
-bbu analyze-repo --hotspots   # Show file hotspots
+bbu analyze-repo --output=html  # Generate HTML report
+bbu analyze-repo --min-coupling=0.5  # Set coupling threshold
 bbu version                   # Show version
 ```
 

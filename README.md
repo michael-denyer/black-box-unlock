@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/logo.png" alt="Black Box Unlock" width="200">
+</p>
+
 # Black Box Unlock
 
 > Mischief. Mayhem. Merge conflicts. Exposed.

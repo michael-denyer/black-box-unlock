@@ -8,7 +8,9 @@ from ..core.models import FileOwnership
 GmapData = dict
 
 
-def parse_ownership_from_gmap(gmap_data: GmapData) -> list[FileOwnership]:  # [3c] Parse authors per file
+def parse_ownership_from_gmap(
+    gmap_data: GmapData,
+) -> list[FileOwnership]:  # [3c] Parse authors per file
     """Parse gmap JSON output into FileOwnership models.
 
     Aggregates unique authors and commit counts per file across all entries.

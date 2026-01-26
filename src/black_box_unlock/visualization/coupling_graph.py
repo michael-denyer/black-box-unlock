@@ -48,7 +48,7 @@ def build_coupling_graph_data(files: list[FileForensics]) -> dict:  # [5c] Cytos
         Keys use camelCase (maxChurn, crossModule) for JavaScript consumption.
     """
     if not files:
-        return {"nodes": [], "edges": [], "directories": [], "maxChurn": 0}
+        return {"nodes": [], "edges": [], "directories": [], "maxChurn": 0, "totalEdges": 0}
 
     nodes: dict[str, dict] = {}
     edges: list[dict] = []
@@ -90,9 +90,12 @@ def build_coupling_graph_data(files: list[FileForensics]) -> dict:  # [5c] Cytos
 
     max_churn = max((n["data"]["churn"] for n in nodes.values()), default=0)
 
+    edges.sort(key=lambda e: e["data"]["coupling"], reverse=True)
+
     return {
         "nodes": list(nodes.values()),
         "edges": edges,
         "directories": sorted(directories),
         "maxChurn": max_churn,
+        "totalEdges": len(edges),
     }

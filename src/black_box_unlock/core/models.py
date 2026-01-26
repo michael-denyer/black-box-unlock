@@ -15,10 +15,10 @@ def _validate_non_empty_path(v: str) -> str:
     return v
 
 
-def _validate_non_negative_commits(v: int) -> int:
-    """Validate that commits is non-negative."""
+def _validate_non_negative_int(v: int, field_name: str) -> int:
+    """Validate that an integer field is non-negative."""
     if v < 0:
-        raise ValueError("commits must be non-negative")
+        raise ValueError(f"{field_name} must be non-negative")
     return v
 
 
@@ -44,7 +44,7 @@ class FileChurn(BaseModel):  # [4a] Churn metrics per file
     @field_validator("commits")
     @classmethod
     def commits_must_be_non_negative(cls, v: int) -> int:
-        return _validate_non_negative_commits(v)
+        return _validate_non_negative_int(v, "commits")
 
 
 class TemporalCoupling(BaseModel):  # [4a.1] File pair co-change
@@ -98,7 +98,7 @@ class FileOwnership(BaseModel):  # [4a.2] Authors per file
     @field_validator("commits")
     @classmethod
     def commits_must_be_non_negative(cls, v: int) -> int:
-        return _validate_non_negative_commits(v)
+        return _validate_non_negative_int(v, "commits")
 
 
 class CouplingInfo(BaseModel):
@@ -116,7 +116,12 @@ class FileForensics(BaseModel):  # [4a.3] Combined forensics
     lines_changed: int
     authors: list[str]
     coupled_with: list[CouplingInfo]
-    build_failures: int = 0  # CI failure count
+    build_failures: int = 0
+
+    @field_validator("build_failures")
+    @classmethod
+    def build_failures_must_be_non_negative(cls, v: int) -> int:
+        return _validate_non_negative_int(v, "build_failures")
 
     @computed_field
     @property

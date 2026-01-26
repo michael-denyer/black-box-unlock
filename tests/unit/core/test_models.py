@@ -89,3 +89,15 @@ class TestFileForensicsBuildFailures:
             build_failures=3,
         )
         assert forensics.build_failures == 3
+
+    def test_rejects_negative_build_failures(self):
+        """build_failures rejects negative values."""
+        with pytest.raises(ValueError):
+            FileForensics(
+                path="src/main.py",
+                commits=5,
+                lines_changed=100,
+                authors=["alice"],
+                coupled_with=[],
+                build_failures=-1,
+            )

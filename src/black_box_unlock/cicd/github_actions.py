@@ -54,3 +54,24 @@ def fetch_workflow_runs(limit: int = 100) -> list[WorkflowRun]:
     result = subprocess.run(cmd, capture_output=True, text=True, check=True)
     gh_json = json.loads(result.stdout)
     return parse_workflow_runs(gh_json)
+
+
+def get_files_changed(commit_sha: str) -> list[str]:
+    """Get list of files changed in a commit.
+
+    Args:
+        commit_sha: Git commit SHA.
+
+    Returns:
+        List of file paths changed in the commit.
+    """
+    cmd = [
+        "git",
+        "show",
+        "--name-only",
+        "--format=",  # Suppress commit info, only show files
+        commit_sha,
+    ]
+    result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+    files = [f.strip() for f in result.stdout.strip().split("\n") if f.strip()]
+    return files

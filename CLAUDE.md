@@ -56,6 +56,7 @@ flowchart TD
 | `src/black_box_unlock/cli.py` | CLI commands (`bbu`) |
 | `src/black_box_unlock/core/` | Pydantic models, protocols, exceptions |
 | `src/black_box_unlock/git/` | Git forensics (churn, coupling, ownership) |
+| `src/black_box_unlock/cicd/` | CI/CD forensics (build failures via gh CLI) |
 | `tests/` | TDD test suite |
 | `.beads/` | Issue tracking for multi-session work |
 
@@ -111,11 +112,11 @@ bbu version                   # Show version
 - Invoke `/codemap` skill when architecture changes significantly
 - `bd close <id>` - mark issue complete
 - `bd sync` - push to remote
-- Update readme.md if new features
+- Update README.md if new features
 
 ## Gotchas
 
-- **Lazy-load MCPs**: Never initialize MCP clients at module import
+- **Pytest markers for external CLIs**: Use `@pytest.mark.requires_<tool>` (e.g., `requires_gmap`, `requires_gh`) for tests needing external CLI tools - skipped automatically via `conftest.py` when tool unavailable
 - **Git commands**: Always handle missing git repos gracefully
 - **File paths**: Normalize paths for cross-platform compatibility
 - **Rich console.print() strips brackets**: Use `print()` for HTML output - Rich interprets `[text]` as markup tags

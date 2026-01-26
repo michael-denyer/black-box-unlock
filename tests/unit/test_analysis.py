@@ -344,3 +344,84 @@ class TestExportToJson:
         assert parsed["files"][0]["hotspot_score"] == 2000  # 10 * 200
         assert parsed["files"][0]["author_count"] == 4
         assert parsed["files"][0]["is_high_risk"] is True
+
+
+class TestRunAnalysisWithCIData:
+    """Tests for CI data integration in analysis."""
+
+    @patch("black_box_unlock.analysis._fetch_ci_failures")
+    @patch("black_box_unlock.analysis._fetch_gmap_data")
+    def test_includes_build_failures_in_file_forensics(self, mock_gmap, mock_ci):
+        """File forensics includes build_failures from CI data."""
+        mock_gmap.return_value = {
+            "entries": [
+                {
+                    "timestamp": "2026-01-26T10:00:00Z",
+                    "author_email": "test@example.com",
+                    "files": [{"path": "src/main.py", "added_lines": 10, "deleted_lines": 5}],
+                }
+            ]
+        }
+        mock_ci.return_value = {"src/main.py": 2}
+
+        result = run_analysis(Path("/fake/repo"), days=30, include_ci=True)
+
+        main_file = next(f for f in result.files if f.path == "src/main.py")
+        assert main_file.build_failures == 2
+
+    @patch("black_box_unlock.analysis._fetch_ci_failures")
+    @patch("black_box_unlock.analysis._fetch_gmap_data")
+    def test_defaults_build_failures_to_zero_when_file_not_in_ci_data(self, mock_gmap, mock_ci):
+        """Files not in CI data get build_failures=0."""
+        mock_gmap.return_value = {
+            "entries": [
+                {
+                    "timestamp": "2026-01-26T10:00:00Z",
+                    "author_email": "test@example.com",
+                    "files": [{"path": "src/main.py", "added_lines": 10, "deleted_lines": 5}],
+                }
+            ]
+        }
+        mock_ci.return_value = {"src/other.py": 3}  # Different file
+
+        result = run_analysis(Path("/fake/repo"), days=30, include_ci=True)
+
+        main_file = next(f for f in result.files if f.path == "src/main.py")
+        assert main_file.build_failures == 0
+
+    @patch("black_box_unlock.analysis._fetch_ci_failures")
+    @patch("black_box_unlock.analysis._fetch_gmap_data")
+    def test_skips_ci_fetch_when_include_ci_is_false(self, mock_gmap, mock_ci):
+        """Does not call _fetch_ci_failures when include_ci=False."""
+        mock_gmap.return_value = {
+            "entries": [
+                {
+                    "timestamp": "2026-01-26T10:00:00Z",
+                    "author_email": "test@example.com",
+                    "files": [{"path": "src/main.py", "added_lines": 10, "deleted_lines": 5}],
+                }
+            ]
+        }
+
+        run_analysis(Path("/fake/repo"), days=30, include_ci=False)
+
+        mock_ci.assert_not_called()
+
+    @patch("black_box_unlock.analysis._fetch_ci_failures")
+    @patch("black_box_unlock.analysis._fetch_gmap_data")
+    def test_include_ci_defaults_to_true(self, mock_gmap, mock_ci):
+        """include_ci parameter defaults to True."""
+        mock_gmap.return_value = {
+            "entries": [
+                {
+                    "timestamp": "2026-01-26T10:00:00Z",
+                    "author_email": "test@example.com",
+                    "files": [{"path": "src/main.py", "added_lines": 10, "deleted_lines": 5}],
+                }
+            ]
+        }
+        mock_ci.return_value = {}
+
+        run_analysis(Path("/fake/repo"), days=30)
+
+        mock_ci.assert_called_once()

@@ -300,3 +300,22 @@ class TestGenerateHtmlReport:
         assert '"edges"' in html
         assert '"directories"' in html
         assert '"maxChurn"' in html
+
+    def test_coupling_slider_present(self):
+        """Coupling tab has slider control for top N edges."""
+        result = AnalysisResult(
+            repo="test-repo",
+            analyzed_days=30,
+            generated_at=datetime(2026, 1, 25, 15, 30, 0),
+            files=[],
+            summary=AnalysisSummary(
+                total_files=0,
+                high_risk_ownership=0,
+                coupled_pairs=0,
+            ),
+        )
+
+        html = generate_html_report(result)
+
+        assert 'id="edge-slider"' in html
+        assert 'id="edge-count"' in html

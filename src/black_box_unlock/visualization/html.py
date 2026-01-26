@@ -117,6 +117,30 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             border: 1px solid var(--secondary);
             border-radius: 6px;
         }}
+        .coupling-controls {{
+            padding: 10px 20px;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            background: var(--surface);
+            border-bottom: 1px solid var(--secondary);
+        }}
+        .coupling-controls label {{
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+        }}
+        .coupling-controls input[type="range"] {{
+            width: 150px;
+        }}
+        #clear-focus {{
+            padding: 4px 12px;
+            border: 1px solid var(--secondary);
+            border-radius: 4px;
+            background: var(--bg);
+            cursor: pointer;
+        }}
         .coupling-legend {{
             display: flex;
             gap: 1rem;
@@ -318,6 +342,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         </div>
 
         <div id="coupling" class="tab-content">
+            <div class="coupling-controls">
+                <label>Show top <input type="range" id="edge-slider" min="10" max="100" value="10"> <span id="edge-count">10</span> edges</label>
+                <button id="clear-focus" style="display: none;">Clear focus</button>
+            </div>
             <div class="coupling-legend" id="coupling-legend"></div>
             <div id="coupling-graph"></div>
         </div>
@@ -522,7 +550,9 @@ FILE_ROW_TEMPLATE = """                <tr>
                 </tr>"""
 
 
-def _get_severity_class(value: int, max_val: int, prefix: str) -> str:  # [5a.1] Severity CSS class mapping
+def _get_severity_class(
+    value: int, max_val: int, prefix: str
+) -> str:  # [5a.1] Severity CSS class mapping
     """Return CSS class based on value relative to max."""
     if max_val == 0:
         return ""

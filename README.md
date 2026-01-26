@@ -1,6 +1,6 @@
 # Black Box Unlock
 
-> Investigate your codebase like a crime scene
+> Mischief. Mayhem. Merge conflicts. Exposed.
 
 Code forensics tool based on Adam Tornhill's ["Your Code as a Crime Scene"](https://pragprog.com/titles/atcrime2/your-code-as-a-crime-scene-second-edition/). Key insight: **2-8% of files cause 60-90% of defects**.
 

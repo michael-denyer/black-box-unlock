@@ -1,17 +1,12 @@
-<table width="100%">
-<tr>
-<td width="190">
-<img src="assets/logo.png" alt="Black Box Unlock" width="190">
-</td>
-<td>
+<div>
+<img src="assets/logo.png" alt="Black Box Unlock" width="200" align="left">
 
-<h1 style="font-size: 5em;">Black Box Unlock</h1>
+# Black Box Unlock
 
-<h4><i>Mischief. Mayhem. Merge conflicts. Exposed.</i></h4>
+### *Mischief. Mayhem. Merge conflicts. Exposed.*
 
-</td>
-</tr>
-</table>
+<br clear="left"/>
+</div>
 
 Code forensics tool based on Adam Tornhill's ["Your Code as a Crime Scene"](https://pragprog.com/titles/atcrime2/your-code-as-a-crime-scene-second-edition/). Key insight: **2-8% of files cause 60-90% of defects**.
 

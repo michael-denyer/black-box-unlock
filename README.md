@@ -1,11 +1,11 @@
 <table>
 <tr>
-<td width="150">
-<img src="assets/logo.png" alt="Black Box Unlock" width="150">
+<td width="190">
+<img src="assets/logo.png" alt="Black Box Unlock" width="190">
 </td>
 <td>
 
-# Black Box Unlock
+<h1><strong>Black Box Unlock</strong></h1>
 
 <h4><i>Mischief. Mayhem. Merge conflicts. Exposed.</i></h4>
 

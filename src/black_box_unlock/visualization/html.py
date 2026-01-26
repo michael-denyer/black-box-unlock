@@ -503,6 +503,66 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             }});
 
             cy.layout({{ name: 'cose', animate: false, nodeDimensionsIncludeLabels: true, padding: 50 }}).run();
+
+            // Re-apply focus if a node was focused
+            if (focusedNode && !visibleNodes.has(focusedNode)) {{
+                focusedNode = null;
+                document.getElementById('clear-focus').style.display = 'none';
+            }} else if (focusedNode) {{
+                focusNode(focusedNode);
+            }}
+        }}
+
+        let focusedNode = null;
+
+        function focusNode(nodeId) {{
+            if (!cy) return;
+            focusedNode = nodeId;
+            document.getElementById('clear-focus').style.display = 'inline';
+
+            const connectedNodes = new Set([nodeId]);
+            cy.edges().forEach(edge => {{
+                if (edge.style('display') === 'none') return;
+                if (edge.data('source') === nodeId || edge.data('target') === nodeId) {{
+                    connectedNodes.add(edge.data('source'));
+                    connectedNodes.add(edge.data('target'));
+                }}
+            }});
+
+            cy.batch(() => {{
+                cy.nodes().forEach(node => {{
+                    if (node.style('display') === 'none') return;
+                    node.style('opacity', connectedNodes.has(node.id()) ? 1 : 0.2);
+                    if (node.id() === nodeId) {{
+                        node.style('border-width', 3);
+                        node.style('border-color', '#333');
+                    }}
+                }});
+                cy.edges().forEach(edge => {{
+                    if (edge.style('display') === 'none') return;
+                    const connected = edge.data('source') === nodeId || edge.data('target') === nodeId;
+                    edge.style('opacity', connected ? 1 : 0.1);
+                }});
+            }});
+        }}
+
+        function clearFocus() {{
+            if (!cy) return;
+            focusedNode = null;
+            document.getElementById('clear-focus').style.display = 'none';
+
+            cy.batch(() => {{
+                cy.nodes().forEach(node => {{
+                    if (node.style('display') === 'none') return;
+                    node.style('opacity', 1);
+                    node.style('border-width', 0);
+                }});
+                cy.edges().forEach(edge => {{
+                    if (edge.style('display') === 'none') return;
+                    const c = edge.data('coupling');
+                    edge.style('opacity', 0.3 + (c - 0.3) / 0.7 * 0.7);
+                }});
+            }});
         }}
 
         function initCouplingGraph() {{
@@ -581,6 +641,19 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
             // Run layout only when slider is released
             slider.addEventListener('change', (e) => filterTopN(parseInt(e.target.value)));
+
+            // Node click for focus
+            cy.on('tap', 'node', (e) => {{
+                focusNode(e.target.id());
+            }});
+
+            // Background click to clear focus
+            cy.on('tap', (e) => {{
+                if (e.target === cy) clearFocus();
+            }});
+
+            // Clear focus button
+            document.getElementById('clear-focus').addEventListener('click', clearFocus);
         }}
 
         // Initialize when coupling tab is clicked

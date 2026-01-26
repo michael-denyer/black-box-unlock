@@ -337,3 +337,22 @@ class TestGenerateHtmlReport:
         html = generate_html_report(result)
 
         assert "function filterTopN(" in html
+
+    def test_focus_functions_present(self):
+        """JavaScript includes focusNode and clearFocus functions."""
+        result = AnalysisResult(
+            repo="test-repo",
+            analyzed_days=30,
+            generated_at=datetime(2026, 1, 25, 15, 30, 0),
+            files=[],
+            summary=AnalysisSummary(
+                total_files=0,
+                high_risk_ownership=0,
+                coupled_pairs=0,
+            ),
+        )
+
+        html = generate_html_report(result)
+
+        assert "function focusNode(" in html
+        assert "function clearFocus(" in html

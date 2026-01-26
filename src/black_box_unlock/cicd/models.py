@@ -29,3 +29,40 @@ class BuildFailure(BaseModel):
     files_changed: list[str]
     failed_at: datetime
     conclusion: str
+
+
+class StepResult(BaseModel):
+    """A single step execution within a job."""
+
+    job_name: str
+    step_name: str
+    conclusion: str  # "success", "failure", "skipped"
+    run_id: int
+    attempt: int
+    commit_sha: str
+    executed_at: datetime
+
+
+class FlakyStep(BaseModel):
+    """Aggregated flakiness data for a job/step combination."""
+
+    job_name: str
+    step_name: str
+    first_seen: datetime
+    last_seen: datetime
+    total_runs: int
+    failures: int
+    flaky_count: int  # Times it failed then passed on retry
+
+    @property
+    def flaky_rate(self) -> float:
+        """Calculate flakiness rate as flaky_count / total_runs."""
+        return self.flaky_count / self.total_runs if self.total_runs else 0.0
+
+    @property
+    def is_active(self) -> bool:
+        """Check if step ran in last 7 days."""
+        from datetime import timezone
+
+        now = datetime.now(timezone.utc)
+        return (now - self.last_seen).days <= 7

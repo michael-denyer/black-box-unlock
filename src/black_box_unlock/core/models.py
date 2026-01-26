@@ -150,6 +150,33 @@ class AnalysisSummary(BaseModel):
     coupled_pairs: int
 
 
+class FlakyStepSummary(BaseModel):
+    """Flaky step summary for inclusion in AnalysisResult."""
+
+    job_name: str
+    step_name: str
+    first_seen: datetime
+    last_seen: datetime
+    total_runs: int
+    failures: int
+    flaky_count: int
+
+    @computed_field
+    @property
+    def flaky_rate(self) -> float:
+        """Calculate flakiness rate as flaky_count / total_runs."""
+        return self.flaky_count / self.total_runs if self.total_runs else 0.0
+
+    @computed_field
+    @property
+    def is_active(self) -> bool:
+        """Check if step ran in last 7 days."""
+        from datetime import timezone
+
+        now = datetime.now(timezone.utc)
+        return (now - self.last_seen).days <= 7
+
+
 class AnalysisResult(BaseModel):  # [4a.4] Complete analysis output
     """Complete analysis output."""
 
@@ -158,3 +185,4 @@ class AnalysisResult(BaseModel):  # [4a.4] Complete analysis output
     generated_at: datetime
     files: list[FileForensics]
     summary: AnalysisSummary
+    flaky_steps: list[FlakyStepSummary] = []

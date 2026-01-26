@@ -49,6 +49,7 @@ def analyze_repo(  # [1a.1] Main analysis command
     days: int = typer.Option(30, help="Days of git history to analyze"),
     output: OutputFormat = typer.Option(OutputFormat.json, help="Output format: json, html"),
     min_coupling: float = typer.Option(0.3, help="Minimum coupling ratio to include"),
+    no_ci: bool = typer.Option(False, "--no-ci", help="Skip CI failure analysis"),
 ) -> None:
     """Analyze repository git history for code forensics.
 
@@ -56,7 +57,7 @@ def analyze_repo(  # [1a.1] Main analysis command
     from git history. Based on 'Your Code as a Crime Scene' methodology.
     """
     repo_path = Path(".")
-    result = run_analysis(repo_path, days=days, min_coupling=min_coupling)
+    result = run_analysis(repo_path, days=days, min_coupling=min_coupling, include_ci=not no_ci)
 
     match output:
         case OutputFormat.json:

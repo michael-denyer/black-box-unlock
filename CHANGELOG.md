@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- CI/CD build failure tracking via GitHub Actions (BBU-b7oh)
+  - Fetches workflow runs via `gh` CLI
+  - Attributes failures to files changed in failing commits
+  - Displays "Build Failures" column in HTML report
+  - `--no-ci` flag to skip CI analysis when GitHub access unavailable
+  - Graceful degradation when CI data unavailable
 - Cytoscape.js network graph for temporal coupling visualization (BBU-ex2p)
   - Nodes colored by directory to reveal cross-module coupling
   - Red edges highlight hidden dependencies between modules

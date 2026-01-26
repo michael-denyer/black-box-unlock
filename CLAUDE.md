@@ -83,6 +83,7 @@ flowchart TD
 
 ```bash
 bbu analyze-repo --days=30    # Analyze git history
+bbu analyze-repo --no-ci      # Skip CI failure analysis
 bbu analyze-repo --hotspots   # Show file hotspots
 bbu version                   # Show version
 ```
@@ -117,7 +118,8 @@ bbu version                   # Show version
 ## Gotchas
 
 - **Pytest markers for external CLIs**: Use `@pytest.mark.requires_<tool>` (e.g., `requires_gmap`, `requires_gh`) for tests needing external CLI tools - skipped automatically via `conftest.py` when tool unavailable
-- **Git commands**: Always handle missing git repos gracefully
+- **CI data is optional**: `_fetch_ci_failures()` catches all exceptions and returns `{}` - analysis continues without CI data
+- **Git commands**: Always handle missing git repos gracefully; avoid `git show --no-stat` (invalid flag)
 - **File paths**: Normalize paths for cross-platform compatibility
 - **Rich console.print() strips brackets**: Use `print()` for HTML output - Rich interprets `[text]` as markup tags
 - **Plotly/Cytoscape hidden containers**: Can't render to `display: none` - defer init until tab visible

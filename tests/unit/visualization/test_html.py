@@ -300,3 +300,77 @@ class TestGenerateHtmlReport:
         assert '"edges"' in html
         assert '"directories"' in html
         assert '"maxChurn"' in html
+
+    def test_coupling_slider_present(self):
+        """Coupling tab has slider control for top N edges."""
+        result = AnalysisResult(
+            repo="test-repo",
+            analyzed_days=30,
+            generated_at=datetime(2026, 1, 25, 15, 30, 0),
+            files=[],
+            summary=AnalysisSummary(
+                total_files=0,
+                high_risk_ownership=0,
+                coupled_pairs=0,
+            ),
+        )
+
+        html = generate_html_report(result)
+
+        assert 'id="edge-slider"' in html
+        assert 'id="edge-count"' in html
+
+    def test_filter_top_n_function_present(self):
+        """JavaScript includes filterTopN function."""
+        result = AnalysisResult(
+            repo="test-repo",
+            analyzed_days=30,
+            generated_at=datetime(2026, 1, 25, 15, 30, 0),
+            files=[],
+            summary=AnalysisSummary(
+                total_files=0,
+                high_risk_ownership=0,
+                coupled_pairs=0,
+            ),
+        )
+
+        html = generate_html_report(result)
+
+        assert "function filterTopN(" in html
+
+    def test_focus_functions_present(self):
+        """JavaScript includes focusNode and clearFocus functions."""
+        result = AnalysisResult(
+            repo="test-repo",
+            analyzed_days=30,
+            generated_at=datetime(2026, 1, 25, 15, 30, 0),
+            files=[],
+            summary=AnalysisSummary(
+                total_files=0,
+                high_risk_ownership=0,
+                coupled_pairs=0,
+            ),
+        )
+
+        html = generate_html_report(result)
+
+        assert "function focusNode(" in html
+        assert "function clearFocus(" in html
+
+    def test_tooltip_element_present(self):
+        """Coupling tab has tooltip element."""
+        result = AnalysisResult(
+            repo="test-repo",
+            analyzed_days=30,
+            generated_at=datetime(2026, 1, 25, 15, 30, 0),
+            files=[],
+            summary=AnalysisSummary(
+                total_files=0,
+                high_risk_ownership=0,
+                coupled_pairs=0,
+            ),
+        )
+
+        html = generate_html_report(result)
+
+        assert 'id="coupling-tooltip"' in html

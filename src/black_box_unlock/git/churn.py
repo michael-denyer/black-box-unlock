@@ -49,7 +49,9 @@ def parse_gmap_output(data: dict[str, Any]) -> list[FileChurn]:  # [3a] Parse gm
     ]
 
 
-def extract_file_churn(repo_path: Path, since_days: int = 30) -> list[FileChurn]:  # [3a.1] Extract churn from git
+def extract_file_churn(
+    repo_path: Path, since_days: int = 30
+) -> list[FileChurn]:  # [3a.1] Extract churn from git
     """Extract file churn metrics from git history.
 
     Uses gmap for performance if available.

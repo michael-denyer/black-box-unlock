@@ -107,7 +107,27 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         #treemap {{
             width: 100%;
             min-height: 600px;
-            height: calc(100vh - 350px);
+            height: calc(100vh - 380px);
+        }}
+        .treemap-controls {{
+            padding: 10px 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: var(--surface);
+            border-bottom: 1px solid var(--secondary);
+            min-height: 30px;
+        }}
+        .treemap-controls button {{
+            padding: 4px 12px;
+            border: 1px solid var(--secondary);
+            border-radius: 4px;
+            background: var(--bg);
+            cursor: pointer;
+        }}
+        #treemap-path {{
+            color: var(--text-secondary);
+            font-size: 14px;
         }}
         #coupling-graph {{
             width: 100%;
@@ -116,6 +136,30 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             background: var(--surface);
             border: 1px solid var(--secondary);
             border-radius: 6px;
+        }}
+        .coupling-controls {{
+            padding: 10px 20px;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            background: var(--surface);
+            border-bottom: 1px solid var(--secondary);
+        }}
+        .coupling-controls label {{
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+        }}
+        .coupling-controls input[type="range"] {{
+            width: 150px;
+        }}
+        #clear-focus {{
+            padding: 4px 12px;
+            border: 1px solid var(--secondary);
+            border-radius: 4px;
+            background: var(--bg);
+            cursor: pointer;
         }}
         .coupling-legend {{
             display: flex;
@@ -142,6 +186,18 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             background: var(--surface);
             border-radius: 6px;
             border: 1px solid var(--secondary);
+        }}
+        .tooltip {{
+            position: absolute;
+            background: rgba(0, 0, 0, 0.85);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            pointer-events: none;
+            display: none;
+            z-index: 1000;
+            max-width: 300px;
         }}
         table {{
             width: 100%;
@@ -314,12 +370,21 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         </div>
 
         <div id="hotspots" class="tab-content">
+            <div class="treemap-controls">
+                <button id="treemap-back" style="display: none;">← Back</button>
+                <span id="treemap-path"></span>
+            </div>
             <div id="treemap"></div>
         </div>
 
         <div id="coupling" class="tab-content">
+            <div class="coupling-controls">
+                <label>Show top <input type="range" id="edge-slider" min="10" max="100" value="10"> <span id="edge-count">10</span> edges</label>
+                <button id="clear-focus" style="display: none;">Clear focus</button>
+            </div>
             <div class="coupling-legend" id="coupling-legend"></div>
             <div id="coupling-graph"></div>
+            <div id="coupling-tooltip" class="tooltip"></div>
         </div>
     </div>
 
@@ -336,6 +401,26 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
         // Treemap data
         const treemapData = {treemap_json};
+
+        // Treemap navigation state
+        let treemapHistory = [];
+        const backBtn = document.getElementById('treemap-back');
+        const pathSpan = document.getElementById('treemap-path');
+
+        function updateTreemapNav() {{
+            backBtn.style.display = treemapHistory.length > 0 ? 'inline' : 'none';
+            pathSpan.textContent = treemapHistory.length > 0 ? treemapHistory.join(' / ') : '';
+        }}
+
+        function treemapBack() {{
+            if (treemapHistory.length === 0) return;
+            treemapHistory.pop();
+            const level = treemapHistory.length > 0 ? treemapHistory[treemapHistory.length - 1] : '';
+            Plotly.restyle('treemap', {{ level: level }});
+            updateTreemapNav();
+        }}
+
+        backBtn.addEventListener('click', treemapBack);
 
         // Defer treemap rendering until tab is visible (Plotly needs visible container)
         let treemapInitialized = false;
@@ -376,12 +461,19 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 responsive: true
             }});
 
-            // Prevent drilling into files (leaf nodes)
+            // Track navigation when drilling into directories
             document.getElementById('treemap').on('plotly_treemapclick', function(data) {{
                 const idx = data.points[0].pointNumber;
+                const id = treemapData.ids[idx];
                 const value = treemapData.values[idx];
+                // Leaf nodes (files) have value > 0, directories have value 0
                 if (value > 0) {{
                     return false;
+                }}
+                // Directory clicked - track navigation
+                if (id && id !== '') {{
+                    treemapHistory.push(id);
+                    updateTreemapNav();
                 }}
             }});
 
@@ -438,10 +530,137 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         }});
 
         // Defer coupling graph initialization until tab is visible
-        let cyInitialized = false;
+        let cy = null;
+        let allEdges = [];
+        let currentTopN = 10;
+
+        function filterTopN(n) {{
+            if (!cy) return;
+            currentTopN = n;
+            document.getElementById('edge-count').textContent = n;
+
+            // Sort edges by coupling and take top N
+            const topEdges = allEdges
+                .slice()
+                .sort((a, b) => b.data.coupling - a.data.coupling)
+                .slice(0, n);
+
+            // Build O(1) lookup sets for visible nodes and edges
+            const visibleNodes = new Set();
+            topEdges.forEach(e => {{
+                visibleNodes.add(e.data.source);
+                visibleNodes.add(e.data.target);
+            }});
+            const topEdgeKeys = new Set(topEdges.map(e =>
+                `${{e.data.source}}:${{e.data.target}}`
+            ));
+
+            // Update visibility
+            cy.batch(() => {{
+                cy.nodes().forEach(node => {{
+                    node.style('display', visibleNodes.has(node.id()) ? 'element' : 'none');
+                }});
+                cy.edges().forEach(edge => {{
+                    const key = `${{edge.data('source')}}:${{edge.data('target')}}`;
+                    edge.style('display', topEdgeKeys.has(key) ? 'element' : 'none');
+                }});
+            }});
+
+            cy.layout({{ name: 'cose', animate: false, nodeDimensionsIncludeLabels: true, padding: 50 }}).run();
+
+            // Re-apply focus if a node was focused
+            if (focusedNode && !visibleNodes.has(focusedNode)) {{
+                focusedNode = null;
+                document.getElementById('clear-focus').style.display = 'none';
+            }} else if (focusedNode) {{
+                focusNode(focusedNode);
+            }}
+        }}
+
+        let focusedNode = null;
+
+        function focusNode(nodeId) {{
+            if (!cy) return;
+            focusedNode = nodeId;
+            document.getElementById('clear-focus').style.display = 'inline';
+
+            const connectedNodes = new Set([nodeId]);
+            cy.edges().forEach(edge => {{
+                if (edge.style('display') === 'none') return;
+                if (edge.data('source') === nodeId || edge.data('target') === nodeId) {{
+                    connectedNodes.add(edge.data('source'));
+                    connectedNodes.add(edge.data('target'));
+                }}
+            }});
+
+            cy.batch(() => {{
+                cy.nodes().forEach(node => {{
+                    if (node.style('display') === 'none') return;
+                    node.style('opacity', connectedNodes.has(node.id()) ? 1 : 0.2);
+                    if (node.id() === nodeId) {{
+                        node.style('border-width', 3);
+                        node.style('border-color', '#333');
+                    }}
+                }});
+                cy.edges().forEach(edge => {{
+                    if (edge.style('display') === 'none') return;
+                    const connected = edge.data('source') === nodeId || edge.data('target') === nodeId;
+                    edge.style('opacity', connected ? 1 : 0.1);
+                }});
+            }});
+        }}
+
+        function clearFocus() {{
+            if (!cy) return;
+            focusedNode = null;
+            document.getElementById('clear-focus').style.display = 'none';
+
+            cy.batch(() => {{
+                cy.nodes().forEach(node => {{
+                    if (node.style('display') === 'none') return;
+                    node.style('opacity', 1);
+                    node.style('border-width', 0);
+                }});
+                cy.edges().forEach(edge => {{
+                    if (edge.style('display') === 'none') return;
+                    const c = edge.data('coupling');
+                    edge.style('opacity', 0.3 + (c - 0.3) / 0.7 * 0.7);
+                }});
+            }});
+        }}
+
+        const tooltip = document.getElementById('coupling-tooltip');
+
+        function showTooltip(node, event) {{
+            const data = node.data();
+            const edgeCount = cy.edges().filter(e =>
+                e.style('display') !== 'none' &&
+                (e.data('source') === data.id || e.data('target') === data.id)
+            ).length;
+
+            // Build tooltip content safely (no innerHTML)
+            tooltip.textContent = '';
+            const strong = document.createElement('strong');
+            strong.textContent = data.id;
+            tooltip.appendChild(strong);
+            tooltip.appendChild(document.createElement('br'));
+            tooltip.appendChild(document.createTextNode('Directory: ' + data.directory));
+            tooltip.appendChild(document.createElement('br'));
+            tooltip.appendChild(document.createTextNode('Churn: ' + data.churn));
+            tooltip.appendChild(document.createElement('br'));
+            tooltip.appendChild(document.createTextNode('Connections: ' + edgeCount));
+
+            tooltip.style.left = (event.originalEvent.pageX + 10) + 'px';
+            tooltip.style.top = (event.originalEvent.pageY + 10) + 'px';
+            tooltip.style.display = 'block';
+        }}
+
+        function hideTooltip() {{
+            tooltip.style.display = 'none';
+        }}
+
         function initCouplingGraph() {{
-            if (cyInitialized) return;
-            cyInitialized = true;
+            if (cy) return;
 
             if (couplingData.edges.length === 0) {{
                 const msgDiv = document.createElement('div');
@@ -451,7 +670,12 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 return;
             }}
 
-            const cy = cytoscape({{
+            allEdges = couplingData.edges;
+            const slider = document.getElementById('edge-slider');
+            slider.max = Math.min(100, couplingData.totalEdges);
+            slider.value = Math.min(10, couplingData.totalEdges);
+
+            cy = cytoscape({{
                 container: document.getElementById('coupling-graph'),
                 elements: {{
                     nodes: couplingData.nodes,
@@ -470,7 +694,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                             'color': '#333',
                             'font-size': '10px',
                             'text-valign': 'bottom',
-                            'text-margin-y': 5
+                            'text-margin-y': 5,
+                            'cursor': 'pointer'
                         }}
                     }},
                     {{
@@ -500,7 +725,37 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 wheelSensitivity: 0.3
             }});
 
-            setTimeout(() => cy.resize().fit(), 100);
+            // Apply initial filter
+            filterTopN(parseInt(slider.value));
+
+            // Update count display in real-time while dragging
+            slider.addEventListener('input', (e) => {{
+                document.getElementById('edge-count').textContent = e.target.value;
+            }});
+
+            // Run layout only when slider is released
+            slider.addEventListener('change', (e) => filterTopN(parseInt(e.target.value)));
+
+            // Node click for focus
+            cy.on('tap', 'node', (e) => {{
+                focusNode(e.target.id());
+            }});
+
+            // Background click to clear focus
+            cy.on('tap', (e) => {{
+                if (e.target === cy) clearFocus();
+            }});
+
+            // Clear focus button
+            document.getElementById('clear-focus').addEventListener('click', clearFocus);
+
+            // Tooltip on hover
+            cy.on('mouseover', 'node', (e) => showTooltip(e.target, e));
+            cy.on('mouseout', 'node', hideTooltip);
+            cy.on('mousemove', 'node', (e) => {{
+                tooltip.style.left = (e.originalEvent.pageX + 10) + 'px';
+                tooltip.style.top = (e.originalEvent.pageY + 10) + 'px';
+            }});
         }}
 
         // Initialize when coupling tab is clicked
@@ -522,7 +777,9 @@ FILE_ROW_TEMPLATE = """                <tr>
                 </tr>"""
 
 
-def _get_severity_class(value: int, max_val: int, prefix: str) -> str:  # [5a.1] Severity CSS class mapping
+def _get_severity_class(
+    value: int, max_val: int, prefix: str
+) -> str:  # [5a.1] Severity CSS class mapping
     """Return CSS class based on value relative to max."""
     if max_val == 0:
         return ""

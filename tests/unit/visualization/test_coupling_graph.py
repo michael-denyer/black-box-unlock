@@ -15,6 +15,7 @@ class TestBuildCouplingGraphData:
         assert result["edges"] == []
         assert result["directories"] == []
         assert result["maxChurn"] == 0
+        assert result["totalEdges"] == 0
 
     def test_files_without_coupling_returns_nodes_only(self):
         """Files with no coupling create nodes but no edges."""
@@ -233,3 +234,44 @@ class TestBuildCouplingGraphData:
         node_ids = [n["data"]["id"] for n in result["nodes"]]
         assert "src/auth.py" in node_ids
         assert "src/user.py" in node_ids
+
+    def test_edges_sorted_by_coupling_descending(self):
+        """Edges are sorted by coupling ratio, highest first."""
+        files = [
+            FileForensics(
+                path="src/auth.py",
+                commits=10,
+                lines_changed=200,
+                authors=["alice@example.com"],
+                coupled_with=[
+                    CouplingInfo(file="src/low.py", ratio=0.35),
+                    CouplingInfo(file="src/high.py", ratio=0.90),
+                    CouplingInfo(file="src/mid.py", ratio=0.55),
+                ],
+            )
+        ]
+
+        result = build_coupling_graph_data(files)
+
+        couplings = [e["data"]["coupling"] for e in result["edges"]]
+        assert couplings == [0.90, 0.55, 0.35]
+
+    def test_total_edges_field_present(self):
+        """Result includes totalEdges count for slider max."""
+        files = [
+            FileForensics(
+                path="src/auth.py",
+                commits=10,
+                lines_changed=200,
+                authors=["alice@example.com"],
+                coupled_with=[
+                    CouplingInfo(file="src/a.py", ratio=0.5),
+                    CouplingInfo(file="src/b.py", ratio=0.6),
+                    CouplingInfo(file="src/c.py", ratio=0.7),
+                ],
+            )
+        ]
+
+        result = build_coupling_graph_data(files)
+
+        assert result["totalEdges"] == 3

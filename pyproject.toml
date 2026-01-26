@@ -61,3 +61,8 @@ ignore = ["E501", "B008"]  # B008: typer.Option in function defaults is idiomati
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-v --tb=short"
+
+[dependency-groups]
+dev = [
+    "pre-commit>=4.5.1",
+]

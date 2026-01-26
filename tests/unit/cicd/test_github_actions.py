@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 
 from black_box_unlock.cicd.github_actions import (
     fetch_workflow_runs,
+    get_files_changed,
     parse_workflow_runs,
 )
 from black_box_unlock.cicd.models import WorkflowRun
@@ -112,3 +113,39 @@ class TestFetchWorkflowRuns:
         assert len(runs) == 1
         assert isinstance(runs[0], WorkflowRun)
         assert runs[0].run_id == 999
+
+
+class TestGetFilesChanged:
+    """Tests for getting files changed in a commit."""
+
+    @patch("black_box_unlock.cicd.github_actions.subprocess.run")
+    def test_returns_list_of_files(self, mock_run):
+        """Returns list of files from git show output."""
+        mock_run.return_value = MagicMock(
+            stdout="src/main.py\ntests/test_main.py\n",
+            returncode=0,
+        )
+        files = get_files_changed("abc123")
+        assert files == ["src/main.py", "tests/test_main.py"]
+
+    @patch("black_box_unlock.cicd.github_actions.subprocess.run")
+    def test_filters_empty_lines(self, mock_run):
+        """Filters out empty lines from output."""
+        mock_run.return_value = MagicMock(
+            stdout="src/main.py\n\n\n",
+            returncode=0,
+        )
+        files = get_files_changed("abc123")
+        assert files == ["src/main.py"]
+
+    @patch("black_box_unlock.cicd.github_actions.subprocess.run")
+    def test_calls_git_show_with_name_only(self, mock_run):
+        """Calls git show with --name-only flag."""
+        mock_run.return_value = MagicMock(stdout="", returncode=0)
+        get_files_changed("abc123")
+
+        args = mock_run.call_args[0][0]
+        assert "git" in args
+        assert "show" in args
+        assert "--name-only" in args
+        assert "abc123" in args

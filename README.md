@@ -42,6 +42,9 @@ bbu analyze-repo --days=30 --output=html > report.html
 
 # Adjust coupling detection threshold (default 0.3)
 bbu analyze-repo --min-coupling=0.5 --output=html > report.html
+
+# Skip CI failure analysis (faster, no GitHub access needed)
+bbu analyze-repo --no-ci --output=html > report.html
 ```
 
 ## Features
@@ -51,6 +54,7 @@ bbu analyze-repo --min-coupling=0.5 --output=html > report.html
 | **Hotspot Score** | churn × complexity - identifies unstable code |
 | **Temporal Coupling** | Files changing together >30% reveal hidden dependencies |
 | **Ownership Risk** | >3 authors + high churn = coordination problems |
+| **Build Failures** | Files appearing in CI failures = fragile code |
 
 ### HTML Report
 
@@ -63,6 +67,7 @@ The HTML report includes three interactive views:
 ```mermaid
 flowchart LR
     Git[Git History] --> Analyze[bbu analyze-repo]
+    CI[GitHub Actions] --> Analyze
     Analyze --> JSON[JSON Output]
     Analyze --> HTML[HTML Report]
     HTML --> Treemap[Hotspot Treemap]
@@ -78,6 +83,7 @@ src/black_box_unlock/
 ├── cli.py              # Typer CLI
 ├── core/               # Pydantic models, exceptions
 ├── git/                # Churn, coupling, ownership extraction
+├── cicd/               # CI/CD forensics (build failures via gh CLI)
 ├── analysis.py         # Orchestration
 └── visualization/      # HTML, treemap, coupling graph
 ```

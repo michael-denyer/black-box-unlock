@@ -1,14 +1,14 @@
 <table>
 <tr>
-<td>
-
-## Black Box Unlock
-
-***Mischief. Mayhem. Merge conflicts. Exposed.***
-
-</td>
 <td width="150">
 <img src="assets/logo.png" alt="Black Box Unlock" width="150">
+</td>
+<td>
+
+# Black Box Unlock
+
+### *Mischief. Mayhem. Merge conflicts. Exposed.*
+
 </td>
 </tr>
 </table>

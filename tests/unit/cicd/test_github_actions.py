@@ -2,6 +2,7 @@
 
 import json
 import subprocess
+from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -168,8 +169,6 @@ class TestBuildFailuresFromRuns:
     @patch("black_box_unlock.cicd.github_actions.get_files_changed")
     def test_creates_failure_for_failed_run(self, mock_get_files):
         """Creates BuildFailure for each failed run."""
-        from datetime import datetime, timezone
-
         mock_get_files.return_value = ["src/broken.py"]
         runs = [
             WorkflowRun(
@@ -188,8 +187,6 @@ class TestBuildFailuresFromRuns:
     @patch("black_box_unlock.cicd.github_actions.get_files_changed")
     def test_skips_successful_runs(self, mock_get_files):
         """Does not create failures for successful runs."""
-        from datetime import datetime, timezone
-
         runs = [
             WorkflowRun(
                 run_id=1,
@@ -206,8 +203,6 @@ class TestBuildFailuresFromRuns:
     @patch("black_box_unlock.cicd.github_actions.get_files_changed")
     def test_handles_multiple_failures(self, mock_get_files):
         """Handles multiple failed runs."""
-        from datetime import datetime, timezone
-
         mock_get_files.side_effect = [["a.py"], ["b.py"]]
         runs = [
             WorkflowRun(
@@ -229,3 +224,19 @@ class TestBuildFailuresFromRuns:
         assert len(failures) == 2
         assert failures[0].files_changed == ["a.py"]
         assert failures[1].files_changed == ["b.py"]
+
+    @patch("black_box_unlock.cicd.github_actions.get_files_changed")
+    def test_propagates_git_error(self, mock_get_files):
+        """Propagates CalledProcessError when git command fails."""
+        mock_get_files.side_effect = subprocess.CalledProcessError(128, "git")
+        runs = [
+            WorkflowRun(
+                run_id=1,
+                workflow_name="CI",
+                commit_sha="abc",
+                conclusion="failure",
+                created_at=datetime.now(timezone.utc),
+            )
+        ]
+        with pytest.raises(subprocess.CalledProcessError):
+            build_failures_from_runs(runs)

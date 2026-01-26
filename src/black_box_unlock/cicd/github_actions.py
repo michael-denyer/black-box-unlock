@@ -88,6 +88,9 @@ def build_failures_from_runs(runs: list[WorkflowRun]) -> list[BuildFailure]:
 
     Returns:
         List of BuildFailure objects for failed runs.
+
+    Raises:
+        subprocess.CalledProcessError: If git command fails for any commit SHA.
     """
     failures = []
     for run in runs:

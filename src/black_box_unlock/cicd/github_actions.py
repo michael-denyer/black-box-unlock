@@ -17,18 +17,16 @@ def parse_workflow_runs(gh_json: list[dict]) -> list[WorkflowRun]:
     Returns:
         List of WorkflowRun objects.
     """
-    runs = []
-    for item in gh_json:
-        runs.append(
-            WorkflowRun(
-                run_id=item["databaseId"],
-                workflow_name=item["workflowName"],
-                commit_sha=item["headSha"],
-                conclusion=item["conclusion"] or "unknown",
-                created_at=datetime.fromisoformat(item["createdAt"].replace("Z", "+00:00")),
-            )
+    return [
+        WorkflowRun(
+            run_id=item["databaseId"],
+            workflow_name=item["workflowName"],
+            commit_sha=item["headSha"],
+            conclusion=item["conclusion"] or "unknown",
+            created_at=datetime.fromisoformat(item["createdAt"].replace("Z", "+00:00")),
         )
-    return runs
+        for item in gh_json
+    ]
 
 
 def fetch_workflow_runs(limit: int = 100) -> list[WorkflowRun]:
@@ -77,8 +75,7 @@ def get_files_changed(commit_sha: str) -> list[str]:
         commit_sha,
     ]
     result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-    files = [f.strip() for f in result.stdout.strip().split("\n") if f.strip()]
-    return files
+    return [line for line in result.stdout.strip().split("\n") if line.strip()]
 
 
 def build_failures_from_runs(runs: list[WorkflowRun]) -> list[BuildFailure]:
@@ -122,6 +119,5 @@ def aggregate_file_failures(failures: list[BuildFailure]) -> dict[str, int]:
     """
     counts: Counter[str] = Counter()
     for failure in failures:
-        for file in failure.files_changed:
-            counts[file] += 1
+        counts.update(failure.files_changed)
     return dict(counts)

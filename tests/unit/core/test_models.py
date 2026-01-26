@@ -4,7 +4,7 @@ from datetime import datetime
 
 import pytest
 
-from black_box_unlock.core.models import FileChurn
+from black_box_unlock.core.models import FileChurn, FileForensics
 
 
 class TestFileChurn:
@@ -62,3 +62,30 @@ class TestFileChurn:
                 first_commit=datetime(2025, 1, 1),
                 last_commit=datetime(2025, 1, 25),
             )
+
+
+class TestFileForensicsBuildFailures:
+    """Tests for build_failures field in FileForensics."""
+
+    def test_build_failures_defaults_to_zero(self):
+        """build_failures defaults to 0."""
+        forensics = FileForensics(
+            path="src/main.py",
+            commits=5,
+            lines_changed=100,
+            authors=["alice"],
+            coupled_with=[],
+        )
+        assert forensics.build_failures == 0
+
+    def test_build_failures_can_be_set(self):
+        """build_failures can be set to a value."""
+        forensics = FileForensics(
+            path="src/main.py",
+            commits=5,
+            lines_changed=100,
+            authors=["alice"],
+            coupled_with=[],
+            build_failures=3,
+        )
+        assert forensics.build_failures == 3

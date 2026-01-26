@@ -116,6 +116,7 @@ class FileForensics(BaseModel):  # [4a.3] Combined forensics
     lines_changed: int
     authors: list[str]
     coupled_with: list[CouplingInfo]
+    build_failures: int = 0  # CI failure count
 
     @computed_field
     @property

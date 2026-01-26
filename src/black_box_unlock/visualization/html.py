@@ -107,7 +107,27 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         #treemap {{
             width: 100%;
             min-height: 600px;
-            height: calc(100vh - 350px);
+            height: calc(100vh - 380px);
+        }}
+        .treemap-controls {{
+            padding: 10px 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: var(--surface);
+            border-bottom: 1px solid var(--secondary);
+            min-height: 30px;
+        }}
+        .treemap-controls button {{
+            padding: 4px 12px;
+            border: 1px solid var(--secondary);
+            border-radius: 4px;
+            background: var(--bg);
+            cursor: pointer;
+        }}
+        #treemap-path {{
+            color: var(--text-secondary);
+            font-size: 14px;
         }}
         #coupling-graph {{
             width: 100%;
@@ -350,6 +370,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         </div>
 
         <div id="hotspots" class="tab-content">
+            <div class="treemap-controls">
+                <button id="treemap-back" style="display: none;">← Back</button>
+                <span id="treemap-path"></span>
+            </div>
             <div id="treemap"></div>
         </div>
 
@@ -377,6 +401,26 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
         // Treemap data
         const treemapData = {treemap_json};
+
+        // Treemap navigation state
+        let treemapHistory = [];
+        const backBtn = document.getElementById('treemap-back');
+        const pathSpan = document.getElementById('treemap-path');
+
+        function updateTreemapNav() {{
+            backBtn.style.display = treemapHistory.length > 0 ? 'inline' : 'none';
+            pathSpan.textContent = treemapHistory.length > 0 ? treemapHistory.join(' / ') : '';
+        }}
+
+        function treemapBack() {{
+            if (treemapHistory.length === 0) return;
+            treemapHistory.pop();
+            const level = treemapHistory.length > 0 ? treemapHistory[treemapHistory.length - 1] : '';
+            Plotly.restyle('treemap', {{ level: level }});
+            updateTreemapNav();
+        }}
+
+        backBtn.addEventListener('click', treemapBack);
 
         // Defer treemap rendering until tab is visible (Plotly needs visible container)
         let treemapInitialized = false;
@@ -417,12 +461,19 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 responsive: true
             }});
 
-            // Prevent drilling into files (leaf nodes)
+            // Track navigation when drilling into directories
             document.getElementById('treemap').on('plotly_treemapclick', function(data) {{
                 const idx = data.points[0].pointNumber;
+                const id = treemapData.ids[idx];
                 const value = treemapData.values[idx];
+                // Leaf nodes (files) have value > 0, directories have value 0
                 if (value > 0) {{
                     return false;
+                }}
+                // Directory clicked - track navigation
+                if (id && id !== '') {{
+                    treemapHistory.push(id);
+                    updateTreemapNav();
                 }}
             }});
 

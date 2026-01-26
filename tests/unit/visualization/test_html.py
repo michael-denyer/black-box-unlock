@@ -374,3 +374,30 @@ class TestGenerateHtmlReport:
         html = generate_html_report(result)
 
         assert 'id="coupling-tooltip"' in html
+
+    def test_table_includes_build_failures_column(self):
+        """Table has Build Failures column header."""
+        result = AnalysisResult(
+            repo="test-repo",
+            analyzed_days=30,
+            generated_at=datetime(2026, 1, 25, 15, 30, 0),
+            files=[
+                FileForensics(
+                    path="src/auth.py",
+                    commits=10,
+                    lines_changed=200,
+                    authors=["alice@example.com"],
+                    coupled_with=[],
+                    build_failures=5,
+                )
+            ],
+            summary=AnalysisSummary(
+                total_files=1,
+                high_risk_ownership=0,
+                coupled_pairs=0,
+            ),
+        )
+
+        html = generate_html_report(result)
+
+        assert "Build Failures" in html

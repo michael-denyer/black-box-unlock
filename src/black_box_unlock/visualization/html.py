@@ -360,6 +360,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                         <th>Commits</th>
                         <th>Lines Changed</th>
                         <th>Authors</th>
+                        <th>Build Failures</th>
                         <th>Coupled With</th>
                     </tr>
                 </thead>
@@ -773,6 +774,7 @@ FILE_ROW_TEMPLATE = """                <tr>
                     <td><span class="metric {commits_class}">{commits}</span></td>
                     <td><span class="metric {lines_class}">{lines_changed:,}</span></td>
                     <td class="{risk_class}">{author_count}</td>
+                    <td>{build_failures}</td>
                     <td class="coupling">{coupling_html}</td>
                 </tr>"""
 
@@ -839,6 +841,7 @@ def generate_html_report(result: AnalysisResult) -> str:  # [5a] Generate comple
                 lines_class=_get_severity_class(file.lines_changed, max_lines, "metric"),
                 author_count=file.author_count,
                 risk_class=risk_class,
+                build_failures=file.build_failures,
                 coupling_html=coupling_html,
             )
         )

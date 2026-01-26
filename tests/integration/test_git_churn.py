@@ -1,8 +1,11 @@
 """Integration tests for git churn extraction."""
 
+import pytest
+
 from black_box_unlock.git.churn import extract_file_churn
 
 
+@pytest.mark.requires_gmap
 class TestExtractFileChurnIntegration:
     """Integration tests using real git repository."""
 

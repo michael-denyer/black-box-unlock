@@ -4,7 +4,7 @@ import json
 import subprocess
 from datetime import datetime
 
-from .models import WorkflowRun
+from .models import BuildFailure, WorkflowRun
 
 
 def parse_workflow_runs(gh_json: list[dict]) -> list[WorkflowRun]:
@@ -78,3 +78,30 @@ def get_files_changed(commit_sha: str) -> list[str]:
     result = subprocess.run(cmd, capture_output=True, text=True, check=True)
     files = [f.strip() for f in result.stdout.strip().split("\n") if f.strip()]
     return files
+
+
+def build_failures_from_runs(runs: list[WorkflowRun]) -> list[BuildFailure]:
+    """Build failure objects for failed runs with file attribution.
+
+    Args:
+        runs: List of workflow runs.
+
+    Returns:
+        List of BuildFailure objects for failed runs.
+    """
+    failures = []
+    for run in runs:
+        if not run.is_failure:
+            continue
+        files = get_files_changed(run.commit_sha)
+        failures.append(
+            BuildFailure(
+                run_id=run.run_id,
+                workflow_name=run.workflow_name,
+                commit_sha=run.commit_sha,
+                files_changed=files,
+                failed_at=run.created_at,
+                conclusion=run.conclusion,
+            )
+        )
+    return failures

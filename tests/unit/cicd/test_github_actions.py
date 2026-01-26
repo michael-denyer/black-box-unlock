@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from black_box_unlock.cicd.github_actions import (
+    build_failures_from_runs,
     fetch_workflow_runs,
     get_files_changed,
     parse_workflow_runs,
@@ -159,3 +160,72 @@ class TestGetFilesChanged:
         mock_run.side_effect = subprocess.CalledProcessError(128, "git")
         with pytest.raises(subprocess.CalledProcessError):
             get_files_changed("invalid_sha")
+
+
+class TestBuildFailuresFromRuns:
+    """Tests for building failure objects with file attribution."""
+
+    @patch("black_box_unlock.cicd.github_actions.get_files_changed")
+    def test_creates_failure_for_failed_run(self, mock_get_files):
+        """Creates BuildFailure for each failed run."""
+        from datetime import datetime, timezone
+
+        mock_get_files.return_value = ["src/broken.py"]
+        runs = [
+            WorkflowRun(
+                run_id=1,
+                workflow_name="CI",
+                commit_sha="abc",
+                conclusion="failure",
+                created_at=datetime.now(timezone.utc),
+            )
+        ]
+        failures = build_failures_from_runs(runs)
+        assert len(failures) == 1
+        assert failures[0].run_id == 1
+        assert failures[0].files_changed == ["src/broken.py"]
+
+    @patch("black_box_unlock.cicd.github_actions.get_files_changed")
+    def test_skips_successful_runs(self, mock_get_files):
+        """Does not create failures for successful runs."""
+        from datetime import datetime, timezone
+
+        runs = [
+            WorkflowRun(
+                run_id=1,
+                workflow_name="CI",
+                commit_sha="abc",
+                conclusion="success",
+                created_at=datetime.now(timezone.utc),
+            )
+        ]
+        failures = build_failures_from_runs(runs)
+        assert len(failures) == 0
+        mock_get_files.assert_not_called()
+
+    @patch("black_box_unlock.cicd.github_actions.get_files_changed")
+    def test_handles_multiple_failures(self, mock_get_files):
+        """Handles multiple failed runs."""
+        from datetime import datetime, timezone
+
+        mock_get_files.side_effect = [["a.py"], ["b.py"]]
+        runs = [
+            WorkflowRun(
+                run_id=1,
+                workflow_name="CI",
+                commit_sha="aaa",
+                conclusion="failure",
+                created_at=datetime.now(timezone.utc),
+            ),
+            WorkflowRun(
+                run_id=2,
+                workflow_name="CI",
+                commit_sha="bbb",
+                conclusion="failure",
+                created_at=datetime.now(timezone.utc),
+            ),
+        ]
+        failures = build_failures_from_runs(runs)
+        assert len(failures) == 2
+        assert failures[0].files_changed == ["a.py"]
+        assert failures[1].files_changed == ["b.py"]

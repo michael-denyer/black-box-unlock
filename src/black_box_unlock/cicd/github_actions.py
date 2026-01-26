@@ -64,6 +64,9 @@ def get_files_changed(commit_sha: str) -> list[str]:
 
     Returns:
         List of file paths changed in the commit.
+
+    Raises:
+        subprocess.CalledProcessError: If git command fails (e.g., invalid SHA).
     """
     cmd = [
         "git",

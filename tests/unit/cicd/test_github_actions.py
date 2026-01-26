@@ -1,7 +1,10 @@
 """Tests for GitHub Actions CI/CD integration."""
 
 import json
+import subprocess
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 from black_box_unlock.cicd.github_actions import (
     fetch_workflow_runs,
@@ -149,3 +152,10 @@ class TestGetFilesChanged:
         assert "show" in args
         assert "--name-only" in args
         assert "abc123" in args
+
+    @patch("black_box_unlock.cicd.github_actions.subprocess.run")
+    def test_raises_on_invalid_sha(self, mock_run):
+        """Raises CalledProcessError for invalid SHA."""
+        mock_run.side_effect = subprocess.CalledProcessError(128, "git")
+        with pytest.raises(subprocess.CalledProcessError):
+            get_files_changed("invalid_sha")

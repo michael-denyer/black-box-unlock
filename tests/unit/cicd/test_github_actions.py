@@ -274,3 +274,26 @@ class TestAggregateFileFailures:
         """Empty failures list returns empty dict."""
         stats = aggregate_file_failures([])
         assert stats == {}
+
+    def test_failure_with_no_files_changed_is_skipped(self):
+        """Failures with no files_changed don't affect counts."""
+        failures = [
+            BuildFailure(
+                run_id=1,
+                workflow_name="CI",
+                commit_sha="a",
+                files_changed=[],
+                failed_at=datetime.now(timezone.utc),
+                conclusion="failure",
+            ),
+            BuildFailure(
+                run_id=2,
+                workflow_name="CI",
+                commit_sha="b",
+                files_changed=["src/a.py"],
+                failed_at=datetime.now(timezone.utc),
+                conclusion="failure",
+            ),
+        ]
+        stats = aggregate_file_failures(failures)
+        assert stats == {"src/a.py": 1}

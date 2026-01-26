@@ -466,10 +466,47 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         }});
 
         // Defer coupling graph initialization until tab is visible
-        let cyInitialized = false;
+        let cy = null;
+        let allEdges = [];
+        let currentTopN = 10;
+
+        function filterTopN(n) {{
+            if (!cy) return;
+            currentTopN = n;
+            document.getElementById('edge-count').textContent = n;
+
+            // Sort edges by coupling and take top N
+            const topEdges = allEdges
+                .slice()
+                .sort((a, b) => b.data.coupling - a.data.coupling)
+                .slice(0, n);
+
+            // Build O(1) lookup sets for visible nodes and edges
+            const visibleNodes = new Set();
+            topEdges.forEach(e => {{
+                visibleNodes.add(e.data.source);
+                visibleNodes.add(e.data.target);
+            }});
+            const topEdgeKeys = new Set(topEdges.map(e =>
+                `${{e.data.source}}:${{e.data.target}}`
+            ));
+
+            // Update visibility
+            cy.batch(() => {{
+                cy.nodes().forEach(node => {{
+                    node.style('display', visibleNodes.has(node.id()) ? 'element' : 'none');
+                }});
+                cy.edges().forEach(edge => {{
+                    const key = `${{edge.data('source')}}:${{edge.data('target')}}`;
+                    edge.style('display', topEdgeKeys.has(key) ? 'element' : 'none');
+                }});
+            }});
+
+            cy.layout({{ name: 'cose', animate: false, nodeDimensionsIncludeLabels: true, padding: 50 }}).run();
+        }}
+
         function initCouplingGraph() {{
-            if (cyInitialized) return;
-            cyInitialized = true;
+            if (cy) return;
 
             if (couplingData.edges.length === 0) {{
                 const msgDiv = document.createElement('div');
@@ -479,7 +516,12 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 return;
             }}
 
-            const cy = cytoscape({{
+            allEdges = couplingData.edges;
+            const slider = document.getElementById('edge-slider');
+            slider.max = Math.min(100, couplingData.totalEdges);
+            slider.value = Math.min(10, couplingData.totalEdges);
+
+            cy = cytoscape({{
                 container: document.getElementById('coupling-graph'),
                 elements: {{
                     nodes: couplingData.nodes,
@@ -498,7 +540,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                             'color': '#333',
                             'font-size': '10px',
                             'text-valign': 'bottom',
-                            'text-margin-y': 5
+                            'text-margin-y': 5,
+                            'cursor': 'pointer'
                         }}
                     }},
                     {{
@@ -528,7 +571,16 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 wheelSensitivity: 0.3
             }});
 
-            setTimeout(() => cy.resize().fit(), 100);
+            // Apply initial filter
+            filterTopN(parseInt(slider.value));
+
+            // Update count display in real-time while dragging
+            slider.addEventListener('input', (e) => {{
+                document.getElementById('edge-count').textContent = e.target.value;
+            }});
+
+            // Run layout only when slider is released
+            slider.addEventListener('change', (e) => filterTopN(parseInt(e.target.value)));
         }}
 
         // Initialize when coupling tab is clicked

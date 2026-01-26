@@ -319,3 +319,21 @@ class TestGenerateHtmlReport:
 
         assert 'id="edge-slider"' in html
         assert 'id="edge-count"' in html
+
+    def test_filter_top_n_function_present(self):
+        """JavaScript includes filterTopN function."""
+        result = AnalysisResult(
+            repo="test-repo",
+            analyzed_days=30,
+            generated_at=datetime(2026, 1, 25, 15, 30, 0),
+            files=[],
+            summary=AnalysisSummary(
+                total_files=0,
+                high_risk_ownership=0,
+                coupled_pairs=0,
+            ),
+        )
+
+        html = generate_html_report(result)
+
+        assert "function filterTopN(" in html

@@ -6,6 +6,11 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 
+from .cicd.github_actions import (
+    aggregate_file_failures,
+    build_failures_from_runs,
+    fetch_workflow_runs,
+)
 from .core.models import (
     AnalysisResult,
     AnalysisSummary,
@@ -15,6 +20,21 @@ from .core.models import (
 from .git.churn import parse_gmap_output
 from .git.coupling import detect_temporal_coupling
 from .git.ownership import parse_ownership_from_gmap
+
+
+def _fetch_ci_failures() -> dict[str, int]:
+    """Fetch CI failure counts per file.
+
+    Returns:
+        Dict mapping file path to failure count.
+    """
+    try:
+        runs = fetch_workflow_runs(limit=100)
+        failures = build_failures_from_runs(runs)
+        return aggregate_file_failures(failures)
+    except Exception:
+        # CI data is optional - gracefully degrade
+        return {}
 
 
 def _fetch_gmap_data(repo_path: Path, days: int) -> dict:  # [2a.1] Fetch git history via gmap
@@ -36,6 +56,7 @@ def run_analysis(  # [2a] Main analysis pipeline
     repo_path: Path,
     days: int = 30,
     min_coupling: float = 0.3,
+    include_ci: bool = True,
 ) -> AnalysisResult:
     """Run complete forensic analysis on a repository.
 
@@ -43,11 +64,17 @@ def run_analysis(  # [2a] Main analysis pipeline
         repo_path: Path to git repository.
         days: Number of days of history to analyze.
         min_coupling: Minimum coupling ratio to include.
+        include_ci: Whether to include CI/CD build failure data.
 
     Returns:
         AnalysisResult with file forensics and summary.
     """
     gmap_data = _fetch_gmap_data(repo_path, days)
+
+    # Fetch CI data if requested
+    ci_failures: dict[str, int] = {}
+    if include_ci:
+        ci_failures = _fetch_ci_failures()
 
     # Parse individual analyses
     churn_list = parse_gmap_output(gmap_data)
@@ -84,6 +111,7 @@ def run_analysis(  # [2a] Main analysis pipeline
                 lines_changed=churn.total_lines_changed if churn else 0,
                 authors=ownership.authors if ownership else [],
                 coupled_with=coupling_by_file.get(path, []),
+                build_failures=ci_failures.get(path, 0),
             )
         )
 

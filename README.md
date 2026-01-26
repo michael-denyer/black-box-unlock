@@ -1,6 +1,4 @@
-<p align="center">
-  <img src="assets/logo.png" alt="Black Box Unlock" width="200">
-</p>
+<img src="assets/logo.png" alt="Black Box Unlock" width="120" align="right">
 
 # Black Box Unlock
 

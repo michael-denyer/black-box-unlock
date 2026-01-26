@@ -111,6 +111,7 @@ bbu version                   # Show version
 - Invoke `/codemap` skill when architecture changes significantly
 - `bd close <id>` - mark issue complete
 - `bd sync` - push to remote
+- Update readme.md if new features
 
 ## Gotchas
 

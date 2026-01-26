@@ -5,7 +5,7 @@ from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch
 
-from black_box_unlock.analysis import export_to_json, run_analysis
+from black_box_unlock.analysis import _fetch_ci_failures, export_to_json, run_analysis
 from black_box_unlock.core.models import (
     AnalysisResult,
     AnalysisSummary,
@@ -425,3 +425,16 @@ class TestRunAnalysisWithCIData:
         run_analysis(Path("/fake/repo"), days=30)
 
         mock_ci.assert_called_once()
+
+
+class TestFetchCIFailures:
+    """Tests for _fetch_ci_failures helper."""
+
+    @patch("black_box_unlock.analysis.fetch_workflow_runs")
+    def test_returns_empty_dict_on_exception(self, mock_fetch):
+        """Returns empty dict when CI fetch fails."""
+        mock_fetch.side_effect = Exception("GitHub API unavailable")
+
+        result = _fetch_ci_failures()
+
+        assert result == {}

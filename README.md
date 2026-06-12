@@ -38,7 +38,7 @@ Register the MCP server in Claude Code (`.mcp.json`):
 ```
 
 Tools: `get_hotspots`, `get_file_forensics`, `get_coupled_files`,
-`get_ownership`, `get_ci_failures`, `get_flaky_steps`.
+`get_ownership`, `get_ci_failures`, `get_flaky_steps`, `xray_file`.
 
 The Claude Code plugin in this repo adds `/analyze`, `/hotspots`, a
 `git-forensics` agent, and an ambient coupling guard that warns when you
@@ -80,6 +80,9 @@ bbu analyze-repo --no-ci --output=html > report.html
 
 # Analyze a different repository
 bbu analyze-repo --repo /path/to/repo --output=html > report.html
+
+# Per-function churn for one file (Tornhill's X-Ray)
+bbu xray src/hot_file.py --days 365
 ```
 
 ### Features
@@ -92,6 +95,7 @@ bbu analyze-repo --repo /path/to/repo --output=html > report.html
 | **Build Failures** | Files appearing in CI failures = fragile code |
 | **Bug-fix Density** | Count of defect-repair commits per file |
 | **Flaky Steps** | CI steps that failed then passed on re-run |
+| **Function X-Ray** | Per-function churn × complexity for hot files ([docs/XRAY.md](docs/XRAY.md)) |
 
 ## Does the ranking actually predict bugs?
 

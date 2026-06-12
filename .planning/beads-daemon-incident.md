@@ -1,5 +1,12 @@
 # Beads daemon incident — diagnosis and runbook (2026-06-12)
 
+**RESOLVED 2026-06-12 21:08** — bd upgraded to 0.49.0, daemon re-enabled (event-driven,
+no pull loop), `beads.left.*` artifacts retired to /tmp/beads-debug, flush verified
+end-to-end (create + tombstone delete both reached issues.jsonl). issues.jsonl is now a
+full export (the upstream model) rather than delta lines — fresh clones hydrate
+completely. Note for the future: if issues.jsonl is ever edited by hand, run
+`bd sync --import-only` once, or the pre-export guard refuses to flush.
+
 ## Symptoms
 
 1. `bd create/update/close` mutations never reached the git-tracked `.beads/issues.jsonl`

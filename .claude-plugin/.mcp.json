@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "black-box-unlock": {
+      "command": "bbu-mcp"
+    }
+  }
+}

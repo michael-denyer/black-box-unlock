@@ -118,6 +118,7 @@ class FileForensics(BaseModel):  # [4a.3] Combined forensics
     authors: list[str]
     coupled_with: list[CouplingInfo]
     build_failures: int = 0
+    bugfix_commits: int = 0
 
     @field_validator("build_failures")
     @classmethod

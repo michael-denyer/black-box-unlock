@@ -165,3 +165,30 @@ class TestXrayFileTool:
             mock_xray.side_effect = NotAGitRepoError("not a repo")
             with pytest.raises(ValueError, match="not a repo"):
                 mcp_server.xray_file("mod.py")
+
+
+class TestXrayFileToolCoupling:
+    def test_min_coupling_forwarded_and_coupling_serialized(self):
+        from black_box_unlock.core.models import FileXRay, FunctionCoupling
+
+        fake = FileXRay(
+            path="mod.py",
+            days=365,
+            revisions_analyzed=3,
+            revision_cap_hit=False,
+            functions=[],
+            coupling=[
+                FunctionCoupling(
+                    function_a="alpha",
+                    function_b="beta",
+                    shared_revisions=2,
+                    revisions_a=3,
+                    revisions_b=2,
+                )
+            ],
+        )
+        with patch("black_box_unlock.mcp_server._xray_file") as mock_xray:
+            mock_xray.return_value = fake
+            out = mcp_server.xray_file("mod.py", min_coupling=0.5)
+        assert mock_xray.call_args[1]["min_coupling"] == 0.5
+        assert out["coupling"][0]["coupling_ratio"] == 1.0

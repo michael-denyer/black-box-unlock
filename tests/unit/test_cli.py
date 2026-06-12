@@ -285,3 +285,12 @@ class TestAnalyzeRepoJsonIntegrity:
                 result = runner.invoke(app, ["analyze-repo", "--output", "json"])
         assert result.exit_code == 0
         assert long_line in result.stdout
+
+
+class TestXrayMinCoupling:
+    def test_min_coupling_forwarded(self):
+        with patch("black_box_unlock.git.xray.xray_file") as mock_xray:
+            mock_xray.return_value = _xray_result()
+            result = runner.invoke(app, ["xray", "mod.py", "--min-coupling", "0.5"])
+        assert result.exit_code == 0
+        assert mock_xray.call_args[1]["min_coupling"] == 0.5

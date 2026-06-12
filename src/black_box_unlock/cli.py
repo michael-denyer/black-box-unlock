@@ -166,16 +166,19 @@ def xray(
     repo: Path = typer.Option(Path("."), "--repo", help="Repository root"),
     days: int = typer.Option(365, help="Days of history to analyze"),
     cap: int = typer.Option(200, "--cap", help="Maximum revisions to analyze"),
+    min_coupling: float = typer.Option(
+        0.3, "--min-coupling", help="Minimum function-pair coupling ratio to report"
+    ),
 ) -> None:
     """Per-function churn for one file (Tornhill's X-Ray).
 
-    Ranks the file's functions by revisions x indentation complexity so you
-    can see which functions drive a hotspot. JSON to stdout.
+    Ranks the file's functions by revisions x indentation complexity and
+    reports function pairs that change together. JSON to stdout.
     """
     from black_box_unlock.git import xray as xray_mod
 
     try:
-        result = xray_mod.xray_file(repo, file, days=days, rev_cap=cap)
+        result = xray_mod.xray_file(repo, file, days=days, rev_cap=cap, min_coupling=min_coupling)
     except BlackBoxUnlockError as e:
         console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(code=1) from e

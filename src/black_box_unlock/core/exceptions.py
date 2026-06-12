@@ -11,3 +11,7 @@ class NotAGitRepoError(BlackBoxUnlockError):
 
 class GitToolNotFoundError(BlackBoxUnlockError):
     """Raised when required git tool is not installed."""
+
+
+class InsufficientHistoryError(BlackBoxUnlockError):
+    """Raised when a validation window contains no commits."""

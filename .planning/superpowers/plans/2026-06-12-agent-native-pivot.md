@@ -14,7 +14,7 @@
 - Pre-commit runs ruff on commit. Never use `--quiet` flags anywhere.
 - Commit messages: conventional commits (`feat:`, `fix:`, `test:`, `docs:`, `chore:`), no AI attribution.
 - The `{"entries": [...]}` dict shape is the contract between extraction and the three parsers (`churn`, `ownership`, `coupling`). Task 1 preserves it exactly and adds one key (`message`).
-- Tasks must be executed in order. Milestone B (Tasks 10-12) must not start until Milestone A is complete — the MCP server must never serve the broken signals.
+- Tasks must be executed in order. Milestone B (Tasks 10-14) must not start until Milestone A is complete — the MCP server must never serve the broken signals.
 
 **Out of scope (do not do these):** new HTML report features; PR cycle time / review comment density / rollback rate / deploy frequency signals; IDE telemetry; JUnit/pytest log parsing; the code-review-graph upstream PR (tracked as a separate beads issue, different repo).
 
@@ -1798,7 +1798,343 @@ the MCP server ships with the plugin."
 
 ---
 
-### Task 12: Release v1.0.0
+### Task 12: Ambient coupling guard — warn on edits to coupled files
+
+This is the differentiating agent-native feature: instead of waiting to be asked, the plugin warns Claude automatically when it edits a file whose temporal couple was not also edited — the classic "changed A, forgot B" defect source. Pull tools (MCP) answer questions; this hook injects forensics at the moment of the edit.
+
+**Files:**
+- Create: `src/black_box_unlock/guard.py`
+- Test: `tests/unit/test_guard.py`
+- Modify: `src/black_box_unlock/cli.py` (new `coupling-guard` command)
+- Create: `.claude-plugin/hooks/hooks.json`
+- Modify: `.gitignore` (add `.bbu/`)
+
+- [ ] **Step 1: Write the failing tests**
+
+Create `tests/unit/test_guard.py`:
+
+```python
+"""Unit tests for the coupling guard."""
+
+import json
+from unittest.mock import patch
+
+from black_box_unlock.guard import coupling_warnings
+
+
+def _cache_payload() -> dict:
+    return {
+        "files": [
+            {
+                "path": "src/auth.py",
+                "coupled_with": [
+                    {"file": "src/token.py", "ratio": 0.8},
+                    {"file": "src/util.py", "ratio": 0.3},
+                ],
+            },
+        ]
+    }
+
+
+class TestCouplingWarnings:
+    def test_warns_above_threshold_only(self, tmp_path):
+        cache = tmp_path / ".bbu" / "cache.json"
+        cache.parent.mkdir()
+        cache.write_text(json.dumps(_cache_payload()))
+
+        warnings = coupling_warnings("src/auth.py", tmp_path, threshold=0.5)
+
+        assert len(warnings) == 1
+        assert "src/token.py" in warnings[0]
+        assert "80%" in warnings[0]
+
+    def test_unknown_file_no_warnings(self, tmp_path):
+        cache = tmp_path / ".bbu" / "cache.json"
+        cache.parent.mkdir()
+        cache.write_text(json.dumps(_cache_payload()))
+
+        assert coupling_warnings("src/new.py", tmp_path) == []
+
+    @patch("black_box_unlock.guard.run_analysis")
+    def test_builds_cache_when_missing(self, mock_run, tmp_path):
+        from datetime import datetime
+
+        from black_box_unlock.core.models import AnalysisResult, AnalysisSummary
+
+        (tmp_path / ".git").mkdir()
+        mock_run.return_value = AnalysisResult(
+            repo="t",
+            analyzed_days=90,
+            generated_at=datetime(2026, 6, 12),
+            files=[],
+            summary=AnalysisSummary(total_files=0, high_risk_ownership=0, coupled_pairs=0),
+        )
+
+        coupling_warnings("src/auth.py", tmp_path)
+
+        mock_run.assert_called_once()
+        assert (tmp_path / ".bbu" / "cache.json").exists()
+```
+
+- [ ] **Step 2: Run to verify failure**
+
+Run: `uv run pytest tests/unit/test_guard.py -v`
+Expected: FAIL with `ModuleNotFoundError`
+
+- [ ] **Step 3: Implement `guard.py` and the CLI command**
+
+Create `src/black_box_unlock/guard.py`:
+
+```python
+"""Ambient coupling guard for editor/agent hooks.
+
+Reads a cached analysis (rebuilding it git-only if stale) and reports
+files temporally coupled to the one just edited. Must be fast and must
+never break an edit: failures degrade to silence by design.
+"""
+
+import json
+import time
+from pathlib import Path
+from typing import Any
+
+from .analysis import export_to_json, run_analysis
+
+CACHE_RELPATH = Path(".bbu") / "cache.json"
+CACHE_MAX_AGE_HOURS = 24
+
+
+def _load_or_build_cache(repo_path: Path) -> dict[str, Any]:
+    cache = repo_path / CACHE_RELPATH
+    if cache.exists() and time.time() - cache.stat().st_mtime < CACHE_MAX_AGE_HOURS * 3600:
+        return json.loads(cache.read_text())
+    result = run_analysis(repo_path, days=90, include_ci=False)
+    payload = export_to_json(result)
+    cache.parent.mkdir(exist_ok=True)
+    cache.write_text(payload)
+    return json.loads(payload)
+
+
+def coupling_warnings(file_path: str, repo_path: Path, threshold: float = 0.5) -> list[str]:
+    """Warnings for files strongly coupled to file_path (repo-relative)."""
+    data = _load_or_build_cache(repo_path)
+    for f in data.get("files", []):
+        if f["path"] == file_path:
+            return [
+                f"{file_path} historically co-changes with {c['file']} "
+                f"{round(c['ratio'] * 100)}% of the time - check whether that file "
+                "needs the same change"
+                for c in f.get("coupled_with", [])
+                if c["ratio"] >= threshold
+            ]
+    return []
+```
+
+Add to `src/black_box_unlock/cli.py` (after the `analyze_repo` command; add `import json` to the imports):
+
+```python
+@app.command()
+def coupling_guard(
+    file: str = typer.Argument(..., help="Repo-relative path of the edited file"),
+    repo: Path = typer.Option(Path("."), "--repo", help="Repository root"),
+    threshold: float = typer.Option(0.5, "--threshold", help="Minimum coupling ratio to warn"),
+) -> None:
+    """Emit a Claude Code hook warning when the edited file has strong temporal coupling.
+
+    Designed for PostToolUse hooks: prints hook JSON when there is something
+    to say, nothing otherwise. Never fails - a guard must not break an edit.
+    """
+    from black_box_unlock.guard import coupling_warnings
+
+    try:
+        warnings = coupling_warnings(file, repo, threshold)
+    except Exception:
+        raise typer.Exit(code=0) from None
+    if warnings:
+        print(
+            json.dumps(
+                {
+                    "hookSpecificOutput": {
+                        "hookEventName": "PostToolUse",
+                        "additionalContext": " ".join(warnings),
+                    }
+                }
+            )
+        )
+```
+
+Append `.bbu/` to `.gitignore`.
+
+- [ ] **Step 4: Run the tests, then pipe-test the hook command for real**
+
+Run: `uv run pytest tests/unit/test_guard.py -v` → 3 PASS
+
+Pipe-test in this repo (visualization files are coupled in real history; if this file has no strong couple, expect empty output — the point is no crash):
+
+```bash
+uv run bbu coupling-guard src/black_box_unlock/visualization/html.py
+echo "exit: $?"
+```
+
+Expected: exit 0; either nothing or a single JSON line with `hookSpecificOutput`.
+
+- [ ] **Step 5: Register the hook in the plugin**
+
+Create `.claude-plugin/hooks/hooks.json`:
+
+```json
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -r '.tool_input.file_path // empty' | { read -r f; [ -n \"$f\" ] && bbu coupling-guard \"${f#$PWD/}\" 2>/dev/null; } || true",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+Validate the wiring against the plugin-dev:hook-development skill (hook file location and plugin.json `hooks` field syntax) and run the plugin-dev:plugin-validator agent — the hooks-in-plugin schema is the one piece of this task to verify against current Claude Code docs rather than trust from memory.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add -A
+git commit -m "feat(plugin): ambient coupling guard warns on edits to coupled files
+
+PostToolUse hook: when a file is edited, warn if its temporal couple
+(ratio >= 0.5) was not part of the change - the classic changed-A-
+forgot-B defect source. Git-only cached analysis, silent on failure."
+```
+
+---
+
+### Task 13: Public release surface — positioning and PyPI
+
+The market window argument cuts both ways: a correct engine nobody can install is as invisible as no engine. Ship the install path.
+
+**Files:**
+- Modify: `README.md` (reposition: agent-native first)
+- Create: `.github/workflows/release.yml`
+
+- [ ] **Step 1: Reposition the README**
+
+Restructure `README.md` so the order after the logo/badges table is:
+
+1. One-paragraph pitch ending with: "Built for AI coding agents: forensic signals as MCP tools and a Claude Code plugin, so reviews and refactors are prioritized by evidence."
+2. `## For agents (MCP + plugin)` — new section, before everything else:
+
+````markdown
+## For agents (MCP + plugin)
+
+```bash
+uv tool install black-box-unlock   # provides bbu and bbu-mcp
+```
+
+Register the MCP server in Claude Code (`.mcp.json`):
+
+```json
+{ "mcpServers": { "black-box-unlock": { "command": "bbu-mcp" } } }
+```
+
+Tools: `get_hotspots`, `get_file_forensics`, `get_coupled_files`,
+`get_ownership`, `get_ci_failures`, `get_flaky_steps`.
+
+The Claude Code plugin (`.claude-plugin/`) adds `/analyze`, `/hotspots`,
+and an ambient coupling guard that warns when you edit one half of a
+temporally coupled file pair.
+````
+
+3. `## CLI` — the existing Usage section.
+4. `## HTML report` — existing content, with one added sentence: "The HTML report is feature-frozen; new signals land in JSON and MCP only."
+
+- [ ] **Step 2: Add the PyPI release workflow**
+
+Resolve current commit SHAs for the pinned actions (his CI standard — tags can be force-pushed):
+
+```bash
+gh api repos/actions/checkout/git/ref/tags/v6 --jq .object.sha
+gh api repos/astral-sh/setup-uv/git/ref/tags/v7 --jq .object.sha
+gh api repos/actions/attest-build-provenance/git/ref/tags/v3 --jq .object.sha
+gh api repos/pypa/gh-action-pypi-publish/git/ref/tags/release/v1 --jq .object.sha
+```
+
+(If a tag is itself an annotated tag object, dereference: append `^{}` via `gh api repos/<r>/git/tags/<sha> --jq .object.sha`.)
+
+Create `.github/workflows/release.yml`, substituting each `<SHA>` with the resolved value and keeping the version comment:
+
+```yaml
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@<SHA>  # v6
+      - uses: astral-sh/setup-uv@<SHA>  # v7
+      - run: uv build
+      - uses: actions/upload-artifact@<SHA>  # v4 - resolve SHA like the others
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+      attestations: write
+      contents: read
+    steps:
+      - uses: actions/download-artifact@<SHA>  # v4 - resolve SHA like the others
+        with:
+          name: dist
+          path: dist/
+      - uses: actions/attest-build-provenance@<SHA>  # v3
+        with:
+          subject-path: "dist/*"
+      - uses: pypa/gh-action-pypi-publish@<SHA>  # release/v1
+```
+
+Manual prerequisite (tell the user, cannot be automated): create the `black-box-unlock` project on PyPI with trusted publishing configured for this repo + `release.yml` + environment `pypi`.
+
+- [ ] **Step 3: Verify the build locally**
+
+```bash
+uv build
+ls dist/   # expect black_box_unlock-*.whl and .tar.gz
+uv run python -m zipfile -l dist/black_box_unlock-*.whl | head
+```
+
+Expected: wheel contains `black_box_unlock/` modules including `mcp_server.py`.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add README.md .github/workflows/release.yml
+git commit -m "feat(release): agent-first README positioning, PyPI publish workflow
+
+Trusted publishing with Sigstore attestations; actions pinned to SHAs."
+```
+
+---
+
+### Task 14: Release v1.0.0
 
 **Files:**
 - Modify: `pyproject.toml`, `src/black_box_unlock/__init__.py`, `CHANGELOG.md`, `uv.lock`
@@ -1812,7 +2148,7 @@ the MCP server ships with the plugin."
 
 - [ ] **Step 2: CHANGELOG**
 
-Move everything under `## [Unreleased]` into a new `## [1.0.0] - <today's date>` section. The section must include the gmap removal, hotspot formula fix, defect linkage, flaky rewrite, repo threading, MCP server, and plugin rewrite entries accumulated during Tasks 1-11.
+Move everything under `## [Unreleased]` into a new `## [1.0.0] - <today's date>` section. The section must include the gmap removal, hotspot formula fix, defect linkage, flaky rewrite, repo threading, MCP server, plugin rewrite, coupling guard, and PyPI release entries accumulated during Tasks 1-13.
 
 - [ ] **Step 3: Final verification**
 
@@ -1834,9 +2170,15 @@ git tag v1.0.0
 git push && git push --tags
 ```
 
-Wait for CI on the push and confirm it is green (`gh run list --limit 1`) before declaring done.
+Wait for CI on the push and confirm it is green (`gh run list --limit 1`). The tag also triggers the Release workflow (Task 13) — confirm it publishes to PyPI before declaring done. If trusted publishing was not yet configured on PyPI (Task 13 manual prerequisite), the publish job will fail with an OIDC error: configure it and re-run the job, do not re-tag.
 
 ---
+
+## v1.1 candidates (deliberately not in this plan)
+
+- **Function-level forensics (Tornhill's X-Ray):** per-function churn via diff hunk parsing — the largest analytical upgrade available, and the one CodeScene paywalls. Big lift (function boundary detection); do it once v1.0 has users.
+- **Self-validation:** with bugfix linkage shipped, compute the hotspot-rank vs bugfix-density correlation across real repos and publish the number. The tool proving its own pitch.
+- **code-review-graph upstream PR** (BBU-6350): churn term in crg's `compute_risk_score`, native git, no bbu dependency.
 
 ## Self-review notes
 

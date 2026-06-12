@@ -126,6 +126,25 @@ class FunctionChurn(BaseModel):
         return self.revisions * self.complexity
 
 
+class FunctionCoupling(BaseModel):
+    """Two functions in the same file that change together (X-Ray internal coupling)."""
+
+    function_a: str
+    function_b: str
+    shared_revisions: int
+    revisions_a: int
+    revisions_b: int
+
+    @computed_field
+    @property
+    def coupling_ratio(self) -> float:
+        """Ratio of shared revisions to the less-changed function (Tornhill's formula)."""
+        min_revisions = min(self.revisions_a, self.revisions_b)
+        if min_revisions == 0:
+            return 0.0
+        return self.shared_revisions / min_revisions
+
+
 class FileXRay(BaseModel):
     """X-Ray result for one file."""
 
@@ -134,6 +153,7 @@ class FileXRay(BaseModel):
     revisions_analyzed: int
     revision_cap_hit: bool
     functions: list[FunctionChurn]
+    coupling: list[FunctionCoupling] = []
 
 
 class FileForensics(BaseModel):  # [4a.3] Combined forensics

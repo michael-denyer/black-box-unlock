@@ -147,3 +147,33 @@ class TestFileForensicsFunctions:
 
         f = FileForensics(path="a.py", commits=1, lines_changed=1, authors=[], coupled_with=[])
         assert f.functions == []
+
+
+class TestFunctionCoupling:
+    def test_ratio_uses_min_revisions(self):
+        from black_box_unlock.core.models import FunctionCoupling
+
+        c = FunctionCoupling(
+            function_a="alpha",
+            function_b="beta",
+            shared_revisions=3,
+            revisions_a=4,
+            revisions_b=6,
+        )
+        assert c.coupling_ratio == 0.75
+
+    def test_zero_min_revisions_gives_zero_ratio(self):
+        from black_box_unlock.core.models import FunctionCoupling
+
+        c = FunctionCoupling(
+            function_a="a", function_b="b", shared_revisions=0, revisions_a=0, revisions_b=5
+        )
+        assert c.coupling_ratio == 0.0
+
+    def test_filexray_coupling_defaults_empty(self):
+        from black_box_unlock.core.models import FileXRay
+
+        xr = FileXRay(
+            path="a.py", days=365, revisions_analyzed=1, revision_cap_hit=False, functions=[]
+        )
+        assert xr.coupling == []

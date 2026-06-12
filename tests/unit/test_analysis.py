@@ -5,15 +5,11 @@ from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
-
 from black_box_unlock.analysis import (
     _fetch_ci_failures,
-    _fetch_gmap_data,
     export_to_json,
     run_analysis,
 )
-from black_box_unlock.core.exceptions import GitToolNotFoundError
 from black_box_unlock.core.models import (
     AnalysisResult,
     AnalysisSummary,
@@ -175,7 +171,7 @@ class TestRunAnalysis:
             ]
         }
 
-        with patch("black_box_unlock.analysis._fetch_gmap_data") as mock_fetch:
+        with patch("black_box_unlock.analysis.fetch_git_history") as mock_fetch:
             mock_fetch.return_value = gmap_output
             result = run_analysis(Path("/fake/repo"), days=30)
 
@@ -205,7 +201,7 @@ class TestRunAnalysis:
             ]
         }
 
-        with patch("black_box_unlock.analysis._fetch_gmap_data") as mock_fetch:
+        with patch("black_box_unlock.analysis.fetch_git_history") as mock_fetch:
             mock_fetch.return_value = gmap_output
             result = run_analysis(Path("/fake/repo"), days=30)
 
@@ -236,7 +232,7 @@ class TestRunAnalysis:
             ]
         }
 
-        with patch("black_box_unlock.analysis._fetch_gmap_data") as mock_fetch:
+        with patch("black_box_unlock.analysis.fetch_git_history") as mock_fetch:
             mock_fetch.return_value = gmap_output
             result = run_analysis(Path("/fake/repo"), days=30, min_coupling=0.3)
 
@@ -278,7 +274,7 @@ class TestRunAnalysis:
             ]
         }
 
-        with patch("black_box_unlock.analysis._fetch_gmap_data") as mock_fetch:
+        with patch("black_box_unlock.analysis.fetch_git_history") as mock_fetch:
             mock_fetch.return_value = gmap_output
             result = run_analysis(Path("/fake/repo"), days=30)
 
@@ -358,7 +354,7 @@ class TestRunAnalysisWithCIData:
     """Tests for CI data integration in analysis."""
 
     @patch("black_box_unlock.analysis._fetch_ci_failures")
-    @patch("black_box_unlock.analysis._fetch_gmap_data")
+    @patch("black_box_unlock.analysis.fetch_git_history")
     def test_includes_build_failures_in_file_forensics(self, mock_gmap, mock_ci):
         """File forensics includes build_failures from CI data."""
         mock_gmap.return_value = {
@@ -378,7 +374,7 @@ class TestRunAnalysisWithCIData:
         assert main_file.build_failures == 2
 
     @patch("black_box_unlock.analysis._fetch_ci_failures")
-    @patch("black_box_unlock.analysis._fetch_gmap_data")
+    @patch("black_box_unlock.analysis.fetch_git_history")
     def test_defaults_build_failures_to_zero_when_file_not_in_ci_data(self, mock_gmap, mock_ci):
         """Files not in CI data get build_failures=0."""
         mock_gmap.return_value = {
@@ -398,7 +394,7 @@ class TestRunAnalysisWithCIData:
         assert main_file.build_failures == 0
 
     @patch("black_box_unlock.analysis._fetch_ci_failures")
-    @patch("black_box_unlock.analysis._fetch_gmap_data")
+    @patch("black_box_unlock.analysis.fetch_git_history")
     def test_skips_ci_fetch_when_include_ci_is_false(self, mock_gmap, mock_ci):
         """Does not call _fetch_ci_failures when include_ci=False."""
         mock_gmap.return_value = {
@@ -416,7 +412,7 @@ class TestRunAnalysisWithCIData:
         mock_ci.assert_not_called()
 
     @patch("black_box_unlock.analysis._fetch_ci_failures")
-    @patch("black_box_unlock.analysis._fetch_gmap_data")
+    @patch("black_box_unlock.analysis.fetch_git_history")
     def test_include_ci_defaults_to_true(self, mock_gmap, mock_ci):
         """include_ci parameter defaults to True."""
         mock_gmap.return_value = {
@@ -433,22 +429,6 @@ class TestRunAnalysisWithCIData:
         run_analysis(Path("/fake/repo"), days=30)
 
         mock_ci.assert_called_once()
-
-
-class TestFetchGmapData:
-    """Tests for _fetch_gmap_data helper."""
-
-    @patch("black_box_unlock.analysis.subprocess.run")
-    def test_raises_git_tool_not_found_when_gmap_missing(self, mock_run):
-        """Raises GitToolNotFoundError with install guidance when gmap binary is absent."""
-        mock_run.side_effect = FileNotFoundError(2, "No such file or directory", "gmap")
-
-        with pytest.raises(GitToolNotFoundError) as exc_info:
-            _fetch_gmap_data(Path("/fake/repo"), days=30)
-
-        message = str(exc_info.value)
-        assert "gmap" in message
-        assert "cargo install gmap" in message
 
 
 class TestFetchCIFailures:

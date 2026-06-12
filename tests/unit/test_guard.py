@@ -32,6 +32,32 @@ class TestCouplingWarnings:
         assert "src/token.py" in warnings[0]
         assert "80%" in warnings[0]
 
+    def test_tied_ratios_break_by_path_ascending(self, tmp_path):
+        """Equal ratios must name files deterministically, not in cache order."""
+        payload = {
+            "files": [
+                {
+                    "path": "src/hub.py",
+                    "coupled_with": [
+                        {"file": "zeta.py", "ratio": 1.0},
+                        {"file": "alpha.py", "ratio": 1.0},
+                        {"file": "mid.py", "ratio": 1.0},
+                        {"file": "beta.py", "ratio": 1.0},
+                    ],
+                },
+            ]
+        }
+        cache = tmp_path / ".bbu" / "cache.json"
+        cache.parent.mkdir()
+        cache.write_text(json.dumps(payload))
+
+        warnings = coupling_warnings("src/hub.py", tmp_path)
+
+        assert "alpha.py" in warnings[0]
+        assert "beta.py" in warnings[1]
+        assert "mid.py" in warnings[2]
+        assert "+1 more" in warnings[3]
+
     def test_unknown_file_no_warnings(self, tmp_path):
         cache = tmp_path / ".bbu" / "cache.json"
         cache.parent.mkdir()

@@ -82,9 +82,9 @@ User-facing commands via Typer CLI.
 
 | ID | Component | Description | File:Line |
 |----|-----------|-------------|-----------|
-| 1a | CLI App | Typer application with `bbu` command | [cli.py:32](../src/black_box_unlock/cli.py#L32) |
-| 1a.1 | analyze_repo | Main analysis command | [cli.py:47](../src/black_box_unlock/cli.py#L47) |
-| 1a.2 | version | Version info command | [cli.py:70](../src/black_box_unlock/cli.py#L70) |
+| 1a | CLI App | Typer application with `bbu` command | [cli.py:34](../src/black_box_unlock/cli.py#L34) |
+| 1a.1 | analyze_repo | Main analysis command | [cli.py:49](../src/black_box_unlock/cli.py#L49) |
+| 1a.2 | version | Version info command | [cli.py:78](../src/black_box_unlock/cli.py#L78) |
 
 ---
 
@@ -170,7 +170,7 @@ Pydantic models and shared infrastructure.
 | 4a.1 | TemporalCoupling | File pair co-change | [models.py:50](../src/black_box_unlock/core/models.py#L50) |
 | 4a.2 | FileOwnership | Authors per file | [models.py:72](../src/black_box_unlock/core/models.py#L72) |
 | 4a.3 | FileForensics | Combined forensics | [models.py:111](../src/black_box_unlock/core/models.py#L111) |
-| 4a.4 | AnalysisResult | Complete analysis output | [models.py:147](../src/black_box_unlock/core/models.py#L147) |
+| 4a.4 | AnalysisResult | Complete analysis output | [models.py:187](../src/black_box_unlock/core/models.py#L187) |
 | 4b | Exceptions | Custom exception classes | [exceptions.py:4](../src/black_box_unlock/core/exceptions.py#L4) |
 | 4c | configure_logging | Loguru configuration | [logging.py:8](../src/black_box_unlock/core/logging.py#L8) |
 
@@ -229,8 +229,8 @@ HTML report generation with interactive visualizations.
 
 | ID | Component | Description | File:Line |
 |----|-----------|-------------|-----------|
-| 5a | generate_html_report | Generate complete HTML | [html.py:547](../src/black_box_unlock/visualization/html.py#L547) |
-| 5a.1 | _get_severity_class | Severity CSS class mapping | [html.py:524](../src/black_box_unlock/visualization/html.py#L524) |
+| 5a | generate_html_report | Generate complete HTML | [html.py:807](../src/black_box_unlock/visualization/html.py#L807) |
+| 5a.1 | _get_severity_class | Severity CSS class mapping | [html.py:782](../src/black_box_unlock/visualization/html.py#L782) |
 | 5a.2 | HTML_TEMPLATE | Full HTML page template | [html.py:9](../src/black_box_unlock/visualization/html.py#L9) |
 | 5b | build_treemap_data | Plotly treemap format | [treemap.py:6](../src/black_box_unlock/visualization/treemap.py#L6) |
 | 5c | build_coupling_graph_data | Cytoscape.js graph format | [coupling_graph.py:40](../src/black_box_unlock/visualization/coupling_graph.py#L40) |

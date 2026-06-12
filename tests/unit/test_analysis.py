@@ -455,6 +455,98 @@ class TestRunAnalysisWithCIData:
         assert auth.bugfix_commits == 1
 
 
+class TestFlakyStepsInPipeline:
+    @patch("black_box_unlock.analysis.detect_flaky_steps")
+    @patch("black_box_unlock.analysis._fetch_ci_failures")
+    @patch("black_box_unlock.analysis.fetch_git_history")
+    def test_populates_flaky_steps(self, mock_hist, mock_ci, mock_flaky):
+        from datetime import datetime
+
+        from black_box_unlock.cicd.models import FlakyStep
+
+        mock_hist.return_value = {"entries": []}
+        mock_ci.return_value = {}
+        mock_flaky.return_value = [
+            FlakyStep(
+                job_name="test (3.11)",
+                step_name="Run tests",
+                first_seen=datetime(2026, 6, 1),
+                last_seen=datetime(2026, 6, 2),
+                total_runs=2,
+                failures=1,
+                flaky_count=1,
+            )
+        ]
+
+        result = run_analysis(Path("/fake/repo"), days=30, include_ci=True)
+
+        assert len(result.flaky_steps) == 1
+        assert result.flaky_steps[0].step_name == "Run tests"
+
+    @patch("black_box_unlock.analysis.detect_flaky_steps")
+    @patch("black_box_unlock.analysis.fetch_git_history")
+    def test_no_ci_skips_flaky_fetch(self, mock_hist, mock_flaky):
+        mock_hist.return_value = {"entries": []}
+
+        run_analysis(Path("/fake/repo"), days=30, include_ci=False)
+
+        mock_flaky.assert_not_called()
+
+    @patch("black_box_unlock.analysis.detect_flaky_steps")
+    @patch("black_box_unlock.analysis._fetch_ci_failures")
+    @patch("black_box_unlock.analysis.fetch_git_history")
+    def test_flaky_fetch_failure_degrades_gracefully(self, mock_hist, mock_ci, mock_flaky):
+        mock_hist.return_value = {"entries": []}
+        mock_ci.return_value = {}
+        mock_flaky.side_effect = Exception("gh not authenticated")
+
+        result = run_analysis(Path("/fake/repo"), days=30, include_ci=True)
+
+        assert result.flaky_steps == []
+
+    @patch("black_box_unlock.analysis.detect_flaky_steps")
+    @patch("black_box_unlock.analysis._fetch_ci_failures")
+    @patch("black_box_unlock.analysis.fetch_git_history")
+    def test_merges_duplicate_steps_across_runs(self, mock_hist, mock_ci, mock_flaky):
+        """The same (job, step) flaky in two different runs becomes one summary."""
+        from datetime import datetime
+
+        from black_box_unlock.cicd.models import FlakyStep
+
+        mock_hist.return_value = {"entries": []}
+        mock_ci.return_value = {}
+        mock_flaky.return_value = [
+            FlakyStep(
+                job_name="test (3.11)",
+                step_name="Run tests",
+                first_seen=datetime(2026, 6, 1),
+                last_seen=datetime(2026, 6, 2),
+                total_runs=2,
+                failures=1,
+                flaky_count=1,
+            ),
+            FlakyStep(
+                job_name="test (3.11)",
+                step_name="Run tests",
+                first_seen=datetime(2026, 6, 3),
+                last_seen=datetime(2026, 6, 4),
+                total_runs=3,
+                failures=2,
+                flaky_count=2,
+            ),
+        ]
+
+        result = run_analysis(Path("/fake/repo"), days=30, include_ci=True)
+
+        assert len(result.flaky_steps) == 1
+        merged = result.flaky_steps[0]
+        assert merged.total_runs == 5
+        assert merged.failures == 3
+        assert merged.flaky_count == 3
+        assert merged.first_seen == datetime(2026, 6, 1)
+        assert merged.last_seen == datetime(2026, 6, 4)
+
+
 class TestFetchCIFailures:
     """Tests for _fetch_ci_failures helper."""
 

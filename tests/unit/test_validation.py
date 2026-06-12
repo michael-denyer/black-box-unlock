@@ -1,10 +1,20 @@
 """Unit tests for hotspot-vs-bugfix self-validation."""
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
-from black_box_unlock.validation import spearman_rho, split_history
+from black_box_unlock.core.exceptions import InsufficientHistoryError
+from black_box_unlock.validation import spearman_rho, split_history, validate_repo
+
+INDENTED = "def f(x):\n    if x:\n        return 1\n    return 0\n"
+FLAT = "X = 1\nY = 2\n"
+
+
+def _days_ago(n: int) -> str:
+    return (datetime.now(timezone.utc) - timedelta(days=n)).isoformat()
 
 
 def _entry(timestamp: str, message: str = "feat: x", paths: list[str] | None = None) -> dict:
@@ -70,3 +80,75 @@ class TestSplitHistory:
         train, test = split_history({"entries": []}, self.CUTOFF)
         assert train["entries"] == []
         assert test["entries"] == []
+
+
+def _fake_history() -> dict:
+    # Train half (older than the 50-day cutoff for days=100, split=0.5):
+    # hot.py churns 3x, cold.py once. Test half: 2 bugfix commits touch hot.py.
+    return {
+        "entries": [
+            _entry(_days_ago(90), "feat: a", ["hot.py"]),
+            _entry(_days_ago(80), "feat: b", ["hot.py", "cold.py"]),
+            _entry(_days_ago(70), "feat: c", ["hot.py", "gone.py"]),
+            _entry(_days_ago(30), "fix: crash", ["hot.py"]),
+            _entry(_days_ago(10), "fix: regression", ["hot.py"]),
+        ]
+    }
+
+
+class TestValidateRepo:
+    def _run(self, tmp_path: Path):
+        (tmp_path / "hot.py").write_text(INDENTED)
+        (tmp_path / "cold.py").write_text(FLAT)
+        # gone.py intentionally absent: deleted files drop out of the universe
+        with patch("black_box_unlock.validation.fetch_git_history") as mock_fetch:
+            mock_fetch.return_value = _fake_history()
+            return validate_repo(tmp_path, days=100, split=0.5)
+
+    def test_correlates_train_hotspots_with_test_bugfixes(self, tmp_path):
+        result = self._run(tmp_path)
+        assert result.spearman == pytest.approx(1.0)  # hot.py: top score, all fixes
+
+    def test_universe_excludes_deleted_files(self, tmp_path):
+        result = self._run(tmp_path)
+        assert result.file_count == 2  # hot.py, cold.py — not gone.py
+
+    def test_top_decile_share_counts_bugfix_touches(self, tmp_path):
+        # universe of 2 -> top decile is ceil(0.2)=1 file (hot.py) with all touches
+        result = self._run(tmp_path)
+        assert result.top_decile_share == pytest.approx(1.0)
+        assert result.test_bugfix_touches == 2
+
+    def test_coverage_is_full_when_all_fixes_hit_ranked_files(self, tmp_path):
+        result = self._run(tmp_path)
+        assert result.bugfix_coverage == pytest.approx(1.0)
+
+    def test_no_test_window_bugfixes_yields_none_share(self, tmp_path):
+        (tmp_path / "hot.py").write_text(INDENTED)
+        history = {
+            "entries": [
+                _entry(_days_ago(90), "feat: a", ["hot.py"]),
+                _entry(_days_ago(10), "feat: quiet period", ["hot.py"]),
+            ]
+        }
+        with patch("black_box_unlock.validation.fetch_git_history") as mock_fetch:
+            mock_fetch.return_value = history
+            result = validate_repo(tmp_path, days=100, split=0.5)
+        assert result.top_decile_share is None
+        assert result.bugfix_coverage is None
+
+    def test_empty_train_half_raises(self, tmp_path):
+        (tmp_path / "hot.py").write_text(INDENTED)
+        history = {"entries": [_entry(_days_ago(10), "feat: a", ["hot.py"])]}
+        with patch("black_box_unlock.validation.fetch_git_history") as mock_fetch:
+            mock_fetch.return_value = history
+            with pytest.raises(InsufficientHistoryError):
+                validate_repo(tmp_path, days=100, split=0.5)
+
+    def test_empty_test_half_raises(self, tmp_path):
+        (tmp_path / "hot.py").write_text(INDENTED)
+        history = {"entries": [_entry(_days_ago(90), "feat: a", ["hot.py"])]}
+        with patch("black_box_unlock.validation.fetch_git_history") as mock_fetch:
+            mock_fetch.return_value = history
+            with pytest.raises(InsufficientHistoryError):
+                validate_repo(tmp_path, days=100, split=0.5)

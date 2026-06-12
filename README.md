@@ -1,5 +1,4 @@
 
-
 <table width="100%">
 <tr>
 <td width="250">
@@ -22,8 +21,6 @@ Key insight: **2-8% of files cause 60-90% of defects**. Built for AI coding agen
 </td>
 </tr>
 </table>
-
-
 
 ## For agents (MCP + plugin)
 
@@ -134,7 +131,7 @@ flowchart LR
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for full details.
 
-```
+```text
 src/black_box_unlock/
 ├── cli.py              # Typer CLI
 ├── complexity.py       # Indentation-depth complexity proxy

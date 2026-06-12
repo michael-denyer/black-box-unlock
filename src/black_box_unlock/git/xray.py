@@ -8,9 +8,16 @@ hunk-header function name, which git truncates at ~80 bytes.
 """
 
 import re
+import subprocess
+import tempfile
+from collections import defaultdict
 from dataclasses import dataclass, field
+from pathlib import Path
 
-from ..spans import FunctionSpan, span_at
+from ..complexity import indentation_complexity_lines
+from ..core.exceptions import GitToolNotFoundError, NotAGitRepoError
+from ..core.models import FileXRay, FunctionChurn
+from ..spans import FunctionSpan, indentation_spans, python_spans, span_at
 
 _COMMIT_MARKER = "\x01"
 _PRETTY_FORMAT = f"{_COMMIT_MARKER}%H"
@@ -130,3 +137,143 @@ def _attribute_hunk(hunk: Hunk, spans: list[FunctionSpan]) -> dict[str, list[int
         if span:
             out.setdefault(span.name, [0, 0])[1] += hunk.old_count
     return out
+
+
+def _git_patch_log(repo_path: Path, file_path: str, days: int) -> str:
+    """Run one `git log -p -U0` pass for the file, with diff drivers injected."""
+    attrs = tempfile.NamedTemporaryFile("w", suffix=".gitattributes", delete=False)
+    attrs.write(_attributes_content())
+    attrs.close()
+    cmd = [
+        "git",
+        "-c",
+        f"core.attributesFile={attrs.name}",
+        "-c",
+        "core.quotePath=false",
+        "-C",
+        str(repo_path),
+        "log",
+        f"--since={days} days ago",
+        "--no-renames",
+        "-p",
+        "-U0",
+        f"--pretty=format:{_PRETTY_FORMAT}",
+        "--",
+        file_path,
+    ]
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+    except FileNotFoundError as e:
+        raise GitToolNotFoundError("git not found on PATH") from e
+    except subprocess.CalledProcessError as e:
+        if e.returncode == 128 and (
+            "does not have any commits" in e.stderr or "bad default revision" in e.stderr
+        ):
+            return ""
+        raise
+    finally:
+        Path(attrs.name).unlink(missing_ok=True)
+    return result.stdout
+
+
+def _show(repo_path: Path, sha: str, file_path: str) -> str | None:
+    """Return file content at a revision; None if absent there (e.g. deletion commit)."""
+    result = subprocess.run(
+        ["git", "-C", str(repo_path), "show", f"{sha}:{file_path}"],
+        capture_output=True,
+        text=True,
+    )
+    return result.stdout if result.returncode == 0 else None
+
+
+def _spans_for(source: str) -> list[FunctionSpan]:
+    try:
+        return python_spans(source)
+    except SyntaxError:
+        return indentation_spans(source)
+
+
+def xray_file(repo_path: Path, file_path: str, days: int = 365, rev_cap: int = 200) -> FileXRay:
+    """Compute per-function churn for one file (Tornhill's X-Ray).
+
+    Ranks the file's functions by revisions x current indentation complexity.
+    Python files get exact ast attribution per revision; other languages use
+    git hunk-header names (complexity 0.0, ranked by revisions).
+
+    Raises:
+        NotAGitRepoError: If repo_path is not a git repository.
+        GitToolNotFoundError: If the git binary is not installed.
+    """
+    if not (repo_path / ".git").exists():
+        raise NotAGitRepoError(f"Not a git repository: {repo_path}")
+
+    commits = parse_patch_log(_git_patch_log(repo_path, file_path, days))
+    cap_hit = len(commits) > rev_cap
+    commits = commits[:rev_cap]  # git log emits newest first
+    is_python = file_path.endswith(".py")
+
+    tallies: dict[str, list[int]] = defaultdict(lambda: [0, 0])  # name -> [added, deleted]
+    touched: dict[str, set[str]] = defaultdict(set)  # name -> commit shas
+    for commit in commits:
+        spans: list[FunctionSpan] = []
+        if is_python:
+            content = _show(repo_path, commit.sha, file_path)
+            if content is not None:
+                spans = _spans_for(content)
+        for hunk in commit.hunks:
+            for name, (added, deleted) in _attribute_hunk(hunk, spans).items():
+                tallies[name][0] += added
+                tallies[name][1] += deleted
+                touched[name].add(commit.sha)
+
+    functions = _build_functions(repo_path, file_path, is_python, tallies, touched)
+    functions.sort(key=lambda f: (-f.hotspot_score, -f.revisions, f.name))
+    return FileXRay(
+        path=file_path,
+        days=days,
+        revisions_analyzed=len(commits),
+        revision_cap_hit=cap_hit,
+        functions=functions,
+    )
+
+
+def _build_functions(
+    repo_path: Path,
+    file_path: str,
+    is_python: bool,
+    tallies: dict[str, list[int]],
+    touched: dict[str, set[str]],
+) -> list[FunctionChurn]:
+    """Join churn tallies onto the current snapshot's spans (Python) or pass through."""
+    if not is_python:
+        return [
+            FunctionChurn(
+                name=name,
+                revisions=len(touched[name]),
+                lines_added=added,
+                lines_deleted=deleted,
+            )
+            for name, (added, deleted) in tallies.items()
+        ]
+    full_path = repo_path / file_path
+    if not full_path.exists():
+        return []
+    lines = full_path.read_text(errors="ignore").splitlines()
+    current = {s.name: s for s in _spans_for("\n".join(lines))}
+    functions: list[FunctionChurn] = []
+    for name, (added, deleted) in tallies.items():
+        span = current.get(name)
+        if span is None:
+            continue  # vanished within the window; ranking targets current code
+        functions.append(
+            FunctionChurn(
+                name=name,
+                start_line=span.start,
+                end_line=span.end,
+                revisions=len(touched[name]),
+                lines_added=added,
+                lines_deleted=deleted,
+                complexity=indentation_complexity_lines(lines[span.start - 1 : span.end]),
+            )
+        )
+    return functions

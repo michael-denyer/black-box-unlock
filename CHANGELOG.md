@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - README documents the `gmap` Rust CLI as a required runtime dependency (`cargo install gmap`)
 
+### Changed
+- Git history extraction is now native (`git log --numstat`) — the gmap Rust CLI is no longer required
+
 ## [0.3.0] - 2026-01-26
 
 ### Added

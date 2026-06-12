@@ -4,19 +4,19 @@ from collections import defaultdict
 
 from ..core.models import FileOwnership
 
-# Type alias for gmap JSON structure
-GmapData = dict
+# Type alias for git history JSON structure
+GitHistoryData = dict
 
 
-def parse_ownership_from_gmap(
-    gmap_data: GmapData,
+def parse_ownership_from_history(
+    history: GitHistoryData,
 ) -> list[FileOwnership]:  # [3c] Parse authors per file
-    """Parse gmap JSON output into FileOwnership models.
+    """Parse git history entries into FileOwnership models.
 
     Aggregates unique authors and commit counts per file across all entries.
 
     Args:
-        gmap_data: Parsed JSON from gmap export --json.
+        history: Parsed git history dict with "entries" list.
 
     Returns:
         List of FileOwnership models, one per unique file path.
@@ -24,7 +24,7 @@ def parse_ownership_from_gmap(
     file_authors: dict[str, set[str]] = defaultdict(set)
     file_commits: dict[str, int] = defaultdict(int)
 
-    for entry in gmap_data.get("entries", []):
+    for entry in history.get("entries", []):
         author = entry.get("author_email", "").strip()
         if not author:
             author = "unknown"
@@ -44,5 +44,6 @@ def parse_ownership_from_gmap(
     ]
 
 
-# Backward compatibility alias
-calculate_file_ownership = parse_ownership_from_gmap
+# Backward compatibility aliases
+parse_ownership_from_gmap = parse_ownership_from_history
+calculate_file_ownership = parse_ownership_from_history

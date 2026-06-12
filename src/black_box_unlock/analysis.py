@@ -1,7 +1,6 @@
 """Repository analysis combining git forensics."""
 
 import json
-import subprocess
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -11,16 +10,16 @@ from .cicd.github_actions import (
     build_failures_from_runs,
     fetch_workflow_runs,
 )
-from .core.exceptions import GitToolNotFoundError
 from .core.models import (
     AnalysisResult,
     AnalysisSummary,
     CouplingInfo,
     FileForensics,
 )
-from .git.churn import parse_gmap_output
+from .git.churn import parse_history_entries
 from .git.coupling import detect_temporal_coupling
-from .git.ownership import parse_ownership_from_gmap
+from .git.log import fetch_git_history
+from .git.ownership import parse_ownership_from_history
 
 
 def _fetch_ci_failures() -> dict[str, int]:
@@ -36,33 +35,6 @@ def _fetch_ci_failures() -> dict[str, int]:
     except Exception:
         # CI data is optional - gracefully degrade
         return {}
-
-
-def _fetch_gmap_data(repo_path: Path, days: int) -> dict:  # [2a.1] Fetch git history via gmap
-    """Fetch git history data using gmap CLI.
-
-    Raises:
-        GitToolNotFoundError: If the gmap binary is not installed.
-    """
-    cmd = [
-        "gmap",
-        "--repo",
-        str(repo_path),
-        "--since",
-        f"{days} days ago",
-        "export",
-        "--json",
-    ]
-    try:
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-    except FileNotFoundError as e:
-        raise GitToolNotFoundError(
-            "gmap CLI not found. bbu uses gmap (a Rust tool) to extract git history. "
-            "Install it with: cargo install gmap "
-            "(requires Rust; tested with gmap >= 0.4.0). "
-            "See https://crates.io/crates/gmap"
-        ) from e
-    return json.loads(result.stdout)
 
 
 def run_analysis(  # [2a] Main analysis pipeline
@@ -82,7 +54,7 @@ def run_analysis(  # [2a] Main analysis pipeline
     Returns:
         AnalysisResult with file forensics and summary.
     """
-    gmap_data = _fetch_gmap_data(repo_path, days)
+    history = fetch_git_history(repo_path, days)
 
     # Fetch CI data if requested
     ci_failures: dict[str, int] = {}
@@ -90,9 +62,9 @@ def run_analysis(  # [2a] Main analysis pipeline
         ci_failures = _fetch_ci_failures()
 
     # Parse individual analyses
-    churn_list = parse_gmap_output(gmap_data)
-    ownership_list = parse_ownership_from_gmap(gmap_data)
-    coupling_list = detect_temporal_coupling(gmap_data, min_ratio=min_coupling)
+    churn_list = parse_history_entries(history)
+    ownership_list = parse_ownership_from_history(history)
+    coupling_list = detect_temporal_coupling(history, min_ratio=min_coupling)
 
     # Index by path for joining
     churn_by_path = {c.path: c for c in churn_list}

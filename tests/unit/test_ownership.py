@@ -3,7 +3,7 @@
 import pytest
 
 from black_box_unlock.core.models import FileOwnership
-from black_box_unlock.git.ownership import calculate_file_ownership, parse_ownership_from_gmap
+from black_box_unlock.git.ownership import calculate_file_ownership, parse_ownership_from_history
 
 
 class TestFileOwnershipModel:
@@ -139,7 +139,7 @@ class TestCalculateFileOwnership:
             ]
         }
 
-        result = parse_ownership_from_gmap(gmap_data)
+        result = parse_ownership_from_history(gmap_data)
 
         assert len(result) == 2
         a_ownership = next(o for o in result if o.path == "a.py")
@@ -148,6 +148,6 @@ class TestCalculateFileOwnership:
         assert a_ownership.authors == ["unknown"]
         assert b_ownership.authors == ["unknown"]
 
-    def test_parse_ownership_from_gmap_is_aliased(self):
-        """calculate_file_ownership is an alias for parse_ownership_from_gmap."""
-        assert calculate_file_ownership is parse_ownership_from_gmap
+    def test_calculate_file_ownership_is_aliased(self):
+        """calculate_file_ownership is an alias for parse_ownership_from_history."""
+        assert calculate_file_ownership is parse_ownership_from_history

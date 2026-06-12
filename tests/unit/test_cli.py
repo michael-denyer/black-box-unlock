@@ -94,6 +94,19 @@ class TestAnalyzeRepoCommand:
         call_kwargs = mock_run_analysis.call_args[1]
         assert call_kwargs.get("include_ci") is False
 
+    def test_repo_option_is_passed_to_run_analysis(self):
+        """--repo option sets the repo path."""
+        mock_result = MagicMock()
+        mock_result.files = []
+
+        with patch("black_box_unlock.cli.run_analysis") as mock_analysis:
+            mock_analysis.return_value = mock_result
+            with patch("black_box_unlock.cli.export_to_json") as mock_export:
+                mock_export.return_value = "{}"
+                runner.invoke(app, ["analyze-repo", "--repo", "/some/repo", "--output", "json"])
+
+        assert mock_analysis.call_args[0][0] == Path("/some/repo")
+
     def test_ci_included_by_default(self):
         """Without --no-ci, include_ci defaults to True."""
         mock_result = MagicMock()

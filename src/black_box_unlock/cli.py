@@ -53,6 +53,9 @@ def analyze_repo(  # [1a.1] Main analysis command
     min_coupling: float = typer.Option(0.3, help="Minimum coupling ratio to include"),
     no_ci: bool = typer.Option(False, "--no-ci", help="Skip CI failure analysis"),
     repo: Path = typer.Option(Path("."), "--repo", help="Path to the git repository to analyze"),
+    xray_top: int = typer.Option(
+        5, "--xray-top", help="Auto X-Ray the top N hotspot files (0 disables)"
+    ),
 ) -> None:
     """Analyze repository git history for code forensics.
 
@@ -61,7 +64,13 @@ def analyze_repo(  # [1a.1] Main analysis command
     """
     repo_path = repo
     try:
-        result = run_analysis(repo_path, days=days, min_coupling=min_coupling, include_ci=not no_ci)
+        result = run_analysis(
+            repo_path,
+            days=days,
+            min_coupling=min_coupling,
+            include_ci=not no_ci,
+            xray_top=xray_top,
+        )
     except BlackBoxUnlockError as e:
         console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(code=1) from e
@@ -147,6 +156,28 @@ def validate(
             console.print(f"median rho={statistics.median(rhos):.2f} across {len(rhos)} repos")
     if not results:
         raise typer.Exit(code=1)
+
+
+@app.command()
+def xray(
+    file: str = typer.Argument(..., help="Repo-relative path of the file to X-Ray"),
+    repo: Path = typer.Option(Path("."), "--repo", help="Repository root"),
+    days: int = typer.Option(365, help="Days of history to analyze"),
+    cap: int = typer.Option(200, "--cap", help="Maximum revisions to analyze"),
+) -> None:
+    """Per-function churn for one file (Tornhill's X-Ray).
+
+    Ranks the file's functions by revisions x indentation complexity so you
+    can see which functions drive a hotspot. JSON to stdout.
+    """
+    from black_box_unlock.git import xray as xray_mod
+
+    try:
+        result = xray_mod.xray_file(repo, file, days=days, rev_cap=cap)
+    except BlackBoxUnlockError as e:
+        console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(code=1) from e
+    print(json.dumps(result.model_dump(mode="json"), indent=2))
 
 
 @app.command()

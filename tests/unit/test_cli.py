@@ -204,3 +204,68 @@ class TestValidateCommand:
             mock_validate.side_effect = InsufficientHistoryError("too little history")
             result = runner.invoke(app, ["validate", "--repo", "bad"])
         assert result.exit_code == 1
+
+
+def _xray_result():
+    from black_box_unlock.core.models import FileXRay, FunctionChurn
+
+    return FileXRay(
+        path="mod.py",
+        days=365,
+        revisions_analyzed=4,
+        revision_cap_hit=False,
+        functions=[
+            FunctionChurn(
+                name="alpha",
+                start_line=1,
+                end_line=3,
+                revisions=3,
+                lines_added=6,
+                lines_deleted=2,
+                complexity=2.0,
+            )
+        ],
+    )
+
+
+class TestXrayCommand:
+    def test_outputs_json(self):
+        with patch("black_box_unlock.git.xray.xray_file") as mock_xray:
+            mock_xray.return_value = _xray_result()
+            result = runner.invoke(app, ["xray", "mod.py"])
+        assert result.exit_code == 0
+        parsed = json.loads(result.stdout)
+        assert parsed["functions"][0]["name"] == "alpha"
+        assert parsed["functions"][0]["hotspot_score"] == 6.0
+
+    def test_error_exits_nonzero(self):
+        from black_box_unlock.core.exceptions import NotAGitRepoError
+
+        with patch("black_box_unlock.git.xray.xray_file") as mock_xray:
+            mock_xray.side_effect = NotAGitRepoError("not a repo")
+            result = runner.invoke(app, ["xray", "mod.py"])
+        assert result.exit_code == 1
+        assert "not a repo" in result.output
+
+    def test_passes_options(self):
+        with patch("black_box_unlock.git.xray.xray_file") as mock_xray:
+            mock_xray.return_value = _xray_result()
+            result = runner.invoke(
+                app, ["xray", "mod.py", "--days", "90", "--cap", "50", "--repo", "."]
+            )
+        assert result.exit_code == 0
+        kwargs = mock_xray.call_args[1]
+        assert kwargs["days"] == 90 and kwargs["rev_cap"] == 50
+
+
+class TestAnalyzeRepoXrayTop:
+    def test_xray_top_forwarded(self):
+        mock_result = MagicMock()
+        mock_result.files = []
+        with patch("black_box_unlock.cli.run_analysis") as mock_run:
+            mock_run.return_value = mock_result
+            with patch("black_box_unlock.cli.export_to_json") as mock_export:
+                mock_export.return_value = "{}"
+                result = runner.invoke(app, ["analyze-repo", "--xray-top", "3"])
+        assert result.exit_code == 0
+        assert mock_run.call_args[1]["xray_top"] == 3

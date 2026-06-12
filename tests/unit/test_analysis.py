@@ -434,6 +434,26 @@ class TestRunAnalysisWithCIData:
 
         mock_ci.assert_called_once()
 
+    def test_includes_bugfix_commit_counts(self):
+        """File forensics include bugfix_commits from commit messages."""
+        history = {
+            "entries": [
+                {
+                    "timestamp": "2026-01-20T10:00:00Z",
+                    "author_email": "a@x.com",
+                    "message": "fix: crash on empty input",
+                    "files": [{"path": "src/auth.py", "added_lines": 5, "deleted_lines": 1}],
+                },
+            ]
+        }
+
+        with patch("black_box_unlock.analysis.fetch_git_history") as mock_fetch:
+            mock_fetch.return_value = history
+            result = run_analysis(Path("/fake/repo"), days=30)
+
+        auth = next(f for f in result.files if f.path == "src/auth.py")
+        assert auth.bugfix_commits == 1
+
 
 class TestFetchCIFailures:
     """Tests for _fetch_ci_failures helper."""

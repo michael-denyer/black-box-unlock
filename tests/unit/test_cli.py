@@ -269,3 +269,19 @@ class TestAnalyzeRepoXrayTop:
                 result = runner.invoke(app, ["analyze-repo", "--xray-top", "3"])
         assert result.exit_code == 0
         assert mock_run.call_args[1]["xray_top"] == 3
+
+
+class TestAnalyzeRepoJsonIntegrity:
+    def test_long_json_lines_not_wrapped(self):
+        # Rich console.print wraps at terminal width, corrupting JSON strings
+        # longer than 80 chars (e.g. qualified function names from X-Ray)
+        long_line = '{"name": "' + "x" * 200 + '"}'
+        mock_result = MagicMock()
+        mock_result.files = []
+        with patch("black_box_unlock.cli.run_analysis") as mock_run:
+            mock_run.return_value = mock_result
+            with patch("black_box_unlock.cli.export_to_json") as mock_export:
+                mock_export.return_value = long_line
+                result = runner.invoke(app, ["analyze-repo", "--output", "json"])
+        assert result.exit_code == 0
+        assert long_line in result.stdout

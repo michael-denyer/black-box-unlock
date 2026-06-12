@@ -87,6 +87,7 @@ bbu analyze-repo --output=html  # Generate HTML report
 bbu analyze-repo --min-coupling=0.5  # Set coupling threshold
 bbu analyze-repo --repo /path/to/repo  # Analyze another repository
 bbu coupling-guard FILE       # Hook helper: warn if FILE has strong temporal couples
+bbu validate --repo /path --days 730  # Hotspot-vs-bugfix self-validation (docs/VALIDATION.md)
 bbu version                   # Show version
 ```
 

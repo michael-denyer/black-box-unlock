@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `bbu validate`: split-history self-validation — Spearman correlation between
+  hotspot rank and subsequent bug-fix density, plus top-decile share and
+  coverage; results published in [docs/VALIDATION.md](docs/VALIDATION.md)
+  (median rho 0.46 across six real repos)
 - Self-hosted plugin marketplace (`/plugin marketplace add michael-denyer/black-box-unlock`)
 
 ### Fixed

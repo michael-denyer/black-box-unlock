@@ -80,6 +80,19 @@ class TestFlakyStepsFromJobs:
         assert step.first_seen.day == 1
         assert step.last_seen.day == 2
 
+    def test_two_failures_before_success_both_count(self):
+        """F,F,S yields flaky_count 2: each failed attempt preceding a later success counts."""
+        jobs = [
+            _job(1, [("Run tests", "failure")]),
+            _job(2, [("Run tests", "failure")]),
+            _job(3, [("Run tests", "success")]),
+        ]
+
+        step = flaky_steps_from_jobs(jobs)[0]
+        assert step.flaky_count == 2
+        assert step.failures == 2
+        assert step.total_runs == 3
+
     def test_same_attempt_fail_and_pass_is_not_flaky(self):
         """A failure and a success in the SAME attempt is not a retry recovery.
 

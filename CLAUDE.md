@@ -11,9 +11,10 @@ Based on Adam Tornhill's "Your Code as a Crime Scene" - using forensic technique
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for full details including module organization, data models, and implementation roadmap. See [docs/CODEMAP.md](docs/CODEMAP.md) for bidirectional navigation between architecture and source code.
 
 ```mermaid
-flowchart TD
+flowchart LR
     subgraph Interface["User Interface"]
         CLI[CLI: bbu]
+        MCP[bbu-mcp]
         Plugin[Claude Code Plugin]
     end
 
@@ -23,15 +24,18 @@ flowchart TD
     end
 
     subgraph Output["Output"]
-        Console[visualization/console.py]
-        HTML[visualization/html.py]
+        JSON[JSON]
+        HTML[visualization/html.py - frozen]
     end
 
     CLI --> GIT
-    Plugin --> GIT
-    GIT --> Console
-    CICD --> Console
-    Console --> HTML
+    CLI --> CICD
+    MCP --> GIT
+    MCP --> CICD
+    Plugin --> MCP
+    GIT --> JSON
+    CICD --> JSON
+    JSON --> HTML
 ```
 
 ## Key Design Decisions
@@ -41,7 +45,7 @@ flowchart TD
 | **Lazy-load MCPs** | MCP clients only initialized when first used |
 | **Sub-agents over monolith** | Specialized agents for each forensic type |
 | **CLI fallback** | `gh` CLI when GitHub MCP unavailable |
-| **Plugin-first** | Claude Code plugin is the primary interface |
+| **Agent-first** | MCP server (bbu-mcp) + plugin are the primary interface; HTML report is frozen |
 | **TDD throughout** | Every feature starts with tests |
 
 ## Key Files
@@ -52,10 +56,10 @@ flowchart TD
 | `docs/CODEMAP.md` | Bidirectional code map with `[ID]` annotations |
 | `.claude-plugin/` | Claude Code plugin (commands, agents) |
 | `src/black_box_unlock/cli.py` | CLI commands (`bbu`) |
-| `src/black_box_unlock/core/` | Pydantic models, protocols, exceptions |
-| `src/black_box_unlock/git/` | Git forensics (churn, coupling, ownership) |
-| `src/black_box_unlock/cicd/` | CI/CD forensics (build failures via gh CLI) |
-| `src/black_box_unlock/visualization/` | Output formatters (console, HTML) |
+| `src/black_box_unlock/core/` | Pydantic models, exceptions, logging |
+| `src/black_box_unlock/git/` | Git forensics (churn, coupling, ownership, defects, log) |
+| `src/black_box_unlock/cicd/` | CI/CD forensics (build failures, flaky steps via gh CLI) |
+| `src/black_box_unlock/visualization/` | HTML report, treemap, coupling graph (frozen) |
 | `tests/` | TDD test suite |
 | `.beads/` | Issue tracking for multi-session work |
 
@@ -65,7 +69,8 @@ flowchart TD
 - **Churn**: Files with many commits = instability
 - **Temporal coupling**: Files changing together >30% = hidden dependencies
 - **Ownership spread**: >3 authors + high churn = coordination risk
-- **Hotspot score**: churn × complexity
+- **Hotspot score**: commits × indentation complexity
+- **Bug-fix density**: defect-repair commits per file (fix/bug/hotfix/revert markers)
 
 ### GitHub (via lazy MCP)
 - **PR labels**: `bug`, `tech-debt` = work type distribution
@@ -85,6 +90,7 @@ bbu analyze-repo --days=30    # Analyze git history
 bbu analyze-repo --no-ci      # Skip CI failure analysis
 bbu analyze-repo --output=html  # Generate HTML report
 bbu analyze-repo --min-coupling=0.5  # Set coupling threshold
+bbu analyze-repo --repo /path/to/repo  # Analyze another repository
 bbu version                   # Show version
 ```
 
@@ -117,7 +123,7 @@ bbu version                   # Show version
 
 ## Gotchas
 
-- **Pytest markers for external CLIs**: Use `@pytest.mark.requires_<tool>` (e.g., `requires_gmap`, `requires_gh`) for tests needing external CLI tools - skipped automatically via `conftest.py` when tool unavailable
+- **Pytest markers for external CLIs**: Use `@pytest.mark.requires_<tool>` (e.g., `requires_gh`) for tests needing external CLI tools - skipped automatically via `conftest.py` when tool unavailable
 - **CI data is optional**: `_fetch_ci_failures()` catches all exceptions and returns `{}` - analysis continues without CI data
 - **Git commands**: Always handle missing git repos gracefully; avoid `git show --no-stat` (invalid flag)
 - **File paths**: Normalize paths for cross-platform compatibility

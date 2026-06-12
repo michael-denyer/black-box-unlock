@@ -70,18 +70,11 @@ flowchart LR
 - **Temporal coupling**: Files changing together >30% = hidden dependencies
 - **Ownership spread**: >3 authors + high churn = coordination risk
 - **Hotspot score**: commits × indentation complexity
-- **Bug-fix density**: defect-repair commits per file (fix/bug/hotfix/revert markers)
-
-### GitHub (via lazy MCP)
-- **PR labels**: `bug`, `tech-debt` = work type distribution
-- **Cycle time**: Slow PRs often touch brittle code
-- **Reverts**: Files in reverts = high risk
-- **Review comments**: Heavily-discussed files need attention
+- **Bug-fix density**: defect-repair commits per file (fix/bug/hotfix/defect/regression/revert markers, excluding docs/style/test/chore-prefixed commits)
 
 ### CI/CD
 - **Build failures**: Files that break builds = fragile code
-- **Flaky tests**: Intermittent failures = unreliable coverage
-- **Rollbacks**: Deploys rolled back = risky changes
+- **Flaky steps**: CI steps that failed then passed on re-run = unreliable coverage
 
 ## CLI Commands
 

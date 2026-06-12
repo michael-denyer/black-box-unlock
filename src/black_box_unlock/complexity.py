@@ -10,7 +10,8 @@ def indentation_complexity(file_path: Path, tab_size: int = TAB_SIZE) -> float:
 
     Cheap, language-agnostic complexity proxy: deeply nested code
     accumulates indentation. Returns 0.0 for missing or unreadable files
-    (e.g. deleted within the analysis window).
+    (e.g. deleted within the analysis window), and 0.0 for binary content
+    (NUL bytes present — indentation measurement is meaningless).
 
     Args:
         file_path: Path to the file to measure.
@@ -22,6 +23,10 @@ def indentation_complexity(file_path: Path, tab_size: int = TAB_SIZE) -> float:
     try:
         text = file_path.read_text(errors="ignore")
     except OSError:
+        return 0.0
+
+    # Binary content: NUL bytes mean indentation measurement is meaningless.
+    if "\x00" in text:
         return 0.0
 
     total = 0

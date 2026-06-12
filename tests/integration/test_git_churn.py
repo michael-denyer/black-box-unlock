@@ -1,26 +1,58 @@
-"""Integration tests for git churn extraction."""
+"""Integration tests for git churn extraction against a real repository."""
+
+import subprocess
+from pathlib import Path
+
+import pytest
 
 from black_box_unlock.git.churn import extract_file_churn
 
 
+@pytest.fixture
+def fixture_repo(tmp_path: Path) -> Path:
+    """Build a real git repo with two commits touching two files."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+
+    def git(*args: str) -> None:
+        subprocess.run(
+            ["git", "-C", str(repo), *args],
+            check=True,
+            capture_output=True,
+            env={
+                "GIT_AUTHOR_NAME": "Alice",
+                "GIT_AUTHOR_EMAIL": "alice@example.com",
+                "GIT_COMMITTER_NAME": "Alice",
+                "GIT_COMMITTER_EMAIL": "alice@example.com",
+                "PATH": "/usr/bin:/bin",
+                "HOME": str(tmp_path),
+            },
+        )
+
+    git("init")
+    (repo / "main.py").write_text("print('hello')\n")
+    git("add", "main.py")
+    git("commit", "-m", "feat: initial")
+    (repo / "main.py").write_text("print('hello')\nprint('world')\n")
+    (repo / "util.py").write_text("x = 1\n")
+    git("add", "main.py", "util.py")
+    git("commit", "-m", "fix: add world and util")
+    return repo
+
+
 class TestExtractFileChurnIntegration:
-    """Integration tests using real git repository."""
+    def test_extracts_churn_from_fixture_repo(self, fixture_repo):
+        result = extract_file_churn(fixture_repo, since_days=30)
 
-    def test_extracts_churn_from_this_repo(self, repo_root):
-        """Extracts file churn from the black-box-unlock repository."""
-        result = extract_file_churn(repo_root, since_days=30)
+        by_path = {c.path: c for c in result}
+        assert set(by_path) == {"main.py", "util.py"}
+        assert by_path["main.py"].commits == 2
+        assert by_path["util.py"].commits == 1
+        # 1 line in initial commit + 1 appended line in second commit
+        assert by_path["main.py"].lines_added == 2
 
-        assert len(result) > 0
-        for churn in result:
-            assert churn.path
-            assert churn.commits >= 1
-            assert churn.lines_added >= 0
-            assert churn.lines_deleted >= 0
+    def test_results_sortable_by_churn(self, fixture_repo):
+        result = extract_file_churn(fixture_repo, since_days=30)
 
-    def test_results_sortable_by_churn(self, repo_root):
-        """Results can be sorted by total lines changed."""
-        result = extract_file_churn(repo_root, since_days=30)
-        sorted_result = sorted(result, key=lambda x: x.total_lines_changed, reverse=True)
-
-        if len(sorted_result) > 1:
-            assert sorted_result[0].total_lines_changed >= sorted_result[1].total_lines_changed
+        ranked = sorted(result, key=lambda c: c.total_lines_changed, reverse=True)
+        assert ranked[0].path == "main.py"

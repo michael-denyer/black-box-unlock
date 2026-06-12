@@ -111,9 +111,8 @@ class FileXRay(BaseModel):
 
 ### Errors
 
-- Path not tracked in repo / no commits in window → `FileXRay` with empty `functions`
-  and `revisions_analyzed=0` (not an error).
-- File missing from working tree → clean CLI error, exit 1 (MCP: error string).
+- Path not tracked / no commits in window / file deleted from working tree → `FileXRay`
+  with empty `functions` (not an error; the empty result is self-describing).
 - git missing / not a repo → existing `GitToolNotFoundError` / `NotAGitRepoError`.
 - ast failures fall back silently (debug log only).
 

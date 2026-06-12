@@ -69,3 +69,25 @@ class TestXrayFile:
         _run(["git", "commit", "-m", "drop beta"], xray_repo)
         result = xray_file(xray_repo, "mod.py", days=365)
         assert "beta" not in {f.name for f in result.functions}
+
+
+class TestXrayCoupling:
+    def test_cochanging_functions_reported(self, xray_repo):
+        # alpha and beta co-changed in the creation commit only (1 shared) -> no pair
+        result = xray_file(xray_repo, "mod.py", days=365)
+        assert result.coupling == []
+
+        # add two commits touching both functions -> shared=3, pair appears
+        mod = xray_repo / "mod.py"
+        for marker in ("p1", "p2"):
+            content = mod.read_text().replace("x = 2", f"x = 2  # {marker}")
+            content = content.replace("y = 5", f"y = 5  # {marker}")
+            mod.write_text(content)
+            _run(["git", "add", "."], xray_repo)
+            _run(["git", "commit", "-m", f"touch both {marker}"], xray_repo)
+        result = xray_file(xray_repo, "mod.py", days=365)
+        assert len(result.coupling) == 1
+        pair = result.coupling[0]
+        assert {pair.function_a, pair.function_b} == {"alpha", "beta"}
+        assert pair.shared_revisions == 3  # creation + p1 + p2
+        assert pair.coupling_ratio == 3 / 4  # beta: 4 revisions, alpha: 5

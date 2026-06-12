@@ -16,8 +16,11 @@ from pathlib import Path
 
 from ..complexity import indentation_complexity_lines
 from ..core.exceptions import GitToolNotFoundError, NotAGitRepoError
-from ..core.models import FileXRay, FunctionChurn
+from ..core.models import FileXRay, FunctionChurn, FunctionCoupling
 from ..spans import FunctionSpan, indentation_spans, python_spans, span_at
+
+# Pairs sharing fewer commits than this are noise within a recency window.
+MIN_SHARED_REVISIONS = 2
 
 _COMMIT_MARKER = "\x01"
 _PRETTY_FORMAT = f"{_COMMIT_MARKER}%H"
@@ -193,10 +196,47 @@ def _spans_for(source: str) -> list[FunctionSpan]:
         return indentation_spans(source)
 
 
-def xray_file(repo_path: Path, file_path: str, days: int = 365, rev_cap: int = 200) -> FileXRay:
+def _function_coupling(
+    touched: dict[str, set[str]], names: set[str], min_ratio: float
+) -> list[FunctionCoupling]:
+    """Same-file function pairs that change together (X-Ray internal coupling).
+
+    A pair is reported when it shares at least MIN_SHARED_REVISIONS commits and
+    its ratio (shared / min revisions, Tornhill's formula) meets min_ratio.
+    Only functions in `names` participate — coupling never references a
+    function the X-Ray output doesn't list.
+    """
+    ordered = sorted(n for n in names if n in touched)
+    pairs: list[FunctionCoupling] = []
+    for i, a in enumerate(ordered):
+        for b in ordered[i + 1 :]:
+            shared = len(touched[a] & touched[b])
+            if shared < MIN_SHARED_REVISIONS:
+                continue
+            pair = FunctionCoupling(
+                function_a=a,
+                function_b=b,
+                shared_revisions=shared,
+                revisions_a=len(touched[a]),
+                revisions_b=len(touched[b]),
+            )
+            if pair.coupling_ratio >= min_ratio:
+                pairs.append(pair)
+    pairs.sort(key=lambda c: (-c.coupling_ratio, c.function_a, c.function_b))
+    return pairs
+
+
+def xray_file(
+    repo_path: Path,
+    file_path: str,
+    days: int = 365,
+    rev_cap: int = 200,
+    min_coupling: float = 0.3,
+) -> FileXRay:
     """Compute per-function churn for one file (Tornhill's X-Ray).
 
-    Ranks the file's functions by revisions x current indentation complexity.
+    Ranks the file's functions by revisions x current indentation complexity
+    and reports function pairs that change together (internal coupling).
     Python files get exact ast attribution per revision; other languages use
     git hunk-header names (complexity 0.0, ranked by revisions).
 
@@ -228,12 +268,14 @@ def xray_file(repo_path: Path, file_path: str, days: int = 365, rev_cap: int = 2
 
     functions = _build_functions(repo_path, file_path, is_python, tallies, touched)
     functions.sort(key=lambda f: (-f.hotspot_score, -f.revisions, f.name))
+    coupling = _function_coupling(touched, {f.name for f in functions}, min_coupling)
     return FileXRay(
         path=file_path,
         days=days,
         revisions_analyzed=len(commits),
         revision_cap_hit=cap_hit,
         functions=functions,
+        coupling=coupling,
     )
 
 

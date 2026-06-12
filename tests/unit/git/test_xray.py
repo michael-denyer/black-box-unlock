@@ -87,3 +87,57 @@ class TestAttributesContent:
         assert "*.py diff=python" in content
         assert "*.go diff=golang" in content
         assert DIFF_DRIVERS[".py"] == "python"
+
+
+class TestFunctionCouplingPairs:
+    TOUCHED = {
+        "alpha": {"c1", "c2", "c3", "c4"},
+        "beta": {"c1", "c2", "c3"},
+        "gamma": {"c4"},
+        "vanished": {"c1", "c2"},
+    }
+
+    def test_pair_with_shared_revisions_and_ratio(self):
+        from black_box_unlock.git.xray import _function_coupling
+
+        pairs = _function_coupling(self.TOUCHED, {"alpha", "beta", "gamma"}, min_ratio=0.3)
+        assert len(pairs) == 1
+        p = pairs[0]
+        assert (p.function_a, p.function_b) == ("alpha", "beta")
+        assert p.shared_revisions == 3
+        assert p.coupling_ratio == 1.0  # 3 / min(4, 3)
+
+    def test_single_shared_revision_filtered(self):
+        from black_box_unlock.git.xray import _function_coupling
+
+        # alpha & gamma share only c4 -> below the floor of 2
+        pairs = _function_coupling(self.TOUCHED, {"alpha", "gamma"}, min_ratio=0.0)
+        assert pairs == []
+
+    def test_threshold_filters_low_ratios(self):
+        from black_box_unlock.git.xray import _function_coupling
+
+        touched = {"a": {f"c{i}" for i in range(10)}, "b": {"c0", "c1", "c99x", "c98x"}}
+        # shared=2, min revs=4 -> ratio 0.5
+        assert _function_coupling(touched, {"a", "b"}, min_ratio=0.6) == []
+        assert len(_function_coupling(touched, {"a", "b"}, min_ratio=0.5)) == 1
+
+    def test_universe_restriction_excludes_vanished(self):
+        from black_box_unlock.git.xray import _function_coupling
+
+        # vanished shares 2 commits with alpha and beta but is not in the universe
+        pairs = _function_coupling(self.TOUCHED, {"alpha", "beta"}, min_ratio=0.3)
+        names = {p.function_a for p in pairs} | {p.function_b for p in pairs}
+        assert "vanished" not in names
+
+    def test_deterministic_order(self):
+        from black_box_unlock.git.xray import _function_coupling
+
+        touched = {
+            "a": {"c1", "c2"},
+            "b": {"c1", "c2"},
+            "x": {"c3", "c4"},
+            "y": {"c3", "c4"},
+        }
+        pairs = _function_coupling(touched, {"a", "b", "x", "y"}, min_ratio=0.3)
+        assert [(p.function_a, p.function_b) for p in pairs] == [("a", "b"), ("x", "y")]

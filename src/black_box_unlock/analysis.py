@@ -10,6 +10,7 @@ from .cicd.github_actions import (
     build_failures_from_runs,
     fetch_workflow_runs,
 )
+from .complexity import indentation_complexity
 from .core.models import (
     AnalysisResult,
     AnalysisSummary,
@@ -97,6 +98,7 @@ def run_analysis(  # [2a] Main analysis pipeline
                 path=path,
                 commits=churn.commits if churn else 0,
                 lines_changed=churn.total_lines_changed if churn else 0,
+                complexity=indentation_complexity(repo_path / path),
                 authors=ownership.authors if ownership else [],
                 coupled_with=coupling_by_file.get(path, []),
                 build_failures=ci_failures.get(path, 0),

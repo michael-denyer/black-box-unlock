@@ -37,17 +37,18 @@ class TestFileForensicsModel:
         assert forensics.authors == ["alice@example.com", "bob@example.com"]
         assert forensics.coupled_with == []
 
-    def test_hotspot_score_is_commits_times_lines_changed(self):
-        """hotspot_score is commits × lines_changed."""
+    def test_hotspot_score_is_commits_times_complexity(self):
+        """hotspot_score is commits × complexity (Tornhill's formula)."""
         forensics = FileForensics(
             path="src/auth.py",
             commits=42,
             lines_changed=1234,
+            complexity=10.0,
             authors=["alice@example.com"],
             coupled_with=[],
         )
 
-        assert forensics.hotspot_score == 42 * 1234
+        assert forensics.hotspot_score == 420.0
 
     def test_author_count_returns_number_of_authors(self):
         """author_count returns len(authors)."""
@@ -200,12 +201,14 @@ class TestRunAnalysis:
                 },
             ]
         }
+        complexity_by_path = {"low.py": 1.0, "high.py": 50.0}
 
         with patch("black_box_unlock.analysis.fetch_git_history") as mock_fetch:
             mock_fetch.return_value = history
-            result = run_analysis(Path("/fake/repo"), days=30)
+            with patch("black_box_unlock.analysis.indentation_complexity") as mock_cx:
+                mock_cx.side_effect = lambda p: complexity_by_path.get(p.name, 0.0)
+                result = run_analysis(Path("/fake/repo"), days=30)
 
-        # Should be sorted by hotspot_score descending
         assert result.files[0].path == "high.py"
         assert result.files[1].path == "low.py"
 
@@ -330,6 +333,7 @@ class TestExportToJson:
                     path="src/auth.py",
                     commits=10,
                     lines_changed=200,
+                    complexity=200.0,
                     authors=["a@x.com", "b@x.com", "c@x.com", "d@x.com"],
                     coupled_with=[],
                 )
@@ -345,7 +349,7 @@ class TestExportToJson:
         parsed = json.loads(json_str)
 
         # Computed properties should be in output
-        assert parsed["files"][0]["hotspot_score"] == 2000  # 10 * 200
+        assert parsed["files"][0]["hotspot_score"] == 2000  # 10 commits * 200.0 complexity
         assert parsed["files"][0]["author_count"] == 4
         assert parsed["files"][0]["is_high_risk"] is True
 

@@ -114,6 +114,7 @@ class FileForensics(BaseModel):  # [4a.3] Combined forensics
     path: str
     commits: int
     lines_changed: int
+    complexity: float = 0.0
     authors: list[str]
     coupled_with: list[CouplingInfo]
     build_failures: int = 0
@@ -125,9 +126,9 @@ class FileForensics(BaseModel):  # [4a.3] Combined forensics
 
     @computed_field
     @property
-    def hotspot_score(self) -> int:
-        """Hotspot score = commits x lines_changed (Tornhill's formula)."""
-        return self.commits * self.lines_changed
+    def hotspot_score(self) -> float:
+        """Hotspot score = commits x complexity (Tornhill: change frequency x complexity)."""
+        return self.commits * self.complexity
 
     @computed_field
     @property

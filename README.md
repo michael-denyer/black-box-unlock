@@ -47,6 +47,9 @@ bbu analyze-repo --min-coupling=0.5 --output=html > report.html
 
 # Skip CI failure analysis (faster, no GitHub access needed)
 bbu analyze-repo --no-ci --output=html > report.html
+
+# Analyze a different repository
+bbu analyze-repo --repo /path/to/repo --output=html > report.html
 ```
 
 ## Features

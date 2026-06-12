@@ -150,8 +150,8 @@ class TestRunAnalysis:
     """Tests for run_analysis function."""
 
     def test_returns_analysis_result_with_file_data(self):
-        """Returns AnalysisResult with forensics from gmap data."""
-        gmap_output = {
+        """Returns AnalysisResult with forensics from git history."""
+        history = {
             "entries": [
                 {
                     "timestamp": "2026-01-20T10:00:00Z",
@@ -172,7 +172,7 @@ class TestRunAnalysis:
         }
 
         with patch("black_box_unlock.analysis.fetch_git_history") as mock_fetch:
-            mock_fetch.return_value = gmap_output
+            mock_fetch.return_value = history
             result = run_analysis(Path("/fake/repo"), days=30)
 
         assert isinstance(result, AnalysisResult)
@@ -188,7 +188,7 @@ class TestRunAnalysis:
 
     def test_computes_hotspot_scores(self):
         """Files are sorted by hotspot_score descending."""
-        gmap_output = {
+        history = {
             "entries": [
                 {
                     "timestamp": "2026-01-20T10:00:00Z",
@@ -202,7 +202,7 @@ class TestRunAnalysis:
         }
 
         with patch("black_box_unlock.analysis.fetch_git_history") as mock_fetch:
-            mock_fetch.return_value = gmap_output
+            mock_fetch.return_value = history
             result = run_analysis(Path("/fake/repo"), days=30)
 
         # Should be sorted by hotspot_score descending
@@ -211,7 +211,7 @@ class TestRunAnalysis:
 
     def test_includes_coupling_info(self):
         """Files include coupling info when above threshold."""
-        gmap_output = {
+        history = {
             "entries": [
                 {
                     "timestamp": "2026-01-20T10:00:00Z",
@@ -233,7 +233,7 @@ class TestRunAnalysis:
         }
 
         with patch("black_box_unlock.analysis.fetch_git_history") as mock_fetch:
-            mock_fetch.return_value = gmap_output
+            mock_fetch.return_value = history
             result = run_analysis(Path("/fake/repo"), days=30, min_coupling=0.3)
 
         # a.py and b.py have 100% coupling (2/2 commits together)
@@ -244,7 +244,7 @@ class TestRunAnalysis:
 
     def test_summary_counts_high_risk_files(self):
         """Summary counts files with >3 authors as high risk."""
-        gmap_output = {
+        history = {
             "entries": [
                 {
                     "timestamp": "2026-01-20T10:00:00Z",
@@ -275,7 +275,7 @@ class TestRunAnalysis:
         }
 
         with patch("black_box_unlock.analysis.fetch_git_history") as mock_fetch:
-            mock_fetch.return_value = gmap_output
+            mock_fetch.return_value = history
             result = run_analysis(Path("/fake/repo"), days=30)
 
         assert result.summary.high_risk_ownership == 1
@@ -355,9 +355,9 @@ class TestRunAnalysisWithCIData:
 
     @patch("black_box_unlock.analysis._fetch_ci_failures")
     @patch("black_box_unlock.analysis.fetch_git_history")
-    def test_includes_build_failures_in_file_forensics(self, mock_gmap, mock_ci):
+    def test_includes_build_failures_in_file_forensics(self, mock_history, mock_ci):
         """File forensics includes build_failures from CI data."""
-        mock_gmap.return_value = {
+        mock_history.return_value = {
             "entries": [
                 {
                     "timestamp": "2026-01-26T10:00:00Z",
@@ -375,9 +375,9 @@ class TestRunAnalysisWithCIData:
 
     @patch("black_box_unlock.analysis._fetch_ci_failures")
     @patch("black_box_unlock.analysis.fetch_git_history")
-    def test_defaults_build_failures_to_zero_when_file_not_in_ci_data(self, mock_gmap, mock_ci):
+    def test_defaults_build_failures_to_zero_when_file_not_in_ci_data(self, mock_history, mock_ci):
         """Files not in CI data get build_failures=0."""
-        mock_gmap.return_value = {
+        mock_history.return_value = {
             "entries": [
                 {
                     "timestamp": "2026-01-26T10:00:00Z",
@@ -395,9 +395,9 @@ class TestRunAnalysisWithCIData:
 
     @patch("black_box_unlock.analysis._fetch_ci_failures")
     @patch("black_box_unlock.analysis.fetch_git_history")
-    def test_skips_ci_fetch_when_include_ci_is_false(self, mock_gmap, mock_ci):
+    def test_skips_ci_fetch_when_include_ci_is_false(self, mock_history, mock_ci):
         """Does not call _fetch_ci_failures when include_ci=False."""
-        mock_gmap.return_value = {
+        mock_history.return_value = {
             "entries": [
                 {
                     "timestamp": "2026-01-26T10:00:00Z",
@@ -413,9 +413,9 @@ class TestRunAnalysisWithCIData:
 
     @patch("black_box_unlock.analysis._fetch_ci_failures")
     @patch("black_box_unlock.analysis.fetch_git_history")
-    def test_include_ci_defaults_to_true(self, mock_gmap, mock_ci):
+    def test_include_ci_defaults_to_true(self, mock_history, mock_ci):
         """include_ci parameter defaults to True."""
-        mock_gmap.return_value = {
+        mock_history.return_value = {
             "entries": [
                 {
                     "timestamp": "2026-01-26T10:00:00Z",

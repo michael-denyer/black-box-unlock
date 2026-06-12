@@ -7,7 +7,7 @@ ambient coupling-guard hook for Claude Code.
 
 ## Module layout
 
-```
+```text
 src/black_box_unlock/
 ├── cli.py                  # Typer CLI: bbu analyze-repo / version
 ├── complexity.py           # Indentation-depth complexity proxy

@@ -1,0 +1,22 @@
+{
+  // MD013 line-length: prose wraps naturally; MD060 table-style: too strict;
+  // MD033 inline HTML + MD041 first-line-h1: README's logo table layout is deliberate
+  "config": {
+    "MD013": false,
+    "MD033": false,
+    "MD041": false,
+    "MD060": false
+  },
+  // docs/plans are historical implementation-plan artifacts (same genre as .planning);
+  // commands/agents/hooks are Claude plugin components whose format the plugin spec dictates
+  "ignores": [
+    ".venv/**",
+    ".planning/**",
+    ".beads/**",
+    "docs/plans/**",
+    "commands/**",
+    "agents/**",
+    "hooks/**",
+    "node_modules/**"
+  ]
+}

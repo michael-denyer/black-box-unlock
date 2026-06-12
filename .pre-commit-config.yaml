@@ -6,3 +6,29 @@ repos:
       - id: ruff
         args: [--fix]
       - id: ruff-format
+
+  - repo: https://github.com/DavidAnson/markdownlint-cli2
+    rev: v0.22.1
+    hooks:
+      - id: markdownlint-cli2
+        exclude: ^(\.planning/|\.beads/|\.github/)
+
+  - repo: local
+    hooks:
+      - id: maid
+        name: maid (mermaid syntax)
+        language: node
+        additional_dependencies: ["@probelabs/maid@0.0.29"]
+        entry: maid
+        types: [markdown]
+        exclude: ^(\.planning/|\.beads/)
+      - id: mmdc
+        # maid alone is insufficient: its parser accepts constructs the real
+        # mermaid-js renderer rejects; this hook catches them pre-merge
+        name: mmdc (mermaid renderer parity)
+        language: node
+        additional_dependencies:
+          ["@mermaid-js/mermaid-cli@11.15.0", "puppeteer@24"]
+        entry: bash -c 'set -e; for f in "$@"; do mmdc -i "$f" -o /tmp/mmdc-validate.md; done' --
+        types: [markdown]
+        exclude: ^(\.planning/|\.beads/)

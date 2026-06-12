@@ -149,7 +149,7 @@ Domain logic for extracting forensic signals from git history.
 
 #### Coupling Detection Formula [3b]
 
-```
+```text
 coupling_ratio = co_change_count / min(commits_a, commits_b)
 
 Interpretation:
@@ -284,7 +284,7 @@ flowchart TB
 
 ## Module Structure
 
-```
+```text
 src/black_box_unlock/
 ├── __init__.py              # Version
 ├── cli.py                   # [1a] Typer CLI

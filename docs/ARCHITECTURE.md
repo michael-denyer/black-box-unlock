@@ -66,6 +66,6 @@ flowchart LR
 
 ## Roadmap
 
-Tracked in beads (`bd ready`) and `.planning/superpowers/plans/2026-06-12-agent-native-pivot.md`.
+Tracked in the local issue tracker.
 Decided direction: agent-native (MCP + plugin) on top of corrected signals; HTML frozen;
 no IDE telemetry; no PR-flow dashboard signals.

@@ -31,6 +31,16 @@ Key insight: **2-8% of files cause 60-90% of defects**.
 uv pip install -e .
 ```
 
+`bbu analyze-repo` also requires the [gmap](https://crates.io/crates/gmap) Rust CLI,
+which extracts git history (tested with gmap >= 0.4.0):
+
+```bash
+cargo install gmap
+```
+
+Without it, `bbu analyze-repo` exits with an error. CI failure analysis additionally
+uses the [gh](https://cli.github.com/) CLI when available (skip with `--no-ci`).
+
 ## Usage
 
 ```bash

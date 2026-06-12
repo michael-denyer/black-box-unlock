@@ -109,3 +109,21 @@ class TestAnalyzeRepoCommand:
         mock_run_analysis.assert_called_once()
         call_kwargs = mock_run_analysis.call_args[1]
         assert call_kwargs.get("include_ci") is True
+
+
+class TestAnalyzeRepoErrorHandling:
+    """Tests for clean error reporting from analyze-repo."""
+
+    def test_missing_gmap_prints_clean_error_not_traceback(self):
+        """GitToolNotFoundError surfaces as an error message with exit code 1."""
+        from black_box_unlock.core.exceptions import GitToolNotFoundError
+
+        with patch("black_box_unlock.cli.run_analysis") as mock_analysis:
+            mock_analysis.side_effect = GitToolNotFoundError(
+                "gmap CLI not found. Install it with: cargo install gmap"
+            )
+            result = runner.invoke(app, ["analyze-repo"])
+
+        assert result.exit_code == 1
+        assert "gmap CLI not found" in result.output
+        assert "Traceback" not in result.output

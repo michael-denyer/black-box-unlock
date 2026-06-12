@@ -11,6 +11,7 @@ from .cicd.github_actions import (
     build_failures_from_runs,
     fetch_workflow_runs,
 )
+from .core.exceptions import GitToolNotFoundError
 from .core.models import (
     AnalysisResult,
     AnalysisSummary,
@@ -38,7 +39,11 @@ def _fetch_ci_failures() -> dict[str, int]:
 
 
 def _fetch_gmap_data(repo_path: Path, days: int) -> dict:  # [2a.1] Fetch git history via gmap
-    """Fetch git history data using gmap CLI."""
+    """Fetch git history data using gmap CLI.
+
+    Raises:
+        GitToolNotFoundError: If the gmap binary is not installed.
+    """
     cmd = [
         "gmap",
         "--repo",
@@ -48,7 +53,15 @@ def _fetch_gmap_data(repo_path: Path, days: int) -> dict:  # [2a.1] Fetch git hi
         "export",
         "--json",
     ]
-    result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+    except FileNotFoundError as e:
+        raise GitToolNotFoundError(
+            "gmap CLI not found. bbu uses gmap (a Rust tool) to extract git history. "
+            "Install it with: cargo install gmap "
+            "(requires Rust; tested with gmap >= 0.4.0). "
+            "See https://crates.io/crates/gmap"
+        ) from e
     return json.loads(result.stdout)
 
 

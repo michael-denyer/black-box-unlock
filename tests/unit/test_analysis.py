@@ -5,7 +5,15 @@ from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch
 
-from black_box_unlock.analysis import _fetch_ci_failures, export_to_json, run_analysis
+import pytest
+
+from black_box_unlock.analysis import (
+    _fetch_ci_failures,
+    _fetch_gmap_data,
+    export_to_json,
+    run_analysis,
+)
+from black_box_unlock.core.exceptions import GitToolNotFoundError
 from black_box_unlock.core.models import (
     AnalysisResult,
     AnalysisSummary,
@@ -425,6 +433,22 @@ class TestRunAnalysisWithCIData:
         run_analysis(Path("/fake/repo"), days=30)
 
         mock_ci.assert_called_once()
+
+
+class TestFetchGmapData:
+    """Tests for _fetch_gmap_data helper."""
+
+    @patch("black_box_unlock.analysis.subprocess.run")
+    def test_raises_git_tool_not_found_when_gmap_missing(self, mock_run):
+        """Raises GitToolNotFoundError with install guidance when gmap binary is absent."""
+        mock_run.side_effect = FileNotFoundError(2, "No such file or directory", "gmap")
+
+        with pytest.raises(GitToolNotFoundError) as exc_info:
+            _fetch_gmap_data(Path("/fake/repo"), days=30)
+
+        message = str(exc_info.value)
+        assert "gmap" in message
+        assert "cargo install gmap" in message
 
 
 class TestFetchCIFailures:

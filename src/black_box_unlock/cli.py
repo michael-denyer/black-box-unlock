@@ -7,6 +7,7 @@ import typer
 from rich.console import Console
 
 from black_box_unlock.analysis import export_to_json, run_analysis
+from black_box_unlock.core.exceptions import BlackBoxUnlockError
 from black_box_unlock.core.logging import configure_logging
 from black_box_unlock.visualization.html import generate_html_report
 
@@ -57,7 +58,11 @@ def analyze_repo(  # [1a.1] Main analysis command
     from git history. Based on 'Your Code as a Crime Scene' methodology.
     """
     repo_path = Path(".")
-    result = run_analysis(repo_path, days=days, min_coupling=min_coupling, include_ci=not no_ci)
+    try:
+        result = run_analysis(repo_path, days=days, min_coupling=min_coupling, include_ci=not no_ci)
+    except BlackBoxUnlockError as e:
+        console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(code=1) from e
 
     match output:
         case OutputFormat.json:

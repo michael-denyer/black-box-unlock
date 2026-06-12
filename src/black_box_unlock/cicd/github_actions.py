@@ -231,7 +231,7 @@ def flaky_steps_from_jobs(jobs: list[dict]) -> list[FlakyStep]:
                 step_name=step_name,
                 first_seen=stats["first_seen"] or now,
                 last_seen=stats["last_seen"] or now,
-                total_runs=len(attempts),
+                total_attempts=len(attempts),
                 failures=failures,
                 flaky_count=flaky_count,
             )

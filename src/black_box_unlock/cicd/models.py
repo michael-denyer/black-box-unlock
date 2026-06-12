@@ -50,14 +50,14 @@ class FlakyStep(BaseModel):
     step_name: str
     first_seen: datetime
     last_seen: datetime
-    total_runs: int
+    total_attempts: int
     failures: int
     flaky_count: int  # Failed attempts that later passed on a retry
 
     @property
     def flaky_rate(self) -> float:
-        """Calculate flakiness rate as flaky_count / total_runs."""
-        return self.flaky_count / self.total_runs if self.total_runs else 0.0
+        """Calculate flaky_count / total_attempts (recoveries per attempt observation)."""
+        return self.flaky_count / self.total_attempts if self.total_attempts else 0.0
 
     @property
     def is_active(self) -> bool:

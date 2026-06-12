@@ -44,7 +44,7 @@ class TestFlakyStepsFromJobs:
         assert step.job_name == "test (3.11)"
         assert step.flaky_count == 1
         assert step.failures == 1
-        assert step.total_runs == 2
+        assert step.total_attempts == 2
 
     def test_consistent_failure_is_not_flaky(self):
         jobs = [
@@ -91,7 +91,7 @@ class TestFlakyStepsFromJobs:
         step = flaky_steps_from_jobs(jobs)[0]
         assert step.flaky_count == 2
         assert step.failures == 2
-        assert step.total_runs == 3
+        assert step.total_attempts == 3
 
     def test_same_attempt_fail_and_pass_is_not_flaky(self):
         """A failure and a success in the SAME attempt is not a retry recovery.
@@ -198,35 +198,35 @@ class TestFlakyStepModel:
             step_name="Run tests",
             first_seen=datetime(2026, 1, 20, tzinfo=timezone.utc),
             last_seen=datetime(2026, 1, 26, tzinfo=timezone.utc),
-            total_runs=20,
+            total_attempts=20,
             failures=5,
             flaky_count=3,
         )
         assert step.job_name == "test (3.10)"
-        assert step.total_runs == 20
+        assert step.total_attempts == 20
         assert step.flaky_count == 3
 
     def test_flaky_rate_calculation(self):
-        """Calculates flaky_rate as flaky_count / total_runs."""
+        """Calculates flaky_rate as flaky_count / total_attempts."""
         step = FlakyStep(
             job_name="test",
             step_name="Run tests",
             first_seen=datetime(2026, 1, 20, tzinfo=timezone.utc),
             last_seen=datetime(2026, 1, 26, tzinfo=timezone.utc),
-            total_runs=20,
+            total_attempts=20,
             failures=5,
             flaky_count=4,
         )
         assert step.flaky_rate == 0.2  # 4/20
 
     def test_flaky_rate_zero_when_no_runs(self):
-        """Returns 0 flaky_rate when total_runs is 0."""
+        """Returns 0 flaky_rate when total_attempts is 0."""
         step = FlakyStep(
             job_name="test",
             step_name="Run tests",
             first_seen=datetime(2026, 1, 20, tzinfo=timezone.utc),
             last_seen=datetime(2026, 1, 26, tzinfo=timezone.utc),
-            total_runs=0,
+            total_attempts=0,
             failures=0,
             flaky_count=0,
         )
@@ -240,7 +240,7 @@ class TestFlakyStepModel:
             step_name="Run tests",
             first_seen=datetime(2026, 1, 20, tzinfo=timezone.utc),
             last_seen=now,
-            total_runs=10,
+            total_attempts=10,
             failures=1,
             flaky_count=1,
         )
@@ -253,7 +253,7 @@ class TestFlakyStepModel:
             step_name="Run tests",
             first_seen=datetime(2026, 1, 1, tzinfo=timezone.utc),
             last_seen=datetime(2026, 1, 10, tzinfo=timezone.utc),  # Old date
-            total_runs=10,
+            total_attempts=10,
             failures=1,
             flaky_count=1,
         )
@@ -373,7 +373,7 @@ class TestAnalysisResultIntegration:
             step_name="Run tests",
             first_seen=datetime(2026, 1, 20, tzinfo=timezone.utc),
             last_seen=datetime(2026, 1, 26, tzinfo=timezone.utc),
-            total_runs=20,
+            total_attempts=20,
             failures=5,
             flaky_count=3,
         )
@@ -395,7 +395,7 @@ class TestAnalysisResultIntegration:
             step_name="Run tests",
             first_seen=datetime(2026, 1, 20, tzinfo=timezone.utc),
             last_seen=datetime(2026, 1, 26, tzinfo=timezone.utc),
-            total_runs=10,
+            total_attempts=10,
             failures=2,
             flaky_count=1,
         )

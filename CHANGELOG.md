@@ -7,10 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-06-12
+
 ### Added
 - Bug-fix commit density per file
 - Flaky CI step detection in analysis output
-- --repo flag to analyze a repository other than the cwd
+- `--repo` flag to analyze a repository other than the cwd
+- `bbu-mcp` MCP server: six forensic tools as agent context
+- Claude Code plugin: `/analyze`, `/hotspots`, git-forensics agent, ambient coupling guard hook
+- PyPI publishing via trusted publishing with Sigstore attestations
 
 ### Fixed
 - Version mismatch: `pyproject.toml` and `__init__.py` said 0.2.0 after the 0.3.0 release
@@ -19,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Git history extraction is now native (`git log --numstat`) — the gmap Rust CLI is no longer required
 - Hotspot score is now commits × indentation complexity (was commits × lines changed)
+- Plugin restructured to spec (components at repo root, lean manifest)
 
 ## [0.3.0] - 2026-01-26
 

@@ -49,6 +49,9 @@ def run_analysis(  # [2a] Main analysis pipeline
 ) -> AnalysisResult:
     """Run complete forensic analysis on a repository.
 
+    Complexity is measured from current file contents: files deleted or renamed
+    within the window score 0 and drop from the hotspot ranking.
+
     Args:
         repo_path: Path to git repository.
         days: Number of days of history to analyze.

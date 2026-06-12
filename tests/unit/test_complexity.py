@@ -34,3 +34,9 @@ class TestIndentationComplexity:
 
     def test_missing_file_is_zero(self, tmp_path):
         assert indentation_complexity(tmp_path / "gone.py") == 0.0
+
+    def test_binary_content_is_zero(self, tmp_path):
+        f = tmp_path / "blob.bin"
+        f.write_bytes(b"\x00\x01" + b" " * 64 + b"\n" + b"\x00" * 32)
+
+        assert indentation_complexity(f) == 0.0

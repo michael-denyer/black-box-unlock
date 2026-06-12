@@ -54,7 +54,7 @@ flowchart LR
 |------|---------|
 | `docs/ARCHITECTURE.md` | Full architecture, data models, roadmap |
 | `docs/CODEMAP.md` | Bidirectional code map with `[ID]` annotations |
-| `.claude-plugin/` | Claude Code plugin (commands, agents) |
+| `.claude-plugin/plugin.json` | Claude Code plugin manifest (components live at repo root: `commands/`, `agents/`, `hooks/`, `.mcp.json`) |
 | `src/black_box_unlock/cli.py` | CLI commands (`bbu`) |
 | `src/black_box_unlock/core/` | Pydantic models, exceptions, logging |
 | `src/black_box_unlock/git/` | Git forensics (churn, coupling, ownership, defects, log) |

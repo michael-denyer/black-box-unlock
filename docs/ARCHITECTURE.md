@@ -2,7 +2,8 @@
 
 Code forensics tool based on Adam Tornhill's "Your Code as a Crime Scene".
 Signals are extracted from git history and GitHub Actions, joined per file,
-and served as JSON, an HTML report (frozen), and (from Milestone B) MCP tools.
+and served as JSON, an HTML report (frozen), MCP tools (`bbu-mcp`), and an
+ambient coupling-guard hook for Claude Code.
 
 ## Module layout
 
@@ -11,7 +12,8 @@ src/black_box_unlock/
 ├── cli.py                  # Typer CLI: bbu analyze-repo / version
 ├── complexity.py           # Indentation-depth complexity proxy
 ├── analysis.py             # Pipeline: fetch -> parse -> join -> AnalysisResult
-├── mcp_server.py           # FastMCP server: bbu-mcp (Milestone B)
+├── mcp_server.py           # FastMCP server: bbu-mcp (six read tools, cached)
+├── guard.py                # Coupling guard: cached analysis for the edit hook
 ├── core/
 │   ├── models.py           # Pydantic models (FileForensics, AnalysisResult, ...)
 │   ├── exceptions.py       # NotAGitRepoError, GitToolNotFoundError
@@ -52,7 +54,8 @@ flowchart LR
     CI --> Join
     Join --> JSON[JSON]
     Join --> HTML[HTML report - frozen]
-    Join --> MCP[bbu-mcp tools - Milestone B]
+    Join --> MCP[bbu-mcp tools]
+    Join --> Guard[coupling guard hook]
 ```
 
 ## Degraded modes

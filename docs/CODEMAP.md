@@ -272,6 +272,8 @@ flowchart TB
 | Area | Entry Point |
 |------|-------------|
 | CLI entry | [cli.py](../src/black_box_unlock/cli.py) |
+| MCP server (bbu-mcp) | [mcp_server.py](../src/black_box_unlock/mcp_server.py) |
+| Coupling guard | [guard.py](../src/black_box_unlock/guard.py) |
 | Analysis pipeline | [analysis.py](../src/black_box_unlock/analysis.py) |
 | Data models | [core/models.py](../src/black_box_unlock/core/models.py) |
 | Git forensics | [git/](../src/black_box_unlock/git/) |
@@ -288,6 +290,8 @@ src/black_box_unlock/
 ├── cli.py                   # [1a] Typer CLI
 ├── complexity.py            # Indentation-depth complexity proxy
 ├── analysis.py              # [2a] Orchestration
+├── mcp_server.py            # bbu-mcp FastMCP server (six read tools)
+├── guard.py                 # Coupling guard cache + warnings (edit hook)
 ├── core/
 │   ├── models.py            # [4a] Pydantic models
 │   ├── exceptions.py        # [4b] Custom exceptions

@@ -1,5 +1,6 @@
 """Black Box Unlock CLI - Code forensics commands."""
 
+import json
 from enum import Enum
 from pathlib import Path
 
@@ -72,6 +73,37 @@ def analyze_repo(  # [1a.1] Main analysis command
             # Use print() instead of console.print() to avoid Rich markup interpretation
             # Rich would strip [dir], [data-tab=...] etc. as invalid markup tags
             print(generate_html_report(result))
+
+
+@app.command()
+def coupling_guard(
+    file: str = typer.Argument(..., help="Repo-relative path of the edited file"),
+    repo: Path = typer.Option(Path("."), "--repo", help="Repository root"),
+    threshold: float = typer.Option(0.5, "--threshold", help="Minimum coupling ratio to warn"),
+) -> None:
+    """Emit a Claude Code hook warning when the edited file has strong temporal coupling.
+
+    Designed for PostToolUse hooks: prints hook JSON when there is something
+    to say, nothing otherwise. Never fails - a guard must not break an edit.
+    """
+    from black_box_unlock.guard import coupling_warnings
+
+    try:
+        warnings = coupling_warnings(file, repo, threshold)
+    except Exception:
+        # A guard must never break the edit it observes; degrade to silence.
+        raise typer.Exit(code=0) from None
+    if warnings:
+        print(
+            json.dumps(
+                {
+                    "hookSpecificOutput": {
+                        "hookEventName": "PostToolUse",
+                        "additionalContext": " ".join(warnings),
+                    }
+                }
+            )
+        )
 
 
 @app.command()

@@ -151,16 +151,24 @@ def xray_file(
     repo_path: str = ".",
     days: int = 365,
     revision_cap: int = 200,
+    min_coupling: float = 0.3,
 ) -> dict:
     """Per-function churn for one file (Tornhill's X-Ray).
 
     Use after get_hotspots: X-Ray a hot file to see which functions drive its
     instability - the highest-scoring functions are the precise refactoring
-    and review targets. Python files get exact attribution; other languages
-    are ranked by revisions only (complexity unknown).
+    and review targets. The coupling list shows function pairs that change
+    together (>= min_coupling ratio): edit one, check its partners. Python
+    files get exact attribution; other languages are ranked by revisions only.
     """
     try:
-        result = _xray_file(Path(repo_path), file_path, days=days, rev_cap=revision_cap)
+        result = _xray_file(
+            Path(repo_path),
+            file_path,
+            days=days,
+            rev_cap=revision_cap,
+            min_coupling=min_coupling,
+        )
     except BlackBoxUnlockError as e:
         raise ValueError(str(e)) from e
     return result.model_dump(mode="json")

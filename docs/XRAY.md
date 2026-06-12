@@ -57,6 +57,30 @@ Real output (this repo, 365-day window):
 }
 ```
 
+## Function coupling
+
+The `coupling` list reports same-file function pairs that change together —
+X-Ray's internal temporal coupling. Formula matches the file level:
+`coupling_ratio = shared_revisions / min(revisions_a, revisions_b)`. To keep
+small windows from producing noise, a pair is reported only when it shares at
+least 2 commits **and** meets the ratio threshold (`--min-coupling`, default
+0.3). Edit one half of a strong pair, check the other.
+
+Real output (this repo, `bbu xray src/black_box_unlock/analysis.py`):
+
+```json
+"coupling": [
+  {
+    "function_a": "_fetch_ci_failures",
+    "function_b": "run_analysis",
+    "shared_revisions": 3,
+    "revisions_a": 3,
+    "revisions_b": 8,
+    "coupling_ratio": 1.0
+  }
+]
+```
+
 ## Performance
 
 Measured during design research: the windowed `-p` pass for one file took 0.03 s on a
@@ -74,5 +98,5 @@ under a second; `--xray-top 5` adds negligible cost to `analyze-repo`.
   avoids this via ast; other languages carry the error tail (and `complexity: 0.0`
   marks those rows as less authoritative).
 - **Hunk headers truncate at ~80 bytes** — long signatures are matched by prefix.
-- **No function-level temporal coupling yet** — a natural follow-up once per-function
-  attribution exists; within small windows the percentages would be noisy.
+- **Coupling is same-file only** — cross-file function coupling (CodeScene tier) would
+  need repo-wide attribution; out of scope for now.

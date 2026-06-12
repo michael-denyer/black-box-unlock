@@ -53,10 +53,12 @@ bbu analyze-repo --no-ci --output=html > report.html
 
 | Signal | Description |
 |--------|-------------|
-| **Hotspot Score** | churn × complexity - identifies unstable code |
+| **Hotspot Score** | commits × indentation complexity - identifies unstable complex code |
 | **Temporal Coupling** | Files changing together >30% reveal hidden dependencies |
 | **Ownership Risk** | >3 authors + high churn = coordination problems |
 | **Build Failures** | Files appearing in CI failures = fragile code |
+| **Bug-fix Density** | Count of defect-repair commits per file |
+| **Flaky Steps** | CI steps that failed then passed on re-run |
 
 ### HTML Report
 
@@ -78,16 +80,17 @@ flowchart LR
 
 ## Architecture
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for full details.
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for full details.
 
 ```
 src/black_box_unlock/
 ├── cli.py              # Typer CLI
-├── core/               # Pydantic models, exceptions
-├── git/                # Churn, coupling, ownership extraction
-├── cicd/               # CI/CD forensics (build failures via gh CLI)
+├── complexity.py       # Indentation-depth complexity proxy
 ├── analysis.py         # Orchestration
-└── visualization/      # HTML, treemap, coupling graph
+├── core/               # Pydantic models, exceptions, logging
+├── git/                # Churn, coupling, ownership, defects, log extraction
+├── cicd/               # CI/CD forensics (build failures, flaky steps via gh CLI)
+└── visualization/      # HTML, treemap, coupling graph (frozen)
 ```
 
 ## Development

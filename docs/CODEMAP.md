@@ -54,14 +54,14 @@ sequenceDiagram
     participant User
     participant CLI as CLI [1a]
     participant Analysis as Analysis [2a]
-    participant Gmap as gmap (external)
+    participant Git as git log --numstat
     participant Forensics as Git Forensics [3]
     participant Viz as Visualization [5]
 
     User->>CLI: bbu analyze-repo
     CLI->>Analysis: run_analysis(path, days)
-    Analysis->>Gmap: gmap export --json
-    Gmap-->>Analysis: git history JSON
+    Analysis->>Git: fetch_git_history(repo_path, days)
+    Git-->>Analysis: git history dict
     Analysis->>Forensics: parse + detect
     Forensics-->>Analysis: FileChurn, Coupling, Ownership
     Analysis-->>CLI: AnalysisResult
@@ -94,22 +94,23 @@ Orchestrates forensic analysis by combining data from multiple sources.
 
 | ID | Component | Description | File:Line |
 |----|-----------|-------------|-----------|
-| 2a | run_analysis | Main analysis pipeline | [analysis.py:35](../src/black_box_unlock/analysis.py#L35) |
-| 2a.1 | _fetch_gmap_data | Fetch git history via gmap | [analysis.py:20](../src/black_box_unlock/analysis.py#L20) |
-| 2b | export_to_json | Serialize result to JSON | [analysis.py:112](../src/black_box_unlock/analysis.py#L112) |
+| 2a | run_analysis | Main analysis pipeline | [analysis.py:78](../src/black_box_unlock/analysis.py#L78) |
+| 2a.1 | _fetch_ci_failures | Fetch CI failure counts per file | [analysis.py:31](../src/black_box_unlock/analysis.py#L31) |
+| 2a.2 | _fetch_flaky_steps | Fetch flaky CI step summaries | [analysis.py:49](../src/black_box_unlock/analysis.py#L49) |
+| 2b | export_to_json | Serialize result to JSON | [analysis.py:174](../src/black_box_unlock/analysis.py#L174) |
 
 #### Analysis Pipeline [2a]
 
 ```mermaid
 flowchart LR
     subgraph Fetch["Data Fetch"]
-        Gmap[gmap export]
+        GitLog[fetch_git_history]
     end
 
     subgraph Parse["Parse & Detect"]
-        Churn[parse_gmap_output]
-        Owner[parse_ownership]
-        Couple[detect_coupling]
+        Churn[parse_history_entries]
+        Owner[parse_ownership_from_history]
+        Couple[detect_temporal_coupling]
     end
 
     subgraph Join["Aggregate"]
@@ -122,9 +123,9 @@ flowchart LR
         Result[AnalysisResult]
     end
 
-    Gmap --> Churn
-    Gmap --> Owner
-    Gmap --> Couple
+    GitLog --> Churn
+    GitLog --> Owner
+    GitLog --> Couple
     Churn --> Index
     Owner --> Index
     Couple --> Build
@@ -141,10 +142,10 @@ Domain logic for extracting forensic signals from git history.
 
 | ID | Component | Description | File:Line |
 |----|-----------|-------------|-----------|
-| 3a | parse_gmap_output | Parse gmap JSON to FileChurn | [churn.py:15](../src/black_box_unlock/git/churn.py#L15) |
-| 3a.1 | extract_file_churn | Extract churn from git repo | [churn.py:52](../src/black_box_unlock/git/churn.py#L52) |
+| 3a | parse_history_entries | Parse git log dict to FileChurn list | [churn.py:12](../src/black_box_unlock/git/churn.py#L12) |
+| 3a.1 | extract_file_churn | Extract churn from git repo | [churn.py:43](../src/black_box_unlock/git/churn.py#L43) |
 | 3b | detect_temporal_coupling | Find co-changing files | [coupling.py:10](../src/black_box_unlock/git/coupling.py#L10) |
-| 3c | parse_ownership_from_gmap | Parse authors per file | [ownership.py:11](../src/black_box_unlock/git/ownership.py#L11) |
+| 3c | parse_ownership_from_history | Parse authors per file from git log | [ownership.py:11](../src/black_box_unlock/git/ownership.py#L11) |
 
 #### Coupling Detection Formula [3b]
 
@@ -283,17 +284,23 @@ flowchart TB
 
 ```
 src/black_box_unlock/
-├── __init__.py              # Version: 0.2.0
+├── __init__.py              # Version
 ├── cli.py                   # [1a] Typer CLI
+├── complexity.py            # Indentation-depth complexity proxy
 ├── analysis.py              # [2a] Orchestration
 ├── core/
 │   ├── models.py            # [4a] Pydantic models
 │   ├── exceptions.py        # [4b] Custom exceptions
 │   └── logging.py           # [4c] Loguru config
 ├── git/
+│   ├── log.py               # Native git log --numstat extraction
 │   ├── churn.py             # [3a] FileChurn extraction
 │   ├── coupling.py          # [3b] Coupling detection
-│   └── ownership.py         # [3c] Ownership parsing
+│   ├── ownership.py         # [3c] Ownership parsing
+│   └── defects.py           # Bug-fix commit detection
+├── cicd/
+│   ├── models.py            # WorkflowRun, BuildFailure, FlakyStep
+│   └── github_actions.py    # gh CLI fetchers, flaky detection
 └── visualization/
     ├── html.py              # [5a] HTML report
     ├── treemap.py           # [5b] Plotly treemap
@@ -306,6 +313,7 @@ src/black_box_unlock/
 
 | Tool | Purpose | Notes |
 |------|---------|-------|
-| gmap | Git history extraction | Rust tool in PATH or ~/.cargo/bin |
+| git | Git history extraction | Native `git log --numstat` — no external tools needed |
+| gh CLI | GitHub Actions data | Optional; CI signals empty if absent/unauthenticated |
 | Plotly 2.27.0 | Treemap visualization | CDN-loaded JavaScript |
 | Cytoscape 3.28.1 | Graph visualization | CDN-loaded JavaScript |

@@ -8,13 +8,13 @@ from ..core.models import TemporalCoupling
 
 
 def detect_temporal_coupling(  # [3b] Find co-changing files
-    gmap_data: dict[str, Any],
+    history: dict[str, Any],
     min_ratio: float = 0.3,
 ) -> list[TemporalCoupling]:
     """Detect files that change together frequently.
 
     Args:
-        gmap_data: Parsed JSON from gmap export --json.
+        history: Git history entries dict from fetch_git_history.
         min_ratio: Minimum coupling ratio to include (default 0.3 = 30%).
 
     Returns:
@@ -23,7 +23,7 @@ def detect_temporal_coupling(  # [3b] Find co-changing files
     commit_counts: dict[str, int] = defaultdict(int)
     co_change_counts: dict[tuple[str, str], int] = defaultdict(int)
 
-    for entry in gmap_data.get("entries", []):
+    for entry in history.get("entries", []):
         files = [f["path"] for f in entry.get("files", [])]
 
         for path in files:

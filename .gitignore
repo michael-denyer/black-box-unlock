@@ -52,6 +52,9 @@ htmlcov/
 # gmap cache
 .gmap/
 
+# bbu coupling-guard cache
+.bbu/
+
 # Claude Code (local settings)
 .claude/
 

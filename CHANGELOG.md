@@ -9,10 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Version mismatch: `pyproject.toml` and `__init__.py` said 0.2.0 after the 0.3.0 release
-- Missing `gmap` binary now reports a clear install message instead of a raw traceback
-
-### Added
-- README documents the `gmap` Rust CLI as a required runtime dependency (`cargo install gmap`)
+- Missing git binary reports a clear error message instead of a raw traceback
 
 ### Changed
 - Git history extraction is now native (`git log --numstat`) — the gmap Rust CLI is no longer required

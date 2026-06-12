@@ -1,8 +1,11 @@
 {
+  "fix": true,
   // MD013 line-length: prose wraps naturally; MD060 table-style: too strict;
   // MD033 inline HTML + MD041 first-line-h1: README's logo table layout is deliberate
   "config": {
     "MD013": false,
+    // Keep-a-Changelog repeats Added/Fixed/Changed per release section
+    "MD024": { "siblings_only": true },
     "MD033": false,
     "MD041": false,
     "MD060": false

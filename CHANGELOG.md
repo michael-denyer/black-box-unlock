@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+
 - Function-level forensics (Tornhill X-Ray): per-function churn × complexity via
   `bbu xray FILE`, the `xray_file` MCP tool, and auto X-Ray of top hotspots in
   `analyze-repo` (`--xray-top`, default 5) — [docs/XRAY.md](docs/XRAY.md)
@@ -18,17 +19,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Self-hosted plugin marketplace (`/plugin marketplace add michael-denyer/black-box-unlock`)
 
 ### Fixed
+
 - `analyze-repo` JSON output used Rich's console.print, which wraps at terminal
   width and corrupts JSON strings longer than ~80 chars (exposed by X-Ray's
   qualified function names)
 - Coupling guard names files deterministically when ratios tie (path ascending)
 
 ### Changed
+
+- CI hardening: all workflow actions SHA-pinned, Dependabot for actions, ruff
+  pinned identically in pyproject and pre-commit, hatchling pinned exactly
+- CI dogfood job: bbu analyzes its own repository on every push
+- osv-scanner scans uv.lock on pull requests
+- Tests run randomized (pytest-randomly), parallel (pytest-xdist -n 3), with
+  30s timeouts (pytest-timeout)
+- Pre-commit now lints markdown (markdownlint-cli2) and validates mermaid
+  diagrams twice (maid syntax + mmdc renderer parity)
+- YAML form issue templates; blank issues disabled
 - Release workflow artifact actions bumped to current SHAs (Node 24 ready)
 
 ## [1.0.0] - 2026-06-12
 
 ### Added
+
 - Bug-fix commit density per file
 - Flaky CI step detection in analysis output
 - `--repo` flag to analyze a repository other than the cwd
@@ -37,10 +50,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - PyPI publishing via trusted publishing with Sigstore attestations
 
 ### Fixed
+
 - Version mismatch: `pyproject.toml` and `__init__.py` said 0.2.0 after the 0.3.0 release
 - Missing git binary reports a clear error message instead of a raw traceback
 
 ### Changed
+
 - Git history extraction is now native (`git log --numstat`) — the gmap Rust CLI is no longer required
 - Hotspot score is now commits × indentation complexity (was commits × lines changed)
 - Plugin restructured to spec (components at repo root, lean manifest)
@@ -48,6 +63,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.3.0] - 2026-01-26
 
 ### Added
+
 - CI/CD build failure tracking via GitHub Actions (BBU-b7oh)
   - Fetches workflow runs via `gh` CLI
   - Attributes failures to files changed in failing commits
@@ -63,6 +79,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.2.0] - 2026-01-25
 
 ### Added
+
 - Interactive Plotly treemap visualization for file hotspots (BBU-6335)
 - Tabbed HTML report with Table, Hotspots, and Coupling views
 - Collapsible help section explaining metrics (hotspot score, ownership risk, coupling)

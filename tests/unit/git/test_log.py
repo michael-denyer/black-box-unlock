@@ -1,5 +1,7 @@
 """Unit tests for native git history extraction."""
 
+import os
+import subprocess
 from unittest.mock import patch
 
 import pytest
@@ -66,7 +68,70 @@ class TestFetchGitHistory:
         data = fetch_git_history(tmp_path, days=45)
 
         cmd = mock_run.call_args[0][0]
-        assert cmd[:3] == ["git", "-C", str(tmp_path)]
+        assert cmd[0] == "git"
+        assert "core.quotePath=false" in cmd
+        assert "-C" in cmd
+        assert str(tmp_path) == cmd[cmd.index("-C") + 1]
         assert "--since=45 days ago" in cmd
         assert "--numstat" in cmd
         assert len(data["entries"]) == 2
+
+    def test_unicode_paths_are_preserved(self, tmp_path):
+        """Git core.quotePath=true would mangle non-ASCII paths; we must pass -c core.quotePath=false."""
+        git_env = {
+            "GIT_AUTHOR_NAME": "A",
+            "GIT_AUTHOR_EMAIL": "a@x.com",
+            "GIT_COMMITTER_NAME": "A",
+            "GIT_COMMITTER_EMAIL": "a@x.com",
+            "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
+            "HOME": str(tmp_path),
+        }
+        subprocess.run(["git", "init", str(tmp_path)], check=True, capture_output=True, env=git_env)
+        subprocess.run(
+            ["git", "-C", str(tmp_path), "config", "user.email", "a@x.com"],
+            check=True,
+            capture_output=True,
+            env=git_env,
+        )
+        subprocess.run(
+            ["git", "-C", str(tmp_path), "config", "user.name", "A"],
+            check=True,
+            capture_output=True,
+            env=git_env,
+        )
+        unicode_file = tmp_path / "café.py"
+        unicode_file.write_text("pass\n")
+        subprocess.run(
+            ["git", "-C", str(tmp_path), "add", "café.py"],
+            check=True,
+            capture_output=True,
+            env=git_env,
+        )
+        subprocess.run(
+            ["git", "-C", str(tmp_path), "commit", "-m", "add unicode file"],
+            check=True,
+            capture_output=True,
+            env=git_env,
+        )
+
+        data = fetch_git_history(tmp_path, days=30)
+
+        assert len(data["entries"]) == 1
+        paths = [f["path"] for f in data["entries"][0]["files"]]
+        assert "café.py" in paths
+
+    def test_empty_repo_returns_empty_entries(self, tmp_path):
+        """A freshly git-init'd repo with no commits should return empty entries, not raise."""
+        git_env = {
+            "GIT_AUTHOR_NAME": "A",
+            "GIT_AUTHOR_EMAIL": "a@x.com",
+            "GIT_COMMITTER_NAME": "A",
+            "GIT_COMMITTER_EMAIL": "a@x.com",
+            "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
+            "HOME": str(tmp_path),
+        }
+        subprocess.run(["git", "init", str(tmp_path)], check=True, capture_output=True, env=git_env)
+
+        data = fetch_git_history(tmp_path, days=30)
+
+        assert data == {"entries": []}

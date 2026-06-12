@@ -26,6 +26,7 @@ from .git.coupling import detect_temporal_coupling
 from .git.defects import bugfix_counts
 from .git.log import fetch_git_history
 from .git.ownership import parse_ownership_from_history
+from .git.xray import xray_file
 
 
 def _fetch_ci_failures(repo_path: Path) -> dict[str, int]:
@@ -80,6 +81,7 @@ def run_analysis(  # [2a] Main analysis pipeline
     days: int = 30,
     min_coupling: float = 0.3,
     include_ci: bool = True,
+    xray_top: int = 5,
 ) -> AnalysisResult:
     """Run complete forensic analysis on a repository.
 
@@ -91,6 +93,7 @@ def run_analysis(  # [2a] Main analysis pipeline
         days: Number of days of history to analyze.
         min_coupling: Minimum coupling ratio to include.
         include_ci: Whether to include CI/CD build failure data.
+        xray_top: Auto X-Ray the top N hotspot files (0 disables).
 
     Returns:
         AnalysisResult with file forensics and summary.
@@ -149,6 +152,18 @@ def run_analysis(  # [2a] Main analysis pipeline
     # Sort by hotspot_score descending
     files.sort(key=lambda f: f.hotspot_score, reverse=True)
 
+    # Auto X-Ray: per-function churn for the top hotspots (JSON/MCP only)
+    xrayed = 0
+    if xray_top > 0:
+        for f in files[:xray_top]:
+            if not (repo_path / f.path).exists():
+                continue
+            try:
+                f.functions = xray_file(repo_path, f.path, days=days).functions
+                xrayed += 1
+            except Exception as e:
+                logger.warning("X-Ray failed for {}: {}", f.path, e)
+
     # Compute summary
     high_risk_count = sum(1 for f in files if f.is_high_risk)
     coupled_pairs = len(coupling_list)
@@ -167,6 +182,7 @@ def run_analysis(  # [2a] Main analysis pipeline
             total_files=len(files),
             high_risk_ownership=high_risk_count,
             coupled_pairs=coupled_pairs,
+            xrayed_files=xrayed,
         ),
     )
 

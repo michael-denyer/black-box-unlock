@@ -472,7 +472,7 @@ class TestFlakyStepsInPipeline:
                 step_name="Run tests",
                 first_seen=datetime(2026, 6, 1),
                 last_seen=datetime(2026, 6, 2),
-                total_runs=2,
+                total_attempts=2,
                 failures=1,
                 flaky_count=1,
             )
@@ -521,7 +521,7 @@ class TestFlakyStepsInPipeline:
                 step_name="Run tests",
                 first_seen=datetime(2026, 6, 1),
                 last_seen=datetime(2026, 6, 2),
-                total_runs=2,
+                total_attempts=2,
                 failures=1,
                 flaky_count=1,
             ),
@@ -530,7 +530,7 @@ class TestFlakyStepsInPipeline:
                 step_name="Run tests",
                 first_seen=datetime(2026, 6, 3),
                 last_seen=datetime(2026, 6, 4),
-                total_runs=3,
+                total_attempts=3,
                 failures=2,
                 flaky_count=2,
             ),
@@ -540,7 +540,7 @@ class TestFlakyStepsInPipeline:
 
         assert len(result.flaky_steps) == 1
         merged = result.flaky_steps[0]
-        assert merged.total_runs == 5
+        assert merged.total_attempts == 5
         assert merged.failures == 3
         assert merged.flaky_count == 3
         assert merged.first_seen == datetime(2026, 6, 1)

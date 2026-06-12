@@ -67,7 +67,7 @@ def _fetch_flaky_steps(repo_path: Path) -> list[FlakyStepSummary]:
             merged[key] = s.model_dump()
         else:
             m = merged[key]
-            m["total_runs"] += s.total_runs
+            m["total_attempts"] += s.total_attempts
             m["failures"] += s.failures
             m["flaky_count"] += s.flaky_count
             m["first_seen"] = min(m["first_seen"], s.first_seen)

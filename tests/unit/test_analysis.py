@@ -439,6 +439,6 @@ class TestFetchCIFailures:
         """Returns empty dict when CI fetch fails."""
         mock_fetch.side_effect = Exception("GitHub API unavailable")
 
-        result = _fetch_ci_failures()
+        result = _fetch_ci_failures(Path("."))
 
         assert result == {}

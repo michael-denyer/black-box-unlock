@@ -51,13 +51,14 @@ def analyze_repo(  # [1a.1] Main analysis command
     output: OutputFormat = typer.Option(OutputFormat.json, help="Output format: json, html"),
     min_coupling: float = typer.Option(0.3, help="Minimum coupling ratio to include"),
     no_ci: bool = typer.Option(False, "--no-ci", help="Skip CI failure analysis"),
+    repo: Path = typer.Option(Path("."), "--repo", help="Path to the git repository to analyze"),
 ) -> None:
     """Analyze repository git history for code forensics.
 
     Extracts file churn, temporal coupling, and ownership patterns
     from git history. Based on 'Your Code as a Crime Scene' methodology.
     """
-    repo_path = Path(".")
+    repo_path = repo
     try:
         result = run_analysis(repo_path, days=days, min_coupling=min_coupling, include_ci=not no_ci)
     except BlackBoxUnlockError as e:

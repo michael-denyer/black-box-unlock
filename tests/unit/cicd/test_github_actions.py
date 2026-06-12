@@ -17,6 +17,24 @@ from black_box_unlock.cicd.github_actions import (
 from black_box_unlock.cicd.models import BuildFailure, WorkflowRun
 
 
+class TestRepoPathThreading:
+    @patch("black_box_unlock.cicd.github_actions.subprocess.run")
+    def test_fetch_workflow_runs_uses_repo_cwd(self, mock_run, tmp_path):
+        mock_run.return_value.stdout = "[]"
+
+        fetch_workflow_runs(limit=10, repo_path=tmp_path)
+
+        assert mock_run.call_args.kwargs["cwd"] == tmp_path
+
+    @patch("black_box_unlock.cicd.github_actions.subprocess.run")
+    def test_get_files_changed_uses_repo_cwd(self, mock_run, tmp_path):
+        mock_run.return_value.stdout = "src/a.py\n"
+
+        get_files_changed("abc123", repo_path=tmp_path)
+
+        assert mock_run.call_args.kwargs["cwd"] == tmp_path
+
+
 class TestParseWorkflowRuns:
     """Tests for parsing gh CLI JSON output."""
 

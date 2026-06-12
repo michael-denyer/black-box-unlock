@@ -1,6 +1,18 @@
 """Unit tests for indentation-based complexity."""
 
-from black_box_unlock.complexity import indentation_complexity
+from black_box_unlock.complexity import indentation_complexity, indentation_complexity_lines
+
+
+class TestIndentationComplexityLines:
+    def test_sums_indentation_levels(self):
+        lines = ["def f():", "    if x:", "        return 1", "    return 0"]
+        assert indentation_complexity_lines(lines) == 4.0
+
+    def test_blank_lines_ignored(self):
+        assert indentation_complexity_lines(["    a = 1", "", "   "]) == 1.0
+
+    def test_tabs_expand(self):
+        assert indentation_complexity_lines(["\tx = 1"]) == 1.0
 
 
 class TestIndentationComplexity:

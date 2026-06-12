@@ -1,11 +1,145 @@
-"""Tests for flaky step detection."""
+"""Unit tests for flaky step detection (real GitHub API shapes)."""
 
 import json
 from datetime import datetime, timezone
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+from black_box_unlock.cicd.github_actions import (
+    detect_flaky_steps,
+    flaky_steps_from_jobs,
+)
 from black_box_unlock.cicd.models import FlakyStep, StepResult
 from black_box_unlock.core.models import AnalysisResult, AnalysisSummary, FlakyStepSummary
+
+
+def _job(run_attempt: int, steps: list[tuple[str, str]], name: str = "test (3.11)") -> dict:
+    """A job dict as returned by /actions/runs/{id}/jobs?filter=all."""
+    return {
+        "name": name,
+        "run_attempt": run_attempt,
+        "steps": [
+            {
+                "name": step_name,
+                "conclusion": conclusion,
+                "completed_at": f"2026-06-0{run_attempt}T10:00:00Z",
+            }
+            for step_name, conclusion in steps
+        ],
+    }
+
+
+class TestFlakyStepsFromJobs:
+    def test_fail_then_pass_across_attempts_is_flaky(self):
+        jobs = [
+            _job(1, [("Run tests", "failure"), ("Checkout", "success")]),
+            _job(2, [("Run tests", "success"), ("Checkout", "success")]),
+        ]
+
+        flaky = flaky_steps_from_jobs(jobs)
+
+        assert len(flaky) == 1
+        step = flaky[0]
+        assert step.step_name == "Run tests"
+        assert step.job_name == "test (3.11)"
+        assert step.flaky_count == 1
+        assert step.failures == 1
+        assert step.total_runs == 2
+
+    def test_consistent_failure_is_not_flaky(self):
+        jobs = [
+            _job(1, [("Run tests", "failure")]),
+            _job(2, [("Run tests", "failure")]),
+        ]
+
+        assert flaky_steps_from_jobs(jobs) == []
+
+    def test_all_green_is_not_flaky(self):
+        jobs = [
+            _job(1, [("Run tests", "success")]),
+            _job(2, [("Run tests", "success")]),
+        ]
+
+        assert flaky_steps_from_jobs(jobs) == []
+
+    def test_skipped_steps_ignored(self):
+        jobs = [
+            _job(1, [("Deploy", "skipped")]),
+            _job(2, [("Deploy", "skipped")]),
+        ]
+
+        assert flaky_steps_from_jobs(jobs) == []
+
+    def test_tracks_first_and_last_seen(self):
+        jobs = [
+            _job(1, [("Run tests", "failure")]),
+            _job(2, [("Run tests", "success")]),
+        ]
+
+        step = flaky_steps_from_jobs(jobs)[0]
+        assert step.first_seen.day == 1
+        assert step.last_seen.day == 2
+
+    def test_same_attempt_fail_and_pass_is_not_flaky(self):
+        """A failure and a success in the SAME attempt is not a retry recovery.
+
+        Matrix jobs that share a name can report both outcomes under one
+        run_attempt. The flaky scan requires a success in a STRICTLY LATER
+        attempt, so a same-attempt pair must not count as flaky.
+        """
+        jobs = [
+            {
+                "name": "test (3.11)",
+                "run_attempt": 1,
+                "steps": [
+                    {
+                        "name": "Run tests",
+                        "conclusion": "failure",
+                        "completed_at": "2026-06-01T10:00:00Z",
+                    }
+                ],
+            },
+            {
+                "name": "test (3.11)",
+                "run_attempt": 1,
+                "steps": [
+                    {
+                        "name": "Run tests",
+                        "conclusion": "success",
+                        "completed_at": "2026-06-01T10:05:00Z",
+                    }
+                ],
+            },
+        ]
+
+        assert flaky_steps_from_jobs(jobs) == []
+
+
+class TestDetectFlakySteps:
+    @patch("black_box_unlock.cicd.github_actions.fetch_jobs_for_run")
+    @patch("black_box_unlock.cicd.github_actions.fetch_all_runs")
+    def test_only_fetches_jobs_for_rerun_runs(self, mock_runs, mock_jobs):
+        """Runs with run_attempt == 1 were never re-run - no jobs fetch needed."""
+        mock_runs.return_value = [
+            {"id": 1, "run_attempt": 1, "name": "CI"},
+            {"id": 2, "run_attempt": 3, "name": "CI"},
+        ]
+        mock_jobs.return_value = [
+            _job(1, [("Run tests", "failure")]),
+            _job(3, [("Run tests", "success")]),
+        ]
+
+        flaky = detect_flaky_steps(repo_path=Path("."), limit=50)
+
+        mock_jobs.assert_called_once_with(2, repo_path=Path("."))
+        assert len(flaky) == 1
+        assert flaky[0].flaky_count == 1
+
+    @patch("black_box_unlock.cicd.github_actions.fetch_all_runs")
+    def test_no_reruns_means_no_flaky_steps(self, mock_runs):
+        mock_runs.return_value = [{"id": 1, "run_attempt": 1, "name": "CI"}]
+
+        assert detect_flaky_steps(repo_path=Path("."), limit=50) == []
 
 
 class TestStepResultModel:
@@ -160,7 +294,7 @@ class TestFetchJobsForRun:
 
     @patch("black_box_unlock.cicd.github_actions.subprocess.run")
     def test_calls_gh_api_with_jobs_endpoint(self, mock_run):
-        """Calls gh api with runs/{id}/jobs endpoint."""
+        """Calls gh api with runs/{id}/jobs endpoint including filter=all."""
         from black_box_unlock.cicd.github_actions import fetch_jobs_for_run
 
         mock_run.return_value = MagicMock(
@@ -173,9 +307,11 @@ class TestFetchJobsForRun:
         args = mock_run.call_args[0][0]
         assert "gh" in args
         assert "api" in args
-        # Should include runs/123/jobs in the endpoint
+        # Should include runs/123/jobs in the endpoint, across all attempts
         endpoint_arg = [a for a in args if "123" in a and "jobs" in a]
         assert len(endpoint_arg) == 1
+        assert "filter=all" in endpoint_arg[0]
+        assert "per_page=100" in endpoint_arg[0]
 
     @patch("black_box_unlock.cicd.github_actions.subprocess.run")
     def test_returns_jobs_with_steps(self, mock_run):
@@ -200,243 +336,6 @@ class TestFetchJobsForRun:
         assert len(jobs) == 1
         assert jobs[0]["name"] == "test (3.10)"
         assert len(jobs[0]["steps"]) == 1
-
-
-class TestDetectFlakySteps:
-    """Tests for flaky step detection logic."""
-
-    def test_detects_flaky_when_retry_passes(self):
-        """Detects flakiness when same commit fails then passes on retry."""
-        from black_box_unlock.cicd.github_actions import detect_flaky_steps
-
-        # Simulate: commit abc, attempt 1 failed, attempt 2 passed
-        runs = [
-            {
-                "id": 1,
-                "head_sha": "abc123",
-                "run_attempt": 1,
-                "conclusion": "failure",
-                "workflow_name": "CI",
-            },
-            {
-                "id": 2,
-                "head_sha": "abc123",
-                "run_attempt": 2,
-                "conclusion": "success",
-                "workflow_name": "CI",
-            },
-        ]
-
-        # Mock job data showing step failed then passed
-        job_data = {
-            1: [
-                {
-                    "name": "test",
-                    "steps": [
-                        {
-                            "name": "Run tests",
-                            "conclusion": "failure",
-                            "completed_at": "2026-01-26T10:00:00Z",
-                        }
-                    ],
-                }
-            ],
-            2: [
-                {
-                    "name": "test",
-                    "steps": [
-                        {
-                            "name": "Run tests",
-                            "conclusion": "success",
-                            "completed_at": "2026-01-26T10:05:00Z",
-                        }
-                    ],
-                }
-            ],
-        }
-
-        with patch("black_box_unlock.cicd.github_actions.fetch_jobs_for_run") as mock_fetch:
-            mock_fetch.side_effect = lambda run_id: job_data[run_id]
-            flaky_steps = detect_flaky_steps(runs)
-
-        assert len(flaky_steps) == 1
-        assert flaky_steps[0].step_name == "Run tests"
-        assert flaky_steps[0].flaky_count == 1
-
-    def test_no_flaky_when_consistently_passes(self):
-        """No flakiness detected when step always passes."""
-        from black_box_unlock.cicd.github_actions import detect_flaky_steps
-
-        runs = [
-            {
-                "id": 1,
-                "head_sha": "abc",
-                "run_attempt": 1,
-                "conclusion": "success",
-                "workflow_name": "CI",
-            },
-            {
-                "id": 2,
-                "head_sha": "def",
-                "run_attempt": 1,
-                "conclusion": "success",
-                "workflow_name": "CI",
-            },
-        ]
-
-        job_data = {
-            1: [
-                {
-                    "name": "test",
-                    "steps": [
-                        {
-                            "name": "Run tests",
-                            "conclusion": "success",
-                            "completed_at": "2026-01-26T10:00:00Z",
-                        }
-                    ],
-                }
-            ],
-            2: [
-                {
-                    "name": "test",
-                    "steps": [
-                        {
-                            "name": "Run tests",
-                            "conclusion": "success",
-                            "completed_at": "2026-01-26T11:00:00Z",
-                        }
-                    ],
-                }
-            ],
-        }
-
-        with patch("black_box_unlock.cicd.github_actions.fetch_jobs_for_run") as mock_fetch:
-            mock_fetch.side_effect = lambda run_id: job_data[run_id]
-            flaky_steps = detect_flaky_steps(runs)
-
-        # Should return empty or only steps with high failure rate
-        flaky = [s for s in flaky_steps if s.flaky_count > 0]
-        assert len(flaky) == 0
-
-    def test_no_flaky_when_consistently_fails(self):
-        """No flakiness when step always fails (it's broken, not flaky)."""
-        from black_box_unlock.cicd.github_actions import detect_flaky_steps
-
-        runs = [
-            {
-                "id": 1,
-                "head_sha": "abc",
-                "run_attempt": 1,
-                "conclusion": "failure",
-                "workflow_name": "CI",
-            },
-            {
-                "id": 2,
-                "head_sha": "abc",
-                "run_attempt": 2,
-                "conclusion": "failure",
-                "workflow_name": "CI",
-            },
-        ]
-
-        job_data = {
-            1: [
-                {
-                    "name": "test",
-                    "steps": [
-                        {
-                            "name": "Run tests",
-                            "conclusion": "failure",
-                            "completed_at": "2026-01-26T10:00:00Z",
-                        }
-                    ],
-                }
-            ],
-            2: [
-                {
-                    "name": "test",
-                    "steps": [
-                        {
-                            "name": "Run tests",
-                            "conclusion": "failure",
-                            "completed_at": "2026-01-26T10:05:00Z",
-                        }
-                    ],
-                }
-            ],
-        }
-
-        with patch("black_box_unlock.cicd.github_actions.fetch_jobs_for_run") as mock_fetch:
-            mock_fetch.side_effect = lambda run_id: job_data[run_id]
-            flaky_steps = detect_flaky_steps(runs)
-
-        # Should have failures but no flaky_count
-        flaky = [s for s in flaky_steps if s.flaky_count > 0]
-        assert len(flaky) == 0
-
-    def test_tracks_first_and_last_seen(self):
-        """Tracks first_seen and last_seen timestamps for steps."""
-        from black_box_unlock.cicd.github_actions import detect_flaky_steps
-
-        runs = [
-            {
-                "id": 1,
-                "head_sha": "abc",
-                "run_attempt": 1,
-                "conclusion": "failure",
-                "workflow_name": "CI",
-            },
-            {
-                "id": 2,
-                "head_sha": "abc",
-                "run_attempt": 2,
-                "conclusion": "success",
-                "workflow_name": "CI",
-            },
-        ]
-
-        job_data = {
-            1: [
-                {
-                    "name": "test",
-                    "steps": [
-                        {
-                            "name": "Run tests",
-                            "conclusion": "failure",
-                            "completed_at": "2026-01-20T10:00:00Z",
-                        }
-                    ],
-                }
-            ],
-            2: [
-                {
-                    "name": "test",
-                    "steps": [
-                        {
-                            "name": "Run tests",
-                            "conclusion": "success",
-                            "completed_at": "2026-01-26T10:00:00Z",
-                        }
-                    ],
-                }
-            ],
-        }
-
-        with patch("black_box_unlock.cicd.github_actions.fetch_jobs_for_run") as mock_fetch:
-            mock_fetch.side_effect = lambda run_id: job_data[run_id]
-            flaky_steps = detect_flaky_steps(runs)
-
-        assert len(flaky_steps) == 1
-        assert flaky_steps[0].first_seen.day == 20
-        assert flaky_steps[0].last_seen.day == 26
-
-    def test_empty_runs_returns_empty_list(self):
-        """Empty runs list returns empty flaky steps."""
-        from black_box_unlock.cicd.github_actions import detect_flaky_steps
-
-        flaky_steps = detect_flaky_steps([])
-        assert flaky_steps == []
 
 
 class TestAnalysisResultIntegration:

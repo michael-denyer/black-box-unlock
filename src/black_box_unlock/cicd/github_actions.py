@@ -3,7 +3,7 @@
 import json
 import subprocess
 from collections import Counter, defaultdict
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from .models import BuildFailure, FlakyStep, WorkflowRun
@@ -152,14 +152,14 @@ def fetch_all_runs(limit: int = 100, repo_path: Path = Path(".")) -> list[dict]:
 
 
 def fetch_jobs_for_run(run_id: int, repo_path: Path = Path(".")) -> list[dict]:
-    """Fetch jobs+steps for a single run.
+    """Fetch jobs+steps for a run, across ALL retry attempts.
 
     Args:
         run_id: GitHub Actions run ID.
-        repo_path: Path to the git repository (sets cwd for gh subprocess).
+        repo_path: Repository whose gh context to use (sets cwd).
 
     Returns:
-        List of job dicts with steps.
+        List of job dicts with steps; each job carries its run_attempt.
 
     Raises:
         subprocess.CalledProcessError: If gh command fails.
@@ -167,103 +167,96 @@ def fetch_jobs_for_run(run_id: int, repo_path: Path = Path(".")) -> list[dict]:
     cmd = [
         "gh",
         "api",
-        f"/repos/{{owner}}/{{repo}}/actions/runs/{run_id}/jobs",
+        f"/repos/{{owner}}/{{repo}}/actions/runs/{run_id}/jobs?filter=all&per_page=100",
     ]
     result = subprocess.run(cmd, capture_output=True, text=True, check=True, cwd=repo_path)
     return json.loads(result.stdout)["jobs"]
 
 
-def detect_flaky_steps(runs: list[dict]) -> list[FlakyStep]:
-    """Detect flaky steps by analyzing re-run patterns.
+def flaky_steps_from_jobs(jobs: list[dict]) -> list[FlakyStep]:
+    """Detect flaky steps within one run's jobs across retry attempts.
 
-    A step is flaky if: same commit, attempt N failed, attempt N+1 passed.
+    A step is flaky when it failed in an earlier attempt and succeeded
+    in a later one. Jobs must carry run_attempt (use filter=all).
 
     Args:
-        runs: List of workflow run dicts with id, head_sha, run_attempt, conclusion.
+        jobs: Job dicts from /actions/runs/{id}/jobs?filter=all, each
+            carrying run_attempt and a list of steps.
 
     Returns:
-        List of FlakyStep objects for steps with flakiness detected.
+        List of FlakyStep objects, one per job/step combination that
+        recovered on a strictly later attempt.
     """
-    if not runs:
-        return []
-
-    # Group runs by (head_sha, workflow) to find re-runs
-    by_commit: dict[str, list[dict]] = defaultdict(list)
-    for run in runs:
-        key = f"{run['head_sha']}:{run.get('workflow_name', 'unknown')}"
-        by_commit[key].append(run)
-
-    # Track step history: (job_name, step_name) -> stats
     step_stats: dict[tuple[str, str], dict] = defaultdict(
         lambda: {
-            "total_runs": 0,
-            "failures": 0,
-            "flaky_count": 0,
+            "attempts": [],  # (run_attempt, conclusion)
             "first_seen": None,
             "last_seen": None,
         }
     )
 
-    for _commit_key, commit_runs in by_commit.items():
-        # Sort by attempt number
-        commit_runs.sort(key=lambda r: r.get("run_attempt", 1))
-
-        # Fetch job data for each run
-        run_jobs: dict[int, list[dict]] = {}
-        for run in commit_runs:
-            run_jobs[run["id"]] = fetch_jobs_for_run(run["id"])
-
-        for i, run in enumerate(commit_runs):
-            jobs = run_jobs[run["id"]]
-            for job in jobs:
-                for step in job.get("steps", []):
-                    key = (job["name"], step["name"])
-                    stats = step_stats[key]
-                    stats["total_runs"] += 1
-
-                    # Update timestamps
-                    completed = step.get("completed_at")
-                    if completed:
-                        ts = datetime.fromisoformat(completed.replace("Z", "+00:00"))
-                        if stats["first_seen"] is None or ts < stats["first_seen"]:
-                            stats["first_seen"] = ts
-                        if stats["last_seen"] is None or ts > stats["last_seen"]:
-                            stats["last_seen"] = ts
-
-                    if step["conclusion"] == "failure":
-                        stats["failures"] += 1
-                        # Check if next attempt passed for this step
-                        if i + 1 < len(commit_runs):
-                            next_run = commit_runs[i + 1]
-                            next_jobs = run_jobs[next_run["id"]]
-                            if _step_passed_in_jobs(next_jobs, job["name"], step["name"]):
-                                stats["flaky_count"] += 1
-
-    # Convert to FlakyStep objects
-    result = []
-    for (job_name, step_name), stats in step_stats.items():
-        if stats["flaky_count"] > 0 or (
-            stats["failures"] / stats["total_runs"] > 0.1 if stats["total_runs"] > 0 else False
-        ):
-            result.append(
-                FlakyStep(
-                    job_name=job_name,
-                    step_name=step_name,
-                    first_seen=stats["first_seen"] or datetime.now(),
-                    last_seen=stats["last_seen"] or datetime.now(),
-                    total_runs=stats["total_runs"],
-                    failures=stats["failures"],
-                    flaky_count=stats["flaky_count"],
-                )
-            )
-    return result
-
-
-def _step_passed_in_jobs(jobs: list[dict], job_name: str, step_name: str) -> bool:
-    """Check if a specific step passed in a list of jobs."""
     for job in jobs:
-        if job["name"] == job_name:
-            for step in job.get("steps", []):
-                if step["name"] == step_name and step["conclusion"] == "success":
-                    return True
-    return False
+        attempt = job.get("run_attempt", 1)
+        for step in job.get("steps", []):
+            conclusion = step.get("conclusion")
+            if conclusion not in ("success", "failure"):
+                continue
+            stats = step_stats[(job["name"], step["name"])]
+            stats["attempts"].append((attempt, conclusion))
+
+            completed = step.get("completed_at")
+            if completed:
+                ts = datetime.fromisoformat(completed.replace("Z", "+00:00"))
+                if stats["first_seen"] is None or ts < stats["first_seen"]:
+                    stats["first_seen"] = ts
+                if stats["last_seen"] is None or ts > stats["last_seen"]:
+                    stats["last_seen"] = ts
+
+    flaky: list[FlakyStep] = []
+    now = datetime.now(timezone.utc)
+    for (job_name, step_name), stats in step_stats.items():
+        attempts = sorted(stats["attempts"])
+        failures = sum(1 for _, c in attempts if c == "failure")
+        flaky_count = sum(
+            1
+            for i, (attempt_i, conclusion) in enumerate(attempts)
+            if conclusion == "failure"
+            and any(c == "success" for a, c in attempts[i + 1 :] if a > attempt_i)
+        )
+        if flaky_count == 0:
+            continue
+        flaky.append(
+            FlakyStep(
+                job_name=job_name,
+                step_name=step_name,
+                first_seen=stats["first_seen"] or now,
+                last_seen=stats["last_seen"] or now,
+                total_runs=len(attempts),
+                failures=failures,
+                flaky_count=flaky_count,
+            )
+        )
+    return flaky
+
+
+def detect_flaky_steps(repo_path: Path = Path("."), limit: int = 100) -> list[FlakyStep]:
+    """Detect flaky CI steps by inspecting re-run workflow runs.
+
+    Only runs with run_attempt > 1 are inspected (one jobs call each),
+    so the API cost is 1 + number-of-reruns, not 1 + number-of-runs.
+
+    Args:
+        repo_path: Repository whose gh context to use (sets cwd).
+        limit: Maximum number of workflow runs to scan.
+
+    Returns:
+        List of FlakyStep objects across all inspected re-run runs.
+    """
+    runs = fetch_all_runs(limit=limit, repo_path=repo_path)
+    flaky: list[FlakyStep] = []
+    for run in runs:
+        if run.get("run_attempt", 1) <= 1:
+            continue
+        jobs = fetch_jobs_for_run(run["id"], repo_path=repo_path)
+        flaky.extend(flaky_steps_from_jobs(jobs))
+    return flaky

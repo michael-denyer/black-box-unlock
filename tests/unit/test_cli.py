@@ -1,13 +1,31 @@
 """Unit tests for CLI commands."""
 
+import json
+from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from typer.testing import CliRunner
 
 from black_box_unlock.cli import app
+from black_box_unlock.core.exceptions import InsufficientHistoryError
+from black_box_unlock.validation import ValidationResult
 
 runner = CliRunner()
+
+
+def _validation_result(repo: str = "demo", spearman: float | None = 0.62) -> ValidationResult:
+    return ValidationResult(
+        repo=repo,
+        days=730,
+        split=0.5,
+        cutoff=datetime(2025, 6, 12, tzinfo=timezone.utc),
+        file_count=120,
+        spearman=spearman,
+        top_decile_share=0.45,
+        bugfix_coverage=0.88,
+        test_bugfix_touches=200,
+    )
 
 
 class TestAnalyzeRepoCommand:
@@ -138,3 +156,51 @@ class TestAnalyzeRepoErrorHandling:
         assert result.exit_code == 1
         assert "git not found on PATH" in result.output
         assert "Traceback" not in result.output
+
+
+class TestValidateCommand:
+    """Tests for the validate command."""
+
+    def test_prints_rho_per_repo(self):
+        with patch("black_box_unlock.validation.validate_repo") as mock_validate:
+            mock_validate.return_value = _validation_result()
+            result = runner.invoke(app, ["validate", "--repo", "."])
+        assert result.exit_code == 0
+        assert "0.62" in result.stdout
+
+    def test_json_output(self):
+        with patch("black_box_unlock.validation.validate_repo") as mock_validate:
+            mock_validate.return_value = _validation_result()
+            result = runner.invoke(app, ["validate", "--repo", ".", "--json"])
+        assert result.exit_code == 0
+        parsed = json.loads(result.stdout)
+        assert parsed[0]["spearman"] == 0.62
+
+    def test_median_rho_for_multiple_repos(self):
+        results = [
+            _validation_result("a", 0.4),
+            _validation_result("b", 0.6),
+            _validation_result("c", 0.8),
+        ]
+        with patch("black_box_unlock.validation.validate_repo") as mock_validate:
+            mock_validate.side_effect = results
+            result = runner.invoke(app, ["validate", "--repo", "a", "--repo", "b", "--repo", "c"])
+        assert result.exit_code == 0
+        assert "median" in result.stdout.lower()
+        assert "0.60" in result.stdout
+
+    def test_failing_repo_reports_error_but_others_continue(self):
+        with patch("black_box_unlock.validation.validate_repo") as mock_validate:
+            mock_validate.side_effect = [
+                InsufficientHistoryError("too little history"),
+                _validation_result(),
+            ]
+            result = runner.invoke(app, ["validate", "--repo", "bad", "--repo", "good"])
+        assert result.exit_code == 0
+        assert "too little history" in result.stdout
+
+    def test_all_repos_failing_exits_nonzero(self):
+        with patch("black_box_unlock.validation.validate_repo") as mock_validate:
+            mock_validate.side_effect = InsufficientHistoryError("too little history")
+            result = runner.invoke(app, ["validate", "--repo", "bad"])
+        assert result.exit_code == 1

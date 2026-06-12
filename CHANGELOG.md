@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Function-level forensics (Tornhill X-Ray): per-function churn × complexity via
+  `bbu xray FILE`, the `xray_file` MCP tool, and auto X-Ray of top hotspots in
+  `analyze-repo` (`--xray-top`, default 5) — [docs/XRAY.md](docs/XRAY.md)
 - `bbu validate`: split-history self-validation — Spearman correlation between
   hotspot rank and subsequent bug-fix density, plus top-decile share and
   coverage; results published in [docs/VALIDATION.md](docs/VALIDATION.md)
@@ -15,6 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Self-hosted plugin marketplace (`/plugin marketplace add michael-denyer/black-box-unlock`)
 
 ### Fixed
+- `analyze-repo` JSON output used Rich's console.print, which wraps at terminal
+  width and corrupts JSON strings longer than ~80 chars (exposed by X-Ray's
+  qualified function names)
 - Coupling guard names files deterministically when ratios tie (path ascending)
 
 ### Changed

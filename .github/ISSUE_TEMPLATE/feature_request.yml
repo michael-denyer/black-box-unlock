@@ -1,0 +1,29 @@
+name: Feature request
+description: A forensic signal, tool, or workflow bbu should support
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What are you trying to learn about a codebase that bbu can't tell you today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: What would the command/tool/output look like?
+    validations:
+      required: true
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Preferred surface
+      options:
+        - MCP tool (agent-first)
+        - CLI command
+        - Both
+        - Not sure
+    validations:
+      required: true

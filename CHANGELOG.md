@@ -7,12 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Bug-fix commit density per file
+- Flaky CI step detection in analysis output
+- --repo flag to analyze a repository other than the cwd
+
 ### Fixed
 - Version mismatch: `pyproject.toml` and `__init__.py` said 0.2.0 after the 0.3.0 release
 - Missing git binary reports a clear error message instead of a raw traceback
 
 ### Changed
 - Git history extraction is now native (`git log --numstat`) — the gmap Rust CLI is no longer required
+- Hotspot score is now commits × indentation complexity (was commits × lines changed)
 
 ## [0.3.0] - 2026-01-26
 

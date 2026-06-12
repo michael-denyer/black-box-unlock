@@ -23,6 +23,22 @@ class TestIsBugfixMessage:
         # "prefix" contains "fix" but is not a bugfix marker
         assert is_bugfix_message("docs: explain url prefix handling") is False
 
+    def test_docs_prefix_is_not_bugfix(self):
+        assert is_bugfix_message("docs: fix stale architecture docs") is False
+
+    def test_style_prefix_is_not_bugfix(self):
+        assert is_bugfix_message("style(readme): fix line overlap") is False
+
+    def test_test_prefix_is_not_bugfix(self):
+        assert is_bugfix_message("test: fix flaky assertion") is False
+
+    def test_scoped_fix_prefix_is_bugfix(self):
+        assert is_bugfix_message("fix(core): validate empty input") is True
+
+    def test_revert_of_docs_commit_still_counts(self):
+        # a revert is a defect signal regardless of what it reverts
+        assert is_bugfix_message('Revert "docs: add diagram"') is True
+
 
 class TestBugfixCounts:
     def test_counts_bugfix_commits_per_file(self):

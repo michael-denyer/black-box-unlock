@@ -101,3 +101,49 @@ class TestFileForensicsBuildFailures:
                 coupled_with=[],
                 build_failures=-1,
             )
+
+
+class TestFunctionChurn:
+    def test_hotspot_score_is_revisions_times_complexity(self):
+        from black_box_unlock.core.models import FunctionChurn
+
+        f = FunctionChurn(
+            name="f",
+            start_line=1,
+            end_line=5,
+            revisions=3,
+            lines_added=10,
+            lines_deleted=2,
+            complexity=4.0,
+        )
+        assert f.hotspot_score == 12.0
+
+    def test_header_only_defaults(self):
+        from black_box_unlock.core.models import FunctionChurn
+
+        f = FunctionChurn(name="parse", revisions=2, lines_added=5, lines_deleted=1)
+        assert f.start_line == 0 and f.end_line == 0
+        assert f.complexity == 0.0 and f.hotspot_score == 0.0
+
+
+class TestFileXRay:
+    def test_serializes_with_computed_score(self):
+        from black_box_unlock.core.models import FileXRay, FunctionChurn
+
+        xr = FileXRay(
+            path="a.py",
+            days=365,
+            revisions_analyzed=4,
+            revision_cap_hit=False,
+            functions=[FunctionChurn(name="f", revisions=1, lines_added=1, lines_deleted=0)],
+        )
+        dumped = xr.model_dump(mode="json")
+        assert dumped["functions"][0]["hotspot_score"] == 0.0
+
+
+class TestFileForensicsFunctions:
+    def test_functions_default_empty(self):
+        from black_box_unlock.core.models import FileForensics
+
+        f = FileForensics(path="a.py", commits=1, lines_changed=1, authors=[], coupled_with=[])
+        assert f.functions == []

@@ -19,6 +19,7 @@ from .core.models import (
 )
 from .git.churn import parse_history_entries
 from .git.coupling import detect_temporal_coupling
+from .git.defects import bugfix_counts
 from .git.log import fetch_git_history
 from .git.ownership import parse_ownership_from_history
 
@@ -72,6 +73,7 @@ def run_analysis(  # [2a] Main analysis pipeline
     churn_list = parse_history_entries(history)
     ownership_list = parse_ownership_from_history(history)
     coupling_list = detect_temporal_coupling(history, min_ratio=min_coupling)
+    defect_counts = bugfix_counts(history)
 
     # Index by path for joining
     churn_by_path = {c.path: c for c in churn_list}
@@ -105,6 +107,7 @@ def run_analysis(  # [2a] Main analysis pipeline
                 authors=ownership.authors if ownership else [],
                 coupled_with=coupling_by_file.get(path, []),
                 build_failures=ci_failures.get(path, 0),
+                bugfix_commits=defect_counts.get(path, 0),
             )
         )
 

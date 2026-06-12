@@ -65,9 +65,9 @@ class TestFileOwnershipModel:
 class TestCalculateFileOwnership:
     """Tests for calculate_file_ownership function."""
 
-    def test_calculates_ownership_from_gmap_data(self):
-        """Calculates file ownership from gmap entries."""
-        gmap_data = {
+    def test_calculates_ownership_from_history(self):
+        """Calculates file ownership from git history entries."""
+        history = {
             "entries": [
                 {
                     "author_email": "alice@example.com",
@@ -85,7 +85,7 @@ class TestCalculateFileOwnership:
             ]
         }
 
-        result = calculate_file_ownership(gmap_data)
+        result = calculate_file_ownership(history)
 
         assert len(result) == 2
         a_ownership = next(o for o in result if o.path == "a.py")
@@ -100,13 +100,13 @@ class TestCalculateFileOwnership:
         assert b_ownership.commits == 1
 
     def test_empty_data_returns_empty_list(self):
-        """Empty gmap data returns empty list."""
+        """Empty history returns empty list."""
         assert calculate_file_ownership({}) == []
         assert calculate_file_ownership({"entries": []}) == []
 
     def test_same_author_multiple_commits_counted_once(self):
         """Same author across multiple commits is counted once per file."""
-        gmap_data = {
+        history = {
             "entries": [
                 {
                     "author_email": "alice@example.com",
@@ -119,7 +119,7 @@ class TestCalculateFileOwnership:
             ]
         }
 
-        result = calculate_file_ownership(gmap_data)
+        result = calculate_file_ownership(history)
 
         assert len(result) == 1
         assert result[0].author_count == 1
@@ -127,7 +127,7 @@ class TestCalculateFileOwnership:
 
     def test_missing_author_email_becomes_unknown(self):
         """Missing or empty author_email is recorded as 'unknown'."""
-        gmap_data = {
+        history = {
             "entries": [
                 {
                     "author_email": "",
@@ -139,7 +139,7 @@ class TestCalculateFileOwnership:
             ]
         }
 
-        result = parse_ownership_from_history(gmap_data)
+        result = parse_ownership_from_history(history)
 
         assert len(result) == 2
         a_ownership = next(o for o in result if o.path == "a.py")

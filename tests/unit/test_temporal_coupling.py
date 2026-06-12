@@ -54,7 +54,7 @@ class TestDetectTemporalCoupling:
 
     def test_detects_two_files_changing_together(self):
         """Detects coupling when two files appear in same commits."""
-        gmap_data = {
+        history = {
             "entries": [
                 {
                     "timestamp": "2025-01-01T10:00:00Z",
@@ -73,7 +73,7 @@ class TestDetectTemporalCoupling:
             ]
         }
 
-        result = detect_temporal_coupling(gmap_data, min_ratio=0.0)
+        result = detect_temporal_coupling(history, min_ratio=0.0)
 
         assert len(result) == 1
         coupling = result[0]
@@ -88,7 +88,7 @@ class TestDetectTemporalCoupling:
         """Includes pairs at or above the minimum ratio threshold."""
         # a.py: 2 commits, b.py: 4 commits, co-changes: 1
         # coupling_ratio = 1 / min(2, 4) = 0.5
-        gmap_data = {
+        history = {
             "entries": [
                 {"files": [{"path": "a.py"}, {"path": "b.py"}]},
                 {"files": [{"path": "a.py"}]},
@@ -98,14 +98,14 @@ class TestDetectTemporalCoupling:
             ]
         }
 
-        result = detect_temporal_coupling(gmap_data, min_ratio=0.5)
+        result = detect_temporal_coupling(history, min_ratio=0.5)
         assert len(result) == 1
 
     def test_excludes_pairs_below_threshold(self):
         """Excludes pairs below the minimum ratio threshold."""
         # a.py: 2 commits, b.py: 4 commits, co-changes: 1
         # coupling_ratio = 1 / min(2, 4) = 0.5
-        gmap_data = {
+        history = {
             "entries": [
                 {"files": [{"path": "a.py"}, {"path": "b.py"}]},
                 {"files": [{"path": "a.py"}]},
@@ -115,12 +115,12 @@ class TestDetectTemporalCoupling:
             ]
         }
 
-        result = detect_temporal_coupling(gmap_data, min_ratio=0.6)
+        result = detect_temporal_coupling(history, min_ratio=0.6)
         assert len(result) == 0
 
     def test_alphabetical_ordering_avoids_duplicates(self):
         """Files are ordered alphabetically so (b, a) becomes (a, b)."""
-        gmap_data = {
+        history = {
             "entries": [
                 {
                     "timestamp": "2025-01-01T10:00:00Z",
@@ -132,7 +132,7 @@ class TestDetectTemporalCoupling:
             ]
         }
 
-        result = detect_temporal_coupling(gmap_data, min_ratio=0.0)
+        result = detect_temporal_coupling(history, min_ratio=0.0)
 
         assert len(result) == 1
         assert result[0].file_a == "apple.py"
@@ -140,7 +140,7 @@ class TestDetectTemporalCoupling:
 
     def test_single_file_commits_produce_no_pairs(self):
         """Commits with only one file don't create any pairs."""
-        gmap_data = {
+        history = {
             "entries": [
                 {
                     "timestamp": "2025-01-01T10:00:00Z",
@@ -157,12 +157,12 @@ class TestDetectTemporalCoupling:
             ]
         }
 
-        result = detect_temporal_coupling(gmap_data, min_ratio=0.0)
+        result = detect_temporal_coupling(history, min_ratio=0.0)
 
         assert len(result) == 0
 
     def test_empty_data_returns_empty_list(self):
-        """Empty gmap data returns empty list."""
+        """Empty history returns empty list."""
         result = detect_temporal_coupling({}, min_ratio=0.0)
         assert result == []
 

@@ -44,6 +44,5 @@ def parse_ownership_from_history(
     ]
 
 
-# Backward compatibility aliases
-parse_ownership_from_gmap = parse_ownership_from_history
+# Backward compatibility alias
 calculate_file_ownership = parse_ownership_from_history

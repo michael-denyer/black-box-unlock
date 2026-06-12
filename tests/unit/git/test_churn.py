@@ -8,7 +8,7 @@ from unittest.mock import patch
 import pytest
 
 from black_box_unlock.core.exceptions import NotAGitRepoError
-from black_box_unlock.git.churn import extract_file_churn, parse_gmap_output
+from black_box_unlock.git.churn import extract_file_churn, parse_history_entries
 
 
 @pytest.fixture
@@ -18,12 +18,12 @@ def sample_gmap_output():
     return json.loads(fixture_path.read_text())
 
 
-class TestParseGmapOutput:
-    """Tests for parsing gmap JSON output."""
+class TestParseHistoryEntries:
+    """Tests for parsing git history entries into FileChurn."""
 
     def test_aggregates_churn_per_file(self, sample_gmap_output):
         """Aggregates commits and line changes per file."""
-        result = parse_gmap_output(sample_gmap_output)
+        result = parse_history_entries(sample_gmap_output)
 
         # src/main.py appears in 2 commits
         main_py = next(f for f in result if f.path == "src/main.py")
@@ -39,7 +39,7 @@ class TestParseGmapOutput:
 
     def test_tracks_first_and_last_commit_dates(self, sample_gmap_output):
         """Tracks first and last commit timestamps per file."""
-        result = parse_gmap_output(sample_gmap_output)
+        result = parse_history_entries(sample_gmap_output)
 
         main_py = next(f for f in result if f.path == "src/main.py")
         assert main_py.first_commit == datetime(2026, 1, 20, 10, 0, 0)
@@ -48,31 +48,29 @@ class TestParseGmapOutput:
     def test_returns_empty_list_for_no_entries(self):
         """Returns empty list when no commits."""
         data = {"version": 1, "entries": []}
-        result = parse_gmap_output(data)
+        result = parse_history_entries(data)
         assert result == []
 
 
 class TestExtractFileChurn:
     """Tests for extract_file_churn function."""
 
-    def test_calls_gmap_with_correct_args(self, tmp_path):
-        """Calls gmap with repo path and since flag."""
+    def test_calls_git_with_correct_args(self, tmp_path):
+        """Calls git log with repo path and since flag."""
         # Create fake git repo
         (tmp_path / ".git").mkdir()
 
-        with patch("black_box_unlock.git.churn.subprocess.run") as mock_run:
-            mock_run.return_value.stdout = '{"version": 1, "entries": []}'
+        with patch("black_box_unlock.git.log.subprocess.run") as mock_run:
+            mock_run.return_value.stdout = ""
             mock_run.return_value.returncode = 0
 
             extract_file_churn(tmp_path, since_days=30)
 
             mock_run.assert_called_once()
             call_args = mock_run.call_args[0][0]
-            assert "gmap" in call_args[0] or call_args[0].endswith("gmap")
-            assert "--repo" in call_args
+            assert "git" in call_args
             assert str(tmp_path) in call_args
-            assert "--since" in call_args
-            assert "30 days ago" in call_args
+            assert "--since=30 days ago" in call_args
 
     def test_raises_not_a_git_repo_error(self, tmp_path):
         """Raises NotAGitRepoError when path is not a git repo."""

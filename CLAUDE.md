@@ -73,6 +73,7 @@ flowchart LR
 - **Ownership spread**: >3 authors + high churn = coordination risk
 - **Hotspot score**: commits × indentation complexity
 - **Bug-fix density**: defect-repair commits per file (fix/bug/hotfix/defect/regression/revert markers, excluding docs/style/test/chore-prefixed commits)
+- **Function X-Ray**: per-function revisions × complexity for top hotspots and on demand (docs/XRAY.md)
 
 ### CI/CD
 - **Build failures**: Files that break builds = fragile code
@@ -88,6 +89,7 @@ bbu analyze-repo --min-coupling=0.5  # Set coupling threshold
 bbu analyze-repo --repo /path/to/repo  # Analyze another repository
 bbu coupling-guard FILE       # Hook helper: warn if FILE has strong temporal couples
 bbu validate --repo /path --days 730  # Hotspot-vs-bugfix self-validation (docs/VALIDATION.md)
+bbu xray FILE --days 365      # Per-function churn (X-Ray, docs/XRAY.md)
 bbu version                   # Show version
 ```
 

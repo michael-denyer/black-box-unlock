@@ -52,7 +52,7 @@ class FlakyStep(BaseModel):
     last_seen: datetime
     total_runs: int
     failures: int
-    flaky_count: int  # Times it failed then passed on retry
+    flaky_count: int  # Failed attempts that later passed on a retry
 
     @property
     def flaky_rate(self) -> float:

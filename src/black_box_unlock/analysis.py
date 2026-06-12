@@ -5,9 +5,12 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 
+from loguru import logger
+
 from .cicd.github_actions import (
     aggregate_file_failures,
     build_failures_from_runs,
+    detect_flaky_steps,
     fetch_workflow_runs,
 )
 from .complexity import indentation_complexity
@@ -16,6 +19,7 @@ from .core.models import (
     AnalysisSummary,
     CouplingInfo,
     FileForensics,
+    FlakyStepSummary,
 )
 from .git.churn import parse_history_entries
 from .git.coupling import detect_temporal_coupling
@@ -37,9 +41,38 @@ def _fetch_ci_failures(repo_path: Path) -> dict[str, int]:
         runs = fetch_workflow_runs(limit=100, repo_path=repo_path)
         failures = build_failures_from_runs(runs, repo_path=repo_path)
         return aggregate_file_failures(failures)
-    except Exception:
-        # CI data is optional - gracefully degrade (logging added in a later task)
+    except Exception as e:
+        logger.warning("CI failure data unavailable, continuing without it: {}", e)
         return {}
+
+
+def _fetch_flaky_steps(repo_path: Path) -> list[FlakyStepSummary]:
+    """Fetch flaky CI steps merged per (job, step); degrade to empty on any failure.
+
+    Args:
+        repo_path: Path to the git repository.
+
+    Returns:
+        List of FlakyStepSummary objects, one per unique (job, step) pair.
+    """
+    try:
+        steps = detect_flaky_steps(repo_path=repo_path, limit=100)
+    except Exception as e:
+        logger.warning("Flaky step data unavailable, continuing without it: {}", e)
+        return []
+    merged: dict[tuple[str, str], dict] = {}
+    for s in steps:
+        key = (s.job_name, s.step_name)
+        if key not in merged:
+            merged[key] = s.model_dump()
+        else:
+            m = merged[key]
+            m["total_runs"] += s.total_runs
+            m["failures"] += s.failures
+            m["flaky_count"] += s.flaky_count
+            m["first_seen"] = min(m["first_seen"], s.first_seen)
+            m["last_seen"] = max(m["last_seen"], s.last_seen)
+    return [FlakyStepSummary(**m) for m in merged.values()]
 
 
 def run_analysis(  # [2a] Main analysis pipeline
@@ -66,8 +99,10 @@ def run_analysis(  # [2a] Main analysis pipeline
 
     # Fetch CI data if requested
     ci_failures: dict[str, int] = {}
+    flaky_steps: list[FlakyStepSummary] = []
     if include_ci:
         ci_failures = _fetch_ci_failures(repo_path)
+        flaky_steps = _fetch_flaky_steps(repo_path)
 
     # Parse individual analyses
     churn_list = parse_history_entries(history)
@@ -118,13 +153,16 @@ def run_analysis(  # [2a] Main analysis pipeline
     high_risk_count = sum(1 for f in files if f.is_high_risk)
     coupled_pairs = len(coupling_list)
 
-    repo_name = repo_path.name
+    repo_name = repo_path.resolve().name
+
+    logger.info("Analyzed {} files over {} days", len(files), days)
 
     return AnalysisResult(
         repo=repo_name,
         analyzed_days=days,
         generated_at=datetime.now(timezone.utc),
         files=files,
+        flaky_steps=flaky_steps,
         summary=AnalysisSummary(
             total_files=len(files),
             high_risk_ownership=high_risk_count,

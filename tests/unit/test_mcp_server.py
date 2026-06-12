@@ -121,7 +121,7 @@ class TestAnalysisCache:
 
 
 class TestToolRegistration:
-    def test_all_six_tools_registered(self):
+    def test_all_seven_tools_registered(self):
         names = {t.name for t in asyncio.run(mcp_server.mcp.list_tools())}
         assert names == {
             "get_hotspots",
@@ -130,4 +130,38 @@ class TestToolRegistration:
             "get_ownership",
             "get_ci_failures",
             "get_flaky_steps",
+            "xray_file",
         }
+
+
+class TestXrayFileTool:
+    def test_returns_function_churn_json(self):
+        from black_box_unlock.core.models import FileXRay, FunctionChurn
+
+        fake = FileXRay(
+            path="mod.py",
+            days=365,
+            revisions_analyzed=2,
+            revision_cap_hit=False,
+            functions=[
+                FunctionChurn(
+                    name="alpha",
+                    start_line=1,
+                    end_line=3,
+                    revisions=2,
+                    lines_added=4,
+                    lines_deleted=1,
+                    complexity=2.0,
+                )
+            ],
+        )
+        with patch("black_box_unlock.mcp_server._xray_file") as mock_xray:
+            mock_xray.return_value = fake
+            out = mcp_server.xray_file("mod.py", repo_path=".", days=365)
+        assert out["functions"][0]["hotspot_score"] == 4.0
+
+    def test_bbu_error_becomes_value_error(self):
+        with patch("black_box_unlock.mcp_server._xray_file") as mock_xray:
+            mock_xray.side_effect = NotAGitRepoError("not a repo")
+            with pytest.raises(ValueError, match="not a repo"):
+                mcp_server.xray_file("mod.py")

@@ -14,6 +14,7 @@ from mcp.server.fastmcp import FastMCP
 from .analysis import run_analysis
 from .core.exceptions import BlackBoxUnlockError
 from .core.models import AnalysisResult, FileForensics
+from .git.xray import xray_file as _xray_file
 
 mcp = FastMCP("black-box-unlock")
 
@@ -142,6 +143,27 @@ def get_flaky_steps(repo_path: str = ".") -> list[dict]:
     # days=30: canonical window for cache reuse; CI signals are run-count-based, not day-based
     result = _safe_analysis(repo_path, 30, include_ci=True)
     return [s.model_dump(mode="json") for s in result.flaky_steps]
+
+
+@mcp.tool()
+def xray_file(
+    file_path: str,
+    repo_path: str = ".",
+    days: int = 365,
+    revision_cap: int = 200,
+) -> dict:
+    """Per-function churn for one file (Tornhill's X-Ray).
+
+    Use after get_hotspots: X-Ray a hot file to see which functions drive its
+    instability - the highest-scoring functions are the precise refactoring
+    and review targets. Python files get exact attribution; other languages
+    are ranked by revisions only (complexity unknown).
+    """
+    try:
+        result = _xray_file(Path(repo_path), file_path, days=days, rev_cap=revision_cap)
+    except BlackBoxUnlockError as e:
+        raise ValueError(str(e)) from e
+    return result.model_dump(mode="json")
 
 
 def main() -> None:

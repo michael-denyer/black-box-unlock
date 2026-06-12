@@ -45,8 +45,7 @@ def coupling_warnings(
         if f["path"] == file_path:
             above = sorted(
                 [c for c in f.get("coupled_with", []) if c["ratio"] >= threshold],
-                key=lambda c: c["ratio"],
-                reverse=True,
+                key=lambda c: (-c["ratio"], c["file"]),
             )
             warnings = [
                 f"{file_path} historically co-changes with {c['file']} "

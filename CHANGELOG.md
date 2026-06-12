@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Self-hosted plugin marketplace (`/plugin marketplace add michael-denyer/black-box-unlock`)
 
+### Fixed
+- Coupling guard names files deterministically when ratios tie (path ascending)
+
+### Changed
+- Release workflow artifact actions bumped to current SHAs (Node 24 ready)
+
 ## [1.0.0] - 2026-06-12
 
 ### Added

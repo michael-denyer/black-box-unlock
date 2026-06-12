@@ -18,14 +18,36 @@
 
 Code forensics tool based on Adam Tornhill's ["Your Code as a Crime Scene"](https://pragprog.com/titles/atcrime2/your-code-as-a-crime-scene-second-edition/).
 
-Key insight: **2-8% of files cause 60-90% of defects**.
+Key insight: **2-8% of files cause 60-90% of defects**. Built for AI coding agents: forensic signals as MCP tools and a Claude Code plugin, so reviews and refactors are prioritized by evidence.
 </td>
 </tr>
 </table>
 
 
 
-## Installation
+## For agents (MCP + plugin)
+
+```bash
+uv tool install black-box-unlock   # provides bbu and bbu-mcp
+```
+
+Register the MCP server in Claude Code (`.mcp.json`):
+
+```json
+{ "mcpServers": { "black-box-unlock": { "command": "bbu-mcp" } } }
+```
+
+Tools: `get_hotspots`, `get_file_forensics`, `get_coupled_files`,
+`get_ownership`, `get_ci_failures`, `get_flaky_steps`.
+
+The Claude Code plugin in this repo adds `/analyze`, `/hotspots`, a
+`git-forensics` agent, and an ambient coupling guard that warns when you
+edit one half of a temporally coupled file pair. Both `bbu` and `bbu-mcp`
+must be on PATH for the plugin and MCP server to work.
+
+## CLI
+
+### Installation
 
 ```bash
 uv pip install -e .
@@ -33,7 +55,7 @@ uv pip install -e .
 
 CI failure analysis additionally uses the [gh](https://cli.github.com/) CLI when available (skip with `--no-ci`).
 
-## Usage
+### Usage
 
 ```bash
 # Analyze last 30 days of git history, output JSON
@@ -52,7 +74,7 @@ bbu analyze-repo --no-ci --output=html > report.html
 bbu analyze-repo --repo /path/to/repo --output=html > report.html
 ```
 
-## Features
+### Features
 
 | Signal | Description |
 |--------|-------------|
@@ -63,13 +85,15 @@ bbu analyze-repo --repo /path/to/repo --output=html > report.html
 | **Bug-fix Density** | Count of defect-repair commits per file |
 | **Flaky Steps** | CI steps that failed then passed on re-run |
 
-### HTML Report
+## HTML report
 
 The HTML report includes three interactive views:
 
 - **Table** - Sortable file metrics with severity coloring
 - **Hotspots** - Plotly treemap showing file churn by directory
 - **Coupling** - Cytoscape.js network graph of temporal coupling
+
+The HTML report is feature-frozen; new signals land in JSON and MCP only.
 
 ```mermaid
 flowchart LR

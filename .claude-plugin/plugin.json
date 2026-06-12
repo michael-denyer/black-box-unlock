@@ -1,5 +1,9 @@
 {
   "name": "black-box-unlock",
   "version": "1.0.0",
-  "description": "Code forensics tool - investigate your codebase like a crime scene"
+  "description": "Code forensics tool - investigate your codebase like a crime scene",
+  "author": {
+    "name": "Michael Denyer",
+    "url": "https://github.com/michael-denyer"
+  }
 }

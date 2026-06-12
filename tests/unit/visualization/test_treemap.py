@@ -100,6 +100,7 @@ class TestBuildTreemapData:
                 path="src/auth.py",
                 commits=10,
                 lines_changed=200,
+                complexity=200.0,
                 authors=["alice@example.com"],
                 coupled_with=[],
             )
@@ -108,7 +109,7 @@ class TestBuildTreemapData:
         result = build_treemap_data(files)
 
         auth_idx = result["labels"].index("auth.py")
-        assert result["colors"][auth_idx] == 2000  # 10 * 200
+        assert result["colors"][auth_idx] == 2000.0  # 10 commits * 200.0 complexity
 
     def test_multiple_files_same_directory(self):
         """Multiple files in same directory share parent."""
@@ -173,6 +174,7 @@ class TestBuildTreemapData:
                 path="src/auth.py",
                 commits=10,
                 lines_changed=200,
+                complexity=200.0,
                 authors=["alice@example.com", "bob@example.com"],
                 coupled_with=[CouplingInfo(file="src/user.py", ratio=0.8)],
             )

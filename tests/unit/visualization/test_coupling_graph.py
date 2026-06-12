@@ -41,6 +41,7 @@ class TestBuildCouplingGraphData:
                 path="src/auth.py",
                 commits=10,
                 lines_changed=200,
+                complexity=200.0,
                 authors=["alice@example.com"],
                 coupled_with=[],
             )
@@ -51,7 +52,7 @@ class TestBuildCouplingGraphData:
 
         assert node["id"] == "src/auth.py"
         assert node["label"] == "auth.py"
-        assert node["churn"] == 2000  # 10 * 200
+        assert node["churn"] == 2000.0  # 10 commits * 200.0 complexity
         assert node["directory"] == "src"
 
     def test_edge_contains_required_fields(self):
@@ -159,6 +160,7 @@ class TestBuildCouplingGraphData:
                 path="src/auth.py",
                 commits=10,
                 lines_changed=200,
+                complexity=200.0,
                 authors=["alice@example.com"],
                 coupled_with=[],
             ),
@@ -166,6 +168,7 @@ class TestBuildCouplingGraphData:
                 path="src/user.py",
                 commits=5,
                 lines_changed=50,
+                complexity=50.0,
                 authors=["bob@example.com"],
                 coupled_with=[],
             ),
@@ -173,7 +176,7 @@ class TestBuildCouplingGraphData:
 
         result = build_coupling_graph_data(files)
 
-        assert result["maxChurn"] == 2000  # max(10*200, 5*50)
+        assert result["maxChurn"] == 2000.0  # max(10*200.0, 5*50.0)
 
     def test_root_level_file_directory(self):
         """Root-level files get directory='root'."""

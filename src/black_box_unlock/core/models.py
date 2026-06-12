@@ -125,6 +125,11 @@ class FileForensics(BaseModel):  # [4a.3] Combined forensics
     def build_failures_must_be_non_negative(cls, v: int) -> int:
         return _validate_non_negative_int(v, "build_failures")
 
+    @field_validator("bugfix_commits")
+    @classmethod
+    def bugfix_commits_must_be_non_negative(cls, v: int) -> int:
+        return _validate_non_negative_int(v, "bugfix_commits")
+
     @computed_field
     @property
     def hotspot_score(self) -> float:

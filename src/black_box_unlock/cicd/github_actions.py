@@ -4,6 +4,7 @@ import json
 import subprocess
 from collections import Counter, defaultdict
 from datetime import datetime
+from pathlib import Path
 
 from .models import BuildFailure, FlakyStep, WorkflowRun
 
@@ -29,11 +30,12 @@ def parse_workflow_runs(gh_json: list[dict]) -> list[WorkflowRun]:
     ]
 
 
-def fetch_workflow_runs(limit: int = 100) -> list[WorkflowRun]:
+def fetch_workflow_runs(limit: int = 100, repo_path: Path = Path(".")) -> list[WorkflowRun]:
     """Fetch recent workflow runs via gh CLI.
 
     Args:
         limit: Maximum number of runs to fetch.
+        repo_path: Path to the git repository (sets cwd for gh subprocess).
 
     Returns:
         List of WorkflowRun objects.
@@ -50,16 +52,17 @@ def fetch_workflow_runs(limit: int = 100) -> list[WorkflowRun]:
         "--json",
         "databaseId,workflowName,headSha,conclusion,createdAt",
     ]
-    result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+    result = subprocess.run(cmd, capture_output=True, text=True, check=True, cwd=repo_path)
     gh_json = json.loads(result.stdout)
     return parse_workflow_runs(gh_json)
 
 
-def get_files_changed(commit_sha: str) -> list[str]:
+def get_files_changed(commit_sha: str, repo_path: Path = Path(".")) -> list[str]:
     """Get list of files changed in a commit.
 
     Args:
         commit_sha: Git commit SHA.
+        repo_path: Path to the git repository (sets cwd for git subprocess).
 
     Returns:
         List of file paths changed in the commit.
@@ -74,15 +77,18 @@ def get_files_changed(commit_sha: str) -> list[str]:
         "--format=",  # Suppress commit info, only show files
         commit_sha,
     ]
-    result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+    result = subprocess.run(cmd, capture_output=True, text=True, check=True, cwd=repo_path)
     return [line for line in result.stdout.strip().split("\n") if line.strip()]
 
 
-def build_failures_from_runs(runs: list[WorkflowRun]) -> list[BuildFailure]:
+def build_failures_from_runs(
+    runs: list[WorkflowRun], repo_path: Path = Path(".")
+) -> list[BuildFailure]:
     """Build failure objects for failed runs with file attribution.
 
     Args:
         runs: List of workflow runs.
+        repo_path: Path to the git repository (sets cwd for git subprocess).
 
     Returns:
         List of BuildFailure objects for failed runs.
@@ -94,7 +100,7 @@ def build_failures_from_runs(runs: list[WorkflowRun]) -> list[BuildFailure]:
     for run in runs:
         if not run.is_failure:
             continue
-        files = get_files_changed(run.commit_sha)
+        files = get_files_changed(run.commit_sha, repo_path=repo_path)
         failures.append(
             BuildFailure(
                 run_id=run.run_id,
@@ -123,11 +129,12 @@ def aggregate_file_failures(failures: list[BuildFailure]) -> dict[str, int]:
     return dict(counts)
 
 
-def fetch_all_runs(limit: int = 100) -> list[dict]:
+def fetch_all_runs(limit: int = 100, repo_path: Path = Path(".")) -> list[dict]:
     """Fetch workflow runs via REST API.
 
     Args:
         limit: Maximum number of runs to fetch.
+        repo_path: Path to the git repository (sets cwd for gh subprocess).
 
     Returns:
         List of workflow run dicts from GitHub API.
@@ -140,15 +147,16 @@ def fetch_all_runs(limit: int = 100) -> list[dict]:
         "api",
         f"/repos/{{owner}}/{{repo}}/actions/runs?per_page={limit}",
     ]
-    result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+    result = subprocess.run(cmd, capture_output=True, text=True, check=True, cwd=repo_path)
     return json.loads(result.stdout)["workflow_runs"]
 
 
-def fetch_jobs_for_run(run_id: int) -> list[dict]:
+def fetch_jobs_for_run(run_id: int, repo_path: Path = Path(".")) -> list[dict]:
     """Fetch jobs+steps for a single run.
 
     Args:
         run_id: GitHub Actions run ID.
+        repo_path: Path to the git repository (sets cwd for gh subprocess).
 
     Returns:
         List of job dicts with steps.
@@ -161,7 +169,7 @@ def fetch_jobs_for_run(run_id: int) -> list[dict]:
         "api",
         f"/repos/{{owner}}/{{repo}}/actions/runs/{run_id}/jobs",
     ]
-    result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+    result = subprocess.run(cmd, capture_output=True, text=True, check=True, cwd=repo_path)
     return json.loads(result.stdout)["jobs"]
 
 

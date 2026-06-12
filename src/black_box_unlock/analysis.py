@@ -22,18 +22,21 @@ from .git.log import fetch_git_history
 from .git.ownership import parse_ownership_from_history
 
 
-def _fetch_ci_failures() -> dict[str, int]:
+def _fetch_ci_failures(repo_path: Path) -> dict[str, int]:
     """Fetch CI failure counts per file.
+
+    Args:
+        repo_path: Path to the git repository.
 
     Returns:
         Dict mapping file path to failure count.
     """
     try:
-        runs = fetch_workflow_runs(limit=100)
-        failures = build_failures_from_runs(runs)
+        runs = fetch_workflow_runs(limit=100, repo_path=repo_path)
+        failures = build_failures_from_runs(runs, repo_path=repo_path)
         return aggregate_file_failures(failures)
     except Exception:
-        # CI data is optional - gracefully degrade
+        # CI data is optional - gracefully degrade (logging added in a later task)
         return {}
 
 
@@ -59,7 +62,7 @@ def run_analysis(  # [2a] Main analysis pipeline
     # Fetch CI data if requested
     ci_failures: dict[str, int] = {}
     if include_ci:
-        ci_failures = _fetch_ci_failures()
+        ci_failures = _fetch_ci_failures(repo_path)
 
     # Parse individual analyses
     churn_list = parse_history_entries(history)

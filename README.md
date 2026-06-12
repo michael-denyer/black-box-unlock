@@ -42,8 +42,16 @@ Tools: `get_hotspots`, `get_file_forensics`, `get_coupled_files`,
 
 The Claude Code plugin in this repo adds `/analyze`, `/hotspots`, a
 `git-forensics` agent, and an ambient coupling guard that warns when you
-edit one half of a temporally coupled file pair. Both `bbu` and `bbu-mcp`
-must be on PATH for the plugin and MCP server to work.
+edit one half of a temporally coupled file pair. Install it via the
+self-hosted marketplace:
+
+```text
+/plugin marketplace add michael-denyer/black-box-unlock
+/plugin install black-box-unlock@black-box-unlock
+```
+
+Both `bbu` and `bbu-mcp` must be on PATH for the plugin and MCP server
+to work.
 
 ## CLI
 

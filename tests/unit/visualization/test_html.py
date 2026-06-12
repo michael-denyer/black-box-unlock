@@ -74,6 +74,7 @@ class TestGenerateHtmlReport:
                     path="src/auth.py",
                     commits=10,
                     lines_changed=200,
+                    complexity=200.0,
                     authors=["alice@example.com", "bob@example.com"],
                     coupled_with=[CouplingInfo(file="src/user.py", ratio=0.8)],
                 )
@@ -89,7 +90,7 @@ class TestGenerateHtmlReport:
 
         assert "src/auth.py" in html
         assert "<table" in html
-        assert "2000" in html  # hotspot score (10 * 200)
+        assert "2000" in html  # hotspot score (10 commits * 200.0 complexity)
 
     def test_highlights_high_risk_files(self):
         """High risk files are highlighted."""

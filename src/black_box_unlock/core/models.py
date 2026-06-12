@@ -108,6 +108,34 @@ class CouplingInfo(BaseModel):
     ratio: float
 
 
+class FunctionChurn(BaseModel):
+    """Per-function churn within one file (Tornhill's X-Ray)."""
+
+    name: str
+    start_line: int = 0  # 0 = boundaries unknown (header-only attribution)
+    end_line: int = 0
+    revisions: int
+    lines_added: int
+    lines_deleted: int
+    complexity: float = 0.0
+
+    @computed_field
+    @property
+    def hotspot_score(self) -> float:
+        """Function hotspot score = revisions x complexity (file formula, function scale)."""
+        return self.revisions * self.complexity
+
+
+class FileXRay(BaseModel):
+    """X-Ray result for one file."""
+
+    path: str
+    days: int
+    revisions_analyzed: int
+    revision_cap_hit: bool
+    functions: list[FunctionChurn]
+
+
 class FileForensics(BaseModel):  # [4a.3] Combined forensics
     """Combined forensics for a single file."""
 
@@ -119,6 +147,7 @@ class FileForensics(BaseModel):  # [4a.3] Combined forensics
     coupled_with: list[CouplingInfo]
     build_failures: int = 0
     bugfix_commits: int = 0
+    functions: list[FunctionChurn] = []
 
     @field_validator("build_failures")
     @classmethod
@@ -155,6 +184,7 @@ class AnalysisSummary(BaseModel):
     total_files: int
     high_risk_ownership: int
     coupled_pairs: int
+    xrayed_files: int = 0
 
 
 class FlakyStepSummary(BaseModel):

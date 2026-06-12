@@ -77,7 +77,9 @@ def analyze_repo(  # [1a.1] Main analysis command
 
     match output:
         case OutputFormat.json:
-            console.print(export_to_json(result))
+            # print() not console.print(): Rich wraps at terminal width, which
+            # inserts newlines inside JSON strings longer than ~80 chars
+            print(export_to_json(result))
         case OutputFormat.html:
             # Use print() instead of console.print() to avoid Rich markup interpretation
             # Rich would strip [dir], [data-tab=...] etc. as invalid markup tags

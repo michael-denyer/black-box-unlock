@@ -1,33 +1,15 @@
-# Show Hotspots
+---
+description: Show file hotspots (high churn x complexity) for review prioritization
+---
 
-Identify code hotspots - files that are both complex and frequently changed.
+Identify the files most likely to harbor defects:
 
-## Instructions
+1. Run: `bbu analyze-repo --output=json --days=90 --no-ci`
+2. From the JSON `files` array, take the top 10 by `hotspot_score`.
+3. Present a table: path, commits, complexity, hotspot_score, bugfix_commits.
+4. For the top 3, read the file and name the specific complexity driver
+   (deep nesting, long functions, mixed responsibilities).
+5. Suggest the single highest-leverage refactoring for each.
 
-A hotspot is a file with:
-1. **High churn**: Many commits in recent history
-2. **High complexity**: Large file size or many functions (proxy for complexity)
-
-These are the "crime scenes" - areas most likely to contain bugs or cause problems.
-
-## Analysis Steps
-
-1. Get file churn from git history (last 90 days)
-2. Get file sizes as complexity proxy
-3. Calculate hotspot score: `churn × log(file_size)`
-4. Rank and display top hotspots
-
-```bash
-# File churn
-git log --since="90 days ago" --pretty=format: --name-only | sort | uniq -c | sort -rn
-
-# File sizes (for existing files)
-find . -name "*.py" -o -name "*.ts" -o -name "*.js" | xargs wc -l 2>/dev/null | sort -rn
-```
-
-## Output Format
-
-Present as a ranked list:
-1. **filename** - X commits, Y lines (Score: Z)
-   - Recent changes: brief summary
-   - Risk factors: what makes this a hotspot
+The score is Tornhill's hotspot formula: change frequency x complexity.
+A high score means the team keeps modifying code that is hard to modify safely.

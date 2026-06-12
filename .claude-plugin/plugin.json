@@ -1,6 +1,6 @@
 {
   "name": "black-box-unlock",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Code forensics tool - investigate your codebase like a crime scene",
   "commands": [
     {

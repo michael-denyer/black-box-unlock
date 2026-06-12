@@ -1,26 +1,19 @@
-# Analyze Repository
+---
+description: Analyze repository for code hotspots and forensic signals
+---
 
-Analyze the current repository for code forensics insights.
+Run a forensic analysis of this repository using the bbu CLI:
 
-## Instructions
-
-Run git forensics analysis on the current repository to identify:
-- **File churn**: Files with high commit frequency
-- **Temporal coupling**: Files that change together
-- **Hotspots**: High churn × complexity areas
-- **Ownership spread**: Files with many contributors
-
-Use the git-forensics agent to perform the analysis, then summarize findings.
-
-## Default Analysis
-
-```bash
-# Get file churn (commits per file, last 90 days)
-git log --since="90 days ago" --pretty=format: --name-only | sort | uniq -c | sort -rn | head -20
-
-# Get recent contributors per file
-git log --since="90 days ago" --format='%an' --name-only | awk '/^$/{next} NF==1{author=$0;next} {print $0, author}' | sort | uniq | cut -d' ' -f1 | sort | uniq -c | sort -rn | head -20
-```
-
-Present results in a table showing:
-| File | Commits | Contributors | Risk Level |
+1. Run: `bbu analyze-repo --output=json --days=90`
+   - If the command fails with "gh" related warnings, re-run with `--no-ci`.
+   - If `bbu` is not installed, tell the user: `uv pip install -e .` from the
+     black-box-unlock repo, then retry.
+2. Parse the JSON. Report, in order:
+   - **Top 5 hotspots** by `hotspot_score` (commits x indentation complexity),
+     with their `bugfix_commits` and `build_failures` counts.
+   - **Coupled pairs**: files whose `coupled_with` ratio >= 0.5 - hidden
+     dependencies; changing one without the other is a defect source.
+   - **High-risk ownership**: files where `is_high_risk` is true.
+   - **Flaky steps** from `flaky_steps`, if any.
+3. Recommend: which 2-3 files deserve refactoring or extra review first, and why -
+   ground every recommendation in the numbers you just reported.

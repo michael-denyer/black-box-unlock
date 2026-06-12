@@ -1,8 +1,19 @@
 """Unit tests for hotspot-vs-bugfix self-validation."""
 
+from datetime import datetime, timezone
+
 import pytest
 
-from black_box_unlock.validation import spearman_rho
+from black_box_unlock.validation import spearman_rho, split_history
+
+
+def _entry(timestamp: str, message: str = "feat: x", paths: list[str] | None = None) -> dict:
+    return {
+        "timestamp": timestamp,
+        "author_email": "a@x.com",
+        "message": message,
+        "files": [{"path": p, "added_lines": 1, "deleted_lines": 0} for p in (paths or ["a.py"])],
+    }
 
 
 class TestSpearmanRho:
@@ -26,3 +37,36 @@ class TestSpearmanRho:
 
     def test_fewer_than_two_points_returns_none(self):
         assert spearman_rho([1], [2]) is None
+
+
+class TestSplitHistory:
+    CUTOFF = datetime(2026, 3, 1, tzinfo=timezone.utc)
+
+    def test_partitions_entries_at_cutoff(self):
+        history = {
+            "entries": [
+                _entry("2026-05-01T10:00:00+00:00"),
+                _entry("2026-01-01T10:00:00+00:00"),
+            ]
+        }
+        train, test = split_history(history, self.CUTOFF)
+        assert [e["timestamp"] for e in train["entries"]] == ["2026-01-01T10:00:00+00:00"]
+        assert [e["timestamp"] for e in test["entries"]] == ["2026-05-01T10:00:00+00:00"]
+
+    def test_entry_exactly_at_cutoff_goes_to_test(self):
+        history = {"entries": [_entry("2026-03-01T00:00:00+00:00")]}
+        train, test = split_history(history, self.CUTOFF)
+        assert train["entries"] == []
+        assert len(test["entries"]) == 1
+
+    def test_zulu_suffix_timestamps_parse(self):
+        # git %aI emits +00:00 offsets but fixtures and other tools use Z
+        history = {"entries": [_entry("2026-01-01T10:00:00Z")]}
+        train, test = split_history(history, self.CUTOFF)
+        assert len(train["entries"]) == 1
+        assert test["entries"] == []
+
+    def test_empty_history(self):
+        train, test = split_history({"entries": []}, self.CUTOFF)
+        assert train["entries"] == []
+        assert test["entries"] == []

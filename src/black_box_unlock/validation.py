@@ -4,6 +4,26 @@ Split-history design: rank files by hotspot score computed from an older window,
 count bug-fix commits in the newer window, correlate. See docs/VALIDATION.md.
 """
 
+from datetime import datetime
+from typing import Any
+
+
+def split_history(
+    history: dict[str, Any], cutoff: datetime
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Partition history entries into (train, test) halves at the cutoff.
+
+    Entries strictly before the cutoff form the train half; the rest form
+    the test half. Accepts both +00:00 offsets (git %aI) and Z suffixes.
+    """
+    train: list[dict[str, Any]] = []
+    test: list[dict[str, Any]] = []
+    for entry in history.get("entries", []):
+        # Python 3.10's fromisoformat rejects the Z suffix
+        timestamp = datetime.fromisoformat(entry["timestamp"].replace("Z", "+00:00"))
+        (train if timestamp < cutoff else test).append(entry)
+    return {"entries": train}, {"entries": test}
+
 
 def _average_ranks(values: list[float]) -> list[float]:
     """1-based ranks, ties receive the average of their positions."""

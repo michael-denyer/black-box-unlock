@@ -1,0 +1,45 @@
+name: Bug report
+description: Something in bbu, bbu-mcp, or the plugin misbehaves
+labels: ["bug"]
+body:
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Surface
+      description: Where did you hit the problem?
+      options:
+        - bbu CLI
+        - bbu-mcp (MCP server)
+        - Claude Code plugin
+        - HTML report
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: bbu version
+      description: Output of `bbu version`
+      placeholder: Black Box Unlock v1.0.0
+    validations:
+      required: true
+  - type: textarea
+    id: command
+    attributes:
+      label: Exact command and output
+      description: The command you ran and what it printed (redact private paths)
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: repo-shape
+    attributes:
+      label: Repository shape
+      description: Anything unusual about the analyzed repo (size, age, shallow clone, submodules, non-UTF8 paths)
+    validations:
+      required: false

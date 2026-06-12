@@ -106,7 +106,7 @@ def validate_repo(repo_path: Path, days: int = 730, split: float = 0.5) -> Valid
         raise InsufficientHistoryError(
             f"Need commits on both sides of {cutoff:%Y-%m-%d} "
             f"(train: {len(train['entries'])}, test: {len(test['entries'])}); "
-            "try a larger --days"
+            "adjust --days/--split so the cutoff falls inside the repo's history"
         )
 
     scores: dict[str, float] = {}

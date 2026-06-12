@@ -93,6 +93,19 @@ bbu analyze-repo --repo /path/to/repo --output=html > report.html
 | **Bug-fix Density** | Count of defect-repair commits per file |
 | **Flaky Steps** | CI steps that failed then passed on re-run |
 
+## Does the ranking actually predict bugs?
+
+Measured with `bbu validate` (split-history: rank hotspots on the older half,
+count bug-fix commits in the newer half): median Spearman rho **0.46** across
+six real repos (click, flask, pydantic, rich, fastapi, httpx); the top 10% of
+ranked files attracted a median **46%** of subsequent bug-fix touches — uniform
+would be 10%. Method, per-repo numbers, and limitations:
+[docs/VALIDATION.md](docs/VALIDATION.md).
+
+```bash
+bbu validate --repo /path/to/repo --days 730
+```
+
 ## HTML report
 
 The HTML report includes three interactive views:

@@ -54,8 +54,10 @@ flowchart LR
 |------|---------|
 | `docs/ARCHITECTURE.md` | Full architecture, data models, roadmap |
 | `docs/CODEMAP.md` | Bidirectional code map with `[ID]` annotations |
-| `.claude-plugin/plugin.json` | Claude Code plugin manifest (components live at repo root: `commands/`, `agents/`, `hooks/`, `.mcp.json`) |
+| `.claude-plugin/` | Plugin manifest + self-hosted marketplace (components live at repo root: `commands/`, `agents/`, `hooks/`, `.mcp.json`) |
 | `src/black_box_unlock/cli.py` | CLI commands (`bbu`) |
+| `src/black_box_unlock/mcp_server.py` | bbu-mcp MCP server (six read tools) |
+| `src/black_box_unlock/guard.py` | Coupling guard backing the edit hook |
 | `src/black_box_unlock/core/` | Pydantic models, exceptions, logging |
 | `src/black_box_unlock/git/` | Git forensics (churn, coupling, ownership, defects, log) |
 | `src/black_box_unlock/cicd/` | CI/CD forensics (build failures, flaky steps via gh CLI) |
@@ -84,6 +86,7 @@ bbu analyze-repo --no-ci      # Skip CI failure analysis
 bbu analyze-repo --output=html  # Generate HTML report
 bbu analyze-repo --min-coupling=0.5  # Set coupling threshold
 bbu analyze-repo --repo /path/to/repo  # Analyze another repository
+bbu coupling-guard FILE       # Hook helper: warn if FILE has strong temporal couples
 bbu version                   # Show version
 ```
 

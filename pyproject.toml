@@ -26,6 +26,7 @@ dependencies = [
     "rich>=13.0.0",
     "pydantic>=2.0.0",
     "loguru>=0.7.0",
+    "mcp>=1.2.0",
 ]
 
 [project.optional-dependencies]
@@ -37,6 +38,7 @@ dev = [
 
 [project.scripts]
 bbu = "black_box_unlock.cli:app"
+bbu-mcp = "black_box_unlock.mcp_server:main"
 
 [project.urls]
 Homepage = "https://github.com/michael-denyer/black-box-unlock"

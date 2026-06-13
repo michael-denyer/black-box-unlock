@@ -13,16 +13,37 @@ import time
 from pathlib import Path
 from typing import Any
 
+from loguru import logger
+
 from .analysis import export_to_json, run_analysis
 
 CACHE_RELPATH = Path(".bbu") / "cache.json"
 CACHE_MAX_AGE_HOURS = 24
 
 
+def _cache_is_usable(data: Any) -> bool:
+    """True when the cache has the shape coupling_warnings reads (dict with a
+    list of file dicts, each carrying a path)."""
+    return (
+        isinstance(data, dict)
+        and isinstance(data.get("files"), list)
+        and all(isinstance(f, dict) and "path" in f for f in data["files"])
+    )
+
+
 def _load_or_build_cache(repo_path: Path) -> dict[str, Any]:
     cache = repo_path / CACHE_RELPATH
     if cache.exists() and time.time() - cache.stat().st_mtime < CACHE_MAX_AGE_HOURS * 3600:
-        return json.loads(cache.read_text())
+        # A corrupt or wrong-shape cache must not disable the guard: rebuild rather
+        # than crash or re-warn on every edit until the TTL expires.
+        try:
+            data = json.loads(cache.read_text())
+        except json.JSONDecodeError as e:
+            logger.warning("coupling cache at {} is unreadable, rebuilding: {}", cache, e)
+        else:
+            if _cache_is_usable(data):
+                return data
+            logger.warning("coupling cache at {} has an unexpected shape, rebuilding", cache)
     result = run_analysis(repo_path, days=90, include_ci=False)
     payload = export_to_json(result)
     cache.parent.mkdir(exist_ok=True)

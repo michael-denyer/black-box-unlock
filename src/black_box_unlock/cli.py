@@ -5,6 +5,7 @@ from enum import Enum
 from pathlib import Path
 
 import typer
+from loguru import logger
 from rich.console import Console
 
 from black_box_unlock.analysis import export_to_json, run_analysis
@@ -101,8 +102,10 @@ def coupling_guard(
 
     try:
         warnings = coupling_warnings(file, repo, threshold)
-    except Exception:
-        # A guard must never break the edit it observes; degrade to silence.
+    except Exception as e:
+        # A guard must never break the edit it observes; degrade to silence — but
+        # log so a permanently-failing guard stays diagnosable instead of silently dead.
+        logger.warning("coupling guard skipped for {}: {}", file, e)
         raise typer.Exit(code=0) from None
     if warnings:
         print(

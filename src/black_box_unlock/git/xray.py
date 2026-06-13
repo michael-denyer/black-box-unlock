@@ -14,13 +14,26 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from loguru import logger
+
 from ..complexity import indentation_complexity_lines
+from ..core.exceptions import GitToolNotFoundError, NotAGitRepoError
 from ..core.models import FileXRay, FunctionChurn, FunctionCoupling
 from ..spans import FunctionSpan, indentation_spans, python_spans, span_at
 from .run import run_git
 
 # Pairs sharing fewer commits than this are noise within a recency window.
 MIN_SHARED_REVISIONS = 2
+
+# git's stderr when a path simply did not exist at a revision (the normal
+# deletion case) — distinct from a real failure we must surface. git picks
+# between the two by whether the path currently exists on disk, so both are
+# legitimate absence signals and must stay silent. Caveat: a corrupt/missing
+# *tree* object also yields "exists on disk, but not in", so that rare
+# corruption is indistinguishable here and degrades silently (git log -p runs
+# first and would usually surface it); blob corruption says "bad object" and is
+# logged. Narrowing these markers would spuriously warn on real deletions.
+_ABSENT_PATH_MARKERS = ("does not exist in", "exists on disk, but not in")
 
 _COMMIT_MARKER = "\x01"
 _PRETTY_FORMAT = f"{_COMMIT_MARKER}%H"
@@ -168,13 +181,26 @@ def _git_patch_log(repo_path: Path, file_path: str, days: int) -> str:
 
 
 def _show(repo_path: Path, sha: str, file_path: str) -> str | None:
-    """Return file content at a revision; None if absent there (e.g. deletion commit)."""
-    result = subprocess.run(
-        ["git", "-C", str(repo_path), "show", f"{sha}:{file_path}"],
-        capture_output=True,
-        text=True,
-    )
-    return result.stdout if result.returncode == 0 else None
+    """Return file content at a revision; None if absent there (e.g. deletion commit).
+
+    Routes through run_git so the not-a-repo/git-missing guards and non-ASCII
+    path handling stay uniform. A path that simply did not exist at ``sha`` is
+    the expected case and yields None silently; any other git failure is logged
+    (that revision falls back to coarse hunk-header attribution) and also yields
+    None, so one bad revision never aborts the whole X-Ray.
+    """
+    try:
+        return run_git(repo_path, ["show", f"{sha}:{file_path}"])
+    except (NotAGitRepoError, GitToolNotFoundError, subprocess.CalledProcessError) as e:
+        stderr = getattr(e, "stderr", "") or ""
+        if not any(marker in stderr for marker in _ABSENT_PATH_MARKERS):
+            logger.warning(
+                "git show {}:{} failed; X-Ray attribution degraded for this revision: {}",
+                sha,
+                file_path,
+                stderr.strip() or e,
+            )
+        return None
 
 
 def _spans_for(source: str) -> list[FunctionSpan]:

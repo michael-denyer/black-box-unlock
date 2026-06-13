@@ -3,9 +3,10 @@
 import subprocess
 
 import pytest
+from loguru import logger
 
 from black_box_unlock.core.exceptions import NotAGitRepoError
-from black_box_unlock.git.xray import xray_file
+from black_box_unlock.git.xray import _show, xray_file
 
 ALPHA_V1 = "def alpha():\n    return 1\n\n\ndef beta():\n    return 2\n"
 ALPHA_V2 = "def alpha():\n    x = 1\n    return x\n\n\ndef beta():\n    return 2\n"
@@ -69,6 +70,36 @@ class TestXrayFile:
         _run(["git", "commit", "-m", "drop beta"], xray_repo)
         result = xray_file(xray_repo, "mod.py", days=365)
         assert "beta" not in {f.name for f in result.functions}
+
+
+class TestShow:
+    def _head(self, repo) -> str:
+        out = subprocess.run(
+            ["git", "rev-parse", "HEAD"], cwd=repo, check=True, capture_output=True, text=True
+        )
+        return out.stdout.strip()
+
+    def test_absent_path_returns_none_without_warning(self, xray_repo):
+        """A path missing at the revision (e.g. deletion commit) is the normal case: silent None."""
+        messages: list[str] = []
+        sink = logger.add(messages.append, level="WARNING")
+        try:
+            assert _show(xray_repo, self._head(xray_repo), "never_existed.py") is None
+        finally:
+            logger.remove(sink)
+        assert messages == []
+
+    def test_unexpected_git_error_returns_none_and_logs(self, xray_repo):
+        """An unexpected git failure (bad revision, not path-absence) is logged, still None."""
+        messages: list[str] = []
+        sink = logger.add(messages.append, level="WARNING")
+        try:
+            # An invalid object name yields "fatal: invalid object name" — not a
+            # path-absence message, so it must surface as a warning.
+            assert _show(xray_repo, "zzzzzz", "mod.py") is None
+        finally:
+            logger.remove(sink)
+        assert any("mod.py" in m for m in messages)
 
 
 class TestXrayCoupling:

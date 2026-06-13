@@ -149,6 +149,18 @@ class TestFileForensicsFunctions:
         assert f.functions == []
 
 
+class TestTornhillRatio:
+    def test_divides_shared_by_min_count(self):
+        from black_box_unlock.core.models import tornhill_ratio
+
+        assert tornhill_ratio(4, 10, 5) == 0.8
+
+    def test_zero_min_count_gives_zero(self):
+        from black_box_unlock.core.models import tornhill_ratio
+
+        assert tornhill_ratio(0, 0, 5) == 0.0
+
+
 class TestFunctionCoupling:
     def test_ratio_uses_min_revisions(self):
         from black_box_unlock.core.models import FunctionCoupling

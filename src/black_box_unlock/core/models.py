@@ -22,6 +22,12 @@ def _validate_non_negative_int(v: int, field_name: str) -> int:
     return v
 
 
+def tornhill_ratio(shared: int, count_a: int, count_b: int) -> float:
+    """Co-change coupling ratio (Tornhill): shared / min(count_a, count_b), 0 if either is 0."""
+    lo = min(count_a, count_b)
+    return shared / lo if lo else 0.0
+
+
 class FileChurn(BaseModel):  # [4a] Churn metrics per file
     """Churn metrics for a single file."""
 
@@ -63,10 +69,7 @@ class TemporalCoupling(BaseModel):  # [4a.1] File pair co-change
     @property
     def coupling_ratio(self) -> float:
         """Ratio of co-changes to minimum commit count (Tornhill's formula)."""
-        min_commits = min(self.commits_a, self.commits_b)
-        if min_commits == 0:
-            return 0.0
-        return self.co_change_count / min_commits
+        return tornhill_ratio(self.co_change_count, self.commits_a, self.commits_b)
 
 
 class FileOwnership(BaseModel):  # [4a.2] Authors per file
@@ -139,10 +142,7 @@ class FunctionCoupling(BaseModel):
     @property
     def coupling_ratio(self) -> float:
         """Ratio of shared revisions to the less-changed function (Tornhill's formula)."""
-        min_revisions = min(self.revisions_a, self.revisions_b)
-        if min_revisions == 0:
-            return 0.0
-        return self.shared_revisions / min_revisions
+        return tornhill_ratio(self.shared_revisions, self.revisions_a, self.revisions_b)
 
 
 class FileXRay(BaseModel):

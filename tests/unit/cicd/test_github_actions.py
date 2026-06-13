@@ -97,6 +97,21 @@ class TestParseWorkflowRuns:
         runs = parse_workflow_runs([])
         assert runs == []
 
+    def test_null_conclusion_becomes_unknown_and_not_failure(self):
+        """An in-progress run reports conclusion: null; it must not count as a build failure."""
+        gh_json = [
+            {
+                "databaseId": 789,
+                "workflowName": "CI",
+                "headSha": "ghi789",
+                "conclusion": None,
+                "createdAt": "2026-01-26T13:00:00Z",
+            }
+        ]
+        runs = parse_workflow_runs(gh_json)
+        assert runs[0].conclusion == "unknown"
+        assert runs[0].is_failure is False
+
 
 class TestFetchWorkflowRuns:
     """Tests for fetching runs via gh CLI."""

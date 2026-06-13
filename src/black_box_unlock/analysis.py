@@ -138,8 +138,8 @@ def run_analysis(  # [2a] Main analysis pipeline
             )
         )
 
-    # Sort by hotspot_score descending
-    files.sort(key=lambda f: f.hotspot_score, reverse=True)
+    # Hotspot score descending; path breaks ties so output is reproducible
+    files.sort(key=lambda f: (-f.hotspot_score, f.path))
 
     # Auto X-Ray: per-function churn for the top hotspots (JSON/MCP only)
     xrayed = 0

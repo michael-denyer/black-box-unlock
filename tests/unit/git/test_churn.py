@@ -9,13 +9,15 @@ import pytest
 
 from black_box_unlock.core.exceptions import NotAGitRepoError
 from black_box_unlock.git.churn import extract_file_churn, parse_history_entries
+from black_box_unlock.git.log import Commit
 
 
 @pytest.fixture
 def sample_history():
-    """Load sample git history JSON."""
+    """Load sample git history JSON as typed Commit models."""
     fixture_path = Path(__file__).parent.parent.parent / "fixtures" / "sample_history.json"
-    return json.loads(fixture_path.read_text())
+    raw = json.loads(fixture_path.read_text())
+    return [Commit(**entry) for entry in raw["entries"]]
 
 
 class TestParseHistoryEntries:
@@ -47,9 +49,7 @@ class TestParseHistoryEntries:
 
     def test_returns_empty_list_for_no_entries(self):
         """Returns empty list when no commits."""
-        data = {"version": 1, "entries": []}
-        result = parse_history_entries(data)
-        assert result == []
+        assert parse_history_entries([]) == []
 
 
 class TestExtractFileChurn:

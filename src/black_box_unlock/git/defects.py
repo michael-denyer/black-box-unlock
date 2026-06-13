@@ -7,7 +7,8 @@ in the Tornhill sense. Reverts are always counted regardless of what they revert
 
 import re
 from collections import Counter
-from typing import Any
+
+from .log import Commit
 
 REVERT_PATTERN = re.compile(r"\brevert\b", re.IGNORECASE)
 
@@ -35,24 +36,16 @@ def is_bugfix_message(message: str) -> bool:
     return bool(BUGFIX_PATTERN.search(message))
 
 
-def bugfix_counts(history: dict[str, Any]) -> dict[str, int]:
+def bugfix_counts(commits: list[Commit]) -> dict[str, int]:
     """Count bug-fix commits per file path.
 
     Files repeatedly touched by fix commits are where defects live —
     this is the defect axis of Tornhill's hotspot validation.
-
-    Args:
-        history: Git history dict with an 'entries' list, each entry having
-            a 'message' key and a 'files' list of dicts with 'path'.
-
-    Returns:
-        Dict mapping file path to number of bug-fix commits touching it.
     """
     counts: Counter[str] = Counter()
-    for entry in history.get("entries", []):
-        message = entry.get("message")
-        if not message or not is_bugfix_message(message):
+    for commit in commits:
+        if not commit.message or not is_bugfix_message(commit.message):
             continue
-        for file_info in entry.get("files", []):
-            counts[file_info["path"]] += 1
+        for file in commit.files:
+            counts[file.path] += 1
     return dict(counts)

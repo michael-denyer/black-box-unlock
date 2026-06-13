@@ -52,7 +52,7 @@ class TestFetchGitHistory:
         with pytest.raises(NotAGitRepoError):
             fetch_git_history(tmp_path, days=30)
 
-    @patch("black_box_unlock.git.log.subprocess.run")
+    @patch("black_box_unlock.git.run.subprocess.run")
     def test_raises_git_tool_not_found(self, mock_run, tmp_path):
         (tmp_path / ".git").mkdir()
         mock_run.side_effect = FileNotFoundError(2, "No such file or directory", "git")
@@ -60,7 +60,7 @@ class TestFetchGitHistory:
         with pytest.raises(GitToolNotFoundError):
             fetch_git_history(tmp_path, days=30)
 
-    @patch("black_box_unlock.git.log.subprocess.run")
+    @patch("black_box_unlock.git.run.subprocess.run")
     def test_invokes_git_log_with_since_window(self, mock_run, tmp_path):
         (tmp_path / ".git").mkdir()
         mock_run.return_value.stdout = SAMPLE_LOG

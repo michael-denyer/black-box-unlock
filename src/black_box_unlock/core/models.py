@@ -1,6 +1,6 @@
 """Core data models for forensic analysis."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from pydantic import BaseModel, computed_field, field_validator
 
@@ -207,8 +207,8 @@ class AnalysisSummary(BaseModel):
     xrayed_files: int = 0
 
 
-class FlakyStepSummary(BaseModel):
-    """Flaky step summary for inclusion in AnalysisResult."""
+class FlakyStepStats(BaseModel):
+    """A job/step's flakiness counts and seen window, per-run or merged across runs."""
 
     job_name: str
     step_name: str
@@ -221,17 +221,18 @@ class FlakyStepSummary(BaseModel):
     @computed_field
     @property
     def flaky_rate(self) -> float:
-        """Calculate flaky_count / total_attempts (recoveries per attempt observation)."""
+        """flaky_count / total_attempts (recoveries per attempt observation)."""
         return self.flaky_count / self.total_attempts if self.total_attempts else 0.0
 
     @computed_field
     @property
     def is_active(self) -> bool:
-        """Check if step ran in last 7 days."""
-        from datetime import timezone
+        """True if the step ran within the last 7 days."""
+        return (datetime.now(timezone.utc) - self.last_seen).days <= 7
 
-        now = datetime.now(timezone.utc)
-        return (now - self.last_seen).days <= 7
+
+class FlakyStepSummary(FlakyStepStats):
+    """Flaky-step counts merged across runs, included in AnalysisResult."""
 
 
 class AnalysisResult(BaseModel):  # [4a.4] Complete analysis output

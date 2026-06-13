@@ -12,6 +12,7 @@ from .cicd.github_actions import (
     build_failures_from_runs,
     detect_flaky_steps,
     fetch_workflow_runs,
+    summarize_flaky_steps,
 )
 from .complexity import indentation_complexity
 from .core.models import (
@@ -48,7 +49,7 @@ def _fetch_ci_failures(repo_path: Path) -> dict[str, int]:
 
 
 def _fetch_flaky_steps(repo_path: Path) -> list[FlakyStepSummary]:
-    """Fetch flaky CI steps merged per (job, step); degrade to empty on any failure.
+    """Fetch flaky CI steps summarized per (job, step); degrade to empty on any failure.
 
     Args:
         repo_path: Path to the git repository.
@@ -61,19 +62,7 @@ def _fetch_flaky_steps(repo_path: Path) -> list[FlakyStepSummary]:
     except Exception as e:
         logger.warning("Flaky step data unavailable, continuing without it: {}", e)
         return []
-    merged: dict[tuple[str, str], dict] = {}
-    for s in steps:
-        key = (s.job_name, s.step_name)
-        if key not in merged:
-            merged[key] = s.model_dump()
-        else:
-            m = merged[key]
-            m["total_attempts"] += s.total_attempts
-            m["failures"] += s.failures
-            m["flaky_count"] += s.flaky_count
-            m["first_seen"] = min(m["first_seen"], s.first_seen)
-            m["last_seen"] = max(m["last_seen"], s.last_seen)
-    return [FlakyStepSummary(**m) for m in merged.values()]
+    return summarize_flaky_steps(steps)
 
 
 def run_analysis(  # [2a] Main analysis pipeline

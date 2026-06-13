@@ -6,6 +6,7 @@ from collections import Counter, defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 
+from ..core.models import FlakyStepSummary
 from .models import BuildFailure, FlakyStep, WorkflowRun
 
 
@@ -237,6 +238,35 @@ def flaky_steps_from_jobs(jobs: list[dict]) -> list[FlakyStep]:
             )
         )
     return flaky
+
+
+def summarize_flaky_steps(steps: list[FlakyStep]) -> list[FlakyStepSummary]:
+    """Merge per-run flaky observations into one summary per (job, step).
+
+    Counts (attempts, failures, recoveries) sum across observations; the seen
+    window spans the earliest first_seen to the latest last_seen.
+    """
+    summaries: dict[tuple[str, str], FlakyStepSummary] = {}
+    for step in steps:
+        key = (step.job_name, step.step_name)
+        summary = summaries.get(key)
+        if summary is None:
+            summaries[key] = FlakyStepSummary(
+                job_name=step.job_name,
+                step_name=step.step_name,
+                first_seen=step.first_seen,
+                last_seen=step.last_seen,
+                total_attempts=step.total_attempts,
+                failures=step.failures,
+                flaky_count=step.flaky_count,
+            )
+        else:
+            summary.total_attempts += step.total_attempts
+            summary.failures += step.failures
+            summary.flaky_count += step.flaky_count
+            summary.first_seen = min(summary.first_seen, step.first_seen)
+            summary.last_seen = max(summary.last_seen, step.last_seen)
+    return list(summaries.values())
 
 
 def detect_flaky_steps(repo_path: Path = Path("."), limit: int = 100) -> list[FlakyStep]:

@@ -13,6 +13,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   that change together (shared-commit ratio, Tornhill's formula), with a
   2-shared-commit noise floor and `--min-coupling` threshold — completes the
   faithful X-Ray feature set
+- `xray_failed` flag on file forensics so JSON/MCP consumers can tell an X-Ray
+  crash from a file that genuinely has no attributable functions (both leave
+  `functions` empty)
+
+### Fixed
+
+- X-Ray no longer silently degrades on unexpected git failures: `_show` routes
+  through the single `run_git` entry point and logs corruption/permission
+  errors, while a path simply absent at a revision stays silent as before
+- Coupling guard recovers from a corrupt or wrong-shape cache by rebuilding,
+  instead of crashing on unparseable JSON or re-warning on every edit until the
+  24h TTL; the CLI guard now logs when it skips so a silently-dead guard is
+  diagnosable
+- `FlakyStepStats` rejects impossible counts (0 ≤ flaky_count ≤ failures ≤
+  total_attempts), keeping `flaky_rate` within [0, 1]
+- Bug-fix prefix exclusion list in CLAUDE.md, ARCHITECTURE.md and VALIDATION.md
+  corrected to match the code (the list also excludes `ci`/`build`/`refactor`)
 
 ## [1.1.0] - 2026-06-12
 

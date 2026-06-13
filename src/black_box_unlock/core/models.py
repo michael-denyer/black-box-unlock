@@ -168,6 +168,9 @@ class FileForensics(BaseModel):  # [4a.3] Combined forensics
     build_failures: int = 0
     bugfix_commits: int = 0
     functions: list[FunctionChurn] = []
+    xray_failed: bool = False
+    """True when an X-Ray attempt on this file raised; lets consumers tell a crash
+    from a file that genuinely has no attributable functions (both leave functions empty)."""
 
     @field_validator("build_failures")
     @classmethod

@@ -8,6 +8,7 @@ from unittest.mock import MagicMock, patch
 from black_box_unlock.cicd.github_actions import (
     detect_flaky_steps,
     flaky_steps_from_jobs,
+    summarize_flaky_steps,
 )
 from black_box_unlock.cicd.models import FlakyStep, StepResult
 from black_box_unlock.core.models import AnalysisResult, AnalysisSummary, FlakyStepSummary
@@ -153,6 +154,73 @@ class TestDetectFlakySteps:
         mock_runs.return_value = [{"id": 1, "run_attempt": 1, "name": "CI"}]
 
         assert detect_flaky_steps(repo_path=Path("."), limit=50) == []
+
+
+class TestSummarizeFlakySteps:
+    def _step(self, *, first, last, attempts, failures, flaky, job="test (3.11)", step="Run tests"):
+        return FlakyStep(
+            job_name=job,
+            step_name=step,
+            first_seen=first,
+            last_seen=last,
+            total_attempts=attempts,
+            failures=failures,
+            flaky_count=flaky,
+        )
+
+    def test_merges_same_job_step_across_runs(self):
+        """Counts sum and the seen window spans the earliest/latest observation."""
+        result = summarize_flaky_steps(
+            [
+                self._step(
+                    first=datetime(2026, 6, 1),
+                    last=datetime(2026, 6, 2),
+                    attempts=2,
+                    failures=1,
+                    flaky=1,
+                ),
+                self._step(
+                    first=datetime(2026, 6, 3),
+                    last=datetime(2026, 6, 4),
+                    attempts=3,
+                    failures=2,
+                    flaky=2,
+                ),
+            ]
+        )
+
+        assert len(result) == 1
+        merged = result[0]
+        assert (merged.total_attempts, merged.failures, merged.flaky_count) == (5, 3, 3)
+        assert merged.first_seen == datetime(2026, 6, 1)
+        assert merged.last_seen == datetime(2026, 6, 4)
+
+    def test_distinct_pairs_stay_separate(self):
+        result = summarize_flaky_steps(
+            [
+                self._step(
+                    first=datetime(2026, 6, 1),
+                    last=datetime(2026, 6, 1),
+                    attempts=2,
+                    failures=1,
+                    flaky=1,
+                    step="lint",
+                ),
+                self._step(
+                    first=datetime(2026, 6, 1),
+                    last=datetime(2026, 6, 1),
+                    attempts=2,
+                    failures=1,
+                    flaky=1,
+                    step="test",
+                ),
+            ]
+        )
+
+        assert {s.step_name for s in result} == {"lint", "test"}
+
+    def test_empty_returns_empty(self):
+        assert summarize_flaky_steps([]) == []
 
 
 class TestStepResultModel:

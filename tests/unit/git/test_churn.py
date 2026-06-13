@@ -60,7 +60,7 @@ class TestExtractFileChurn:
         # Create fake git repo
         (tmp_path / ".git").mkdir()
 
-        with patch("black_box_unlock.git.log.subprocess.run") as mock_run:
+        with patch("black_box_unlock.git.run.subprocess.run") as mock_run:
             mock_run.return_value.stdout = ""
             mock_run.return_value.returncode = 0
 

@@ -15,9 +15,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from ..complexity import indentation_complexity_lines
-from ..core.exceptions import GitToolNotFoundError, NotAGitRepoError
 from ..core.models import FileXRay, FunctionChurn, FunctionCoupling
 from ..spans import FunctionSpan, indentation_spans, python_spans, span_at
+from .run import run_git
 
 # Pairs sharing fewer commits than this are noise within a recency window.
 MIN_SHARED_REVISIONS = 2
@@ -147,36 +147,24 @@ def _git_patch_log(repo_path: Path, file_path: str, days: int) -> str:
     attrs = tempfile.NamedTemporaryFile("w", suffix=".gitattributes", delete=False)
     attrs.write(_attributes_content())
     attrs.close()
-    cmd = [
-        "git",
-        "-c",
-        f"core.attributesFile={attrs.name}",
-        "-c",
-        "core.quotePath=false",
-        "-C",
-        str(repo_path),
-        "log",
-        f"--since={days} days ago",
-        "--no-renames",
-        "-p",
-        "-U0",
-        f"--pretty=format:{_PRETTY_FORMAT}",
-        "--",
-        file_path,
-    ]
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-    except FileNotFoundError as e:
-        raise GitToolNotFoundError("git not found on PATH") from e
-    except subprocess.CalledProcessError as e:
-        if e.returncode == 128 and (
-            "does not have any commits" in e.stderr or "bad default revision" in e.stderr
-        ):
-            return ""
-        raise
+        return run_git(
+            repo_path,
+            [
+                "log",
+                f"--since={days} days ago",
+                "--no-renames",
+                "-p",
+                "-U0",
+                f"--pretty=format:{_PRETTY_FORMAT}",
+                "--",
+                file_path,
+            ],
+            config=[f"core.attributesFile={attrs.name}"],
+            tolerate_unborn=True,
+        )
     finally:
         Path(attrs.name).unlink(missing_ok=True)
-    return result.stdout
 
 
 def _show(repo_path: Path, sha: str, file_path: str) -> str | None:
@@ -244,9 +232,6 @@ def xray_file(
         NotAGitRepoError: If repo_path is not a git repository.
         GitToolNotFoundError: If the git binary is not installed.
     """
-    if not (repo_path / ".git").exists():
-        raise NotAGitRepoError(f"Not a git repository: {repo_path}")
-
     commits = parse_patch_log(_git_patch_log(repo_path, file_path, days))
     cap_hit = len(commits) > rev_cap
     commits = commits[:rev_cap]  # git log emits newest first

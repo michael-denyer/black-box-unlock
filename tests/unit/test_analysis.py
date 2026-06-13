@@ -230,6 +230,18 @@ class TestRunAnalysis:
         assert result.summary.high_risk_ownership == 1
         assert result.summary.total_files == 2
 
+    def test_equal_hotspot_scores_ordered_by_path(self):
+        """Files with tied hotspot scores sort by path, so output is reproducible."""
+        names = ["m.py", "b.py", "z.py", "a.py", "k.py", "f.py"]
+        history = [make_commit(names)]  # each file: one commit, equal complexity -> tied score
+        with patch("black_box_unlock.analysis.fetch_git_history") as mock_fetch:
+            mock_fetch.return_value = history
+            with patch("black_box_unlock.analysis.indentation_complexity") as mock_cx:
+                mock_cx.return_value = 3.0
+                result = run_analysis(Path("/fake/repo"), days=30, include_ci=False, xray_top=0)
+
+        assert [f.path for f in result.files] == sorted(names)
+
 
 class TestExportToJson:
     """Tests for export_to_json function."""

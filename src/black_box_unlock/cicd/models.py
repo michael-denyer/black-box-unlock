@@ -4,6 +4,8 @@ from datetime import datetime
 
 from pydantic import BaseModel
 
+from ..core.models import FlakyStepStats
+
 
 class WorkflowRun(BaseModel):
     """A GitHub Actions workflow run."""
@@ -43,26 +45,5 @@ class StepResult(BaseModel):
     executed_at: datetime
 
 
-class FlakyStep(BaseModel):
-    """Aggregated flakiness data for a job/step combination."""
-
-    job_name: str
-    step_name: str
-    first_seen: datetime
-    last_seen: datetime
-    total_attempts: int
-    failures: int
-    flaky_count: int  # Failed attempts that later passed on a retry
-
-    @property
-    def flaky_rate(self) -> float:
-        """Calculate flaky_count / total_attempts (recoveries per attempt observation)."""
-        return self.flaky_count / self.total_attempts if self.total_attempts else 0.0
-
-    @property
-    def is_active(self) -> bool:
-        """Check if step ran in last 7 days."""
-        from datetime import timezone
-
-        now = datetime.now(timezone.utc)
-        return (now - self.last_seen).days <= 7
+class FlakyStep(FlakyStepStats):
+    """One run's flakiness observation for a job/step, before the cross-run merge."""

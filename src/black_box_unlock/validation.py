@@ -7,7 +7,6 @@ count bug-fix commits in the newer window, correlate. See docs/VALIDATION.md.
 import math
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any
 
 from pydantic import BaseModel
 
@@ -15,7 +14,7 @@ from .complexity import indentation_complexity
 from .core.exceptions import InsufficientHistoryError
 from .git.churn import parse_history_entries
 from .git.defects import bugfix_counts
-from .git.log import fetch_git_history
+from .git.log import Commit, fetch_git_history
 
 TOP_DECILE = 0.10
 
@@ -34,21 +33,17 @@ class ValidationResult(BaseModel):
     test_bugfix_touches: int
 
 
-def split_history(
-    history: dict[str, Any], cutoff: datetime
-) -> tuple[dict[str, Any], dict[str, Any]]:
-    """Partition history entries into (train, test) halves at the cutoff.
+def split_history(commits: list[Commit], cutoff: datetime) -> tuple[list[Commit], list[Commit]]:
+    """Partition commits into (train, test) halves at the cutoff.
 
-    Entries strictly before the cutoff form the train half; the rest form
-    the test half. Accepts both +00:00 offsets (git %aI) and Z suffixes.
+    Commits strictly before the cutoff form the train half; the rest form
+    the test half.
     """
-    train: list[dict[str, Any]] = []
-    test: list[dict[str, Any]] = []
-    for entry in history.get("entries", []):
-        # Python 3.10's fromisoformat rejects the Z suffix
-        timestamp = datetime.fromisoformat(entry["timestamp"].replace("Z", "+00:00"))
-        (train if timestamp < cutoff else test).append(entry)
-    return {"entries": train}, {"entries": test}
+    train: list[Commit] = []
+    test: list[Commit] = []
+    for commit in commits:
+        (train if commit.timestamp < cutoff else test).append(commit)
+    return train, test
 
 
 def _average_ranks(values: list[float]) -> list[float]:
@@ -102,10 +97,10 @@ def validate_repo(repo_path: Path, days: int = 730, split: float = 0.5) -> Valid
     history = fetch_git_history(repo_path, days)
     cutoff = datetime.now(timezone.utc) - timedelta(days=days * (1 - split))
     train, test = split_history(history, cutoff)
-    if not train["entries"] or not test["entries"]:
+    if not train or not test:
         raise InsufficientHistoryError(
             f"Need commits on both sides of {cutoff:%Y-%m-%d} "
-            f"(train: {len(train['entries'])}, test: {len(test['entries'])}); "
+            f"(train: {len(train)}, test: {len(test)}); "
             "adjust --days/--split so the cutoff falls inside the repo's history"
         )
 

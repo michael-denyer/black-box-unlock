@@ -4,6 +4,7 @@ import pytest
 
 from black_box_unlock.core.models import FileOwnership
 from black_box_unlock.git.ownership import calculate_file_ownership, parse_ownership_from_history
+from tests.factories import make_commit
 
 
 class TestFileOwnershipModel:
@@ -67,23 +68,10 @@ class TestCalculateFileOwnership:
 
     def test_calculates_ownership_from_history(self):
         """Calculates file ownership from git history entries."""
-        history = {
-            "entries": [
-                {
-                    "author_email": "alice@example.com",
-                    "files": [
-                        {"path": "a.py", "added_lines": 10, "deleted_lines": 0},
-                        {"path": "b.py", "added_lines": 5, "deleted_lines": 0},
-                    ],
-                },
-                {
-                    "author_email": "bob@example.com",
-                    "files": [
-                        {"path": "a.py", "added_lines": 3, "deleted_lines": 1},
-                    ],
-                },
-            ]
-        }
+        history = [
+            make_commit(["a.py", "b.py"], author_email="alice@example.com"),
+            make_commit(["a.py"], author_email="bob@example.com"),
+        ]
 
         result = calculate_file_ownership(history)
 
@@ -101,23 +89,14 @@ class TestCalculateFileOwnership:
 
     def test_empty_data_returns_empty_list(self):
         """Empty history returns empty list."""
-        assert calculate_file_ownership({}) == []
-        assert calculate_file_ownership({"entries": []}) == []
+        assert calculate_file_ownership([]) == []
 
     def test_same_author_multiple_commits_counted_once(self):
         """Same author across multiple commits is counted once per file."""
-        history = {
-            "entries": [
-                {
-                    "author_email": "alice@example.com",
-                    "files": [{"path": "a.py", "added_lines": 10, "deleted_lines": 0}],
-                },
-                {
-                    "author_email": "alice@example.com",
-                    "files": [{"path": "a.py", "added_lines": 5, "deleted_lines": 2}],
-                },
-            ]
-        }
+        history = [
+            make_commit(["a.py"], author_email="alice@example.com"),
+            make_commit(["a.py"], author_email="alice@example.com"),
+        ]
 
         result = calculate_file_ownership(history)
 
@@ -127,17 +106,10 @@ class TestCalculateFileOwnership:
 
     def test_missing_author_email_becomes_unknown(self):
         """Missing or empty author_email is recorded as 'unknown'."""
-        history = {
-            "entries": [
-                {
-                    "author_email": "",
-                    "files": [{"path": "a.py", "added_lines": 10, "deleted_lines": 0}],
-                },
-                {
-                    "files": [{"path": "b.py", "added_lines": 5, "deleted_lines": 0}],
-                },
-            ]
-        }
+        history = [
+            make_commit(["a.py"], author_email=""),
+            make_commit(["b.py"], author_email=""),
+        ]
 
         result = parse_ownership_from_history(history)
 

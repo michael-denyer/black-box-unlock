@@ -16,6 +16,7 @@ from black_box_unlock.core.models import (
     CouplingInfo,
     FileForensics,
 )
+from tests.factories import make_commit
 
 
 class TestFileForensicsModel:
@@ -152,25 +153,19 @@ class TestRunAnalysis:
 
     def test_returns_analysis_result_with_file_data(self):
         """Returns AnalysisResult with forensics from git history."""
-        history = {
-            "entries": [
-                {
-                    "timestamp": "2026-01-20T10:00:00Z",
-                    "author_email": "alice@example.com",
-                    "files": [
-                        {"path": "src/auth.py", "added_lines": 100, "deleted_lines": 20},
-                        {"path": "src/user.py", "added_lines": 50, "deleted_lines": 10},
-                    ],
-                },
-                {
-                    "timestamp": "2026-01-21T10:00:00Z",
-                    "author_email": "bob@example.com",
-                    "files": [
-                        {"path": "src/auth.py", "added_lines": 30, "deleted_lines": 5},
-                    ],
-                },
-            ]
-        }
+        history = [
+            make_commit(
+                author_email="alice@example.com",
+                files=[
+                    {"path": "src/auth.py", "added_lines": 100, "deleted_lines": 20},
+                    {"path": "src/user.py", "added_lines": 50, "deleted_lines": 10},
+                ],
+            ),
+            make_commit(
+                author_email="bob@example.com",
+                files=[{"path": "src/auth.py", "added_lines": 30, "deleted_lines": 5}],
+            ),
+        ]
 
         with patch("black_box_unlock.analysis.fetch_git_history") as mock_fetch:
             mock_fetch.return_value = history
@@ -189,18 +184,7 @@ class TestRunAnalysis:
 
     def test_computes_hotspot_scores(self):
         """Files are sorted by hotspot_score descending."""
-        history = {
-            "entries": [
-                {
-                    "timestamp": "2026-01-20T10:00:00Z",
-                    "author_email": "alice@example.com",
-                    "files": [
-                        {"path": "low.py", "added_lines": 10, "deleted_lines": 0},
-                        {"path": "high.py", "added_lines": 1000, "deleted_lines": 0},
-                    ],
-                },
-            ]
-        }
+        history = [make_commit(["low.py", "high.py"], author_email="alice@example.com")]
         complexity_by_path = {"low.py": 1.0, "high.py": 50.0}
 
         with patch("black_box_unlock.analysis.fetch_git_history") as mock_fetch:
@@ -214,26 +198,10 @@ class TestRunAnalysis:
 
     def test_includes_coupling_info(self):
         """Files include coupling info when above threshold."""
-        history = {
-            "entries": [
-                {
-                    "timestamp": "2026-01-20T10:00:00Z",
-                    "author_email": "alice@example.com",
-                    "files": [
-                        {"path": "a.py", "added_lines": 10, "deleted_lines": 0},
-                        {"path": "b.py", "added_lines": 10, "deleted_lines": 0},
-                    ],
-                },
-                {
-                    "timestamp": "2026-01-21T10:00:00Z",
-                    "author_email": "alice@example.com",
-                    "files": [
-                        {"path": "a.py", "added_lines": 10, "deleted_lines": 0},
-                        {"path": "b.py", "added_lines": 10, "deleted_lines": 0},
-                    ],
-                },
-            ]
-        }
+        history = [
+            make_commit(["a.py", "b.py"], author_email="alice@example.com"),
+            make_commit(["a.py", "b.py"], author_email="alice@example.com"),
+        ]
 
         with patch("black_box_unlock.analysis.fetch_git_history") as mock_fetch:
             mock_fetch.return_value = history
@@ -247,35 +215,13 @@ class TestRunAnalysis:
 
     def test_summary_counts_high_risk_files(self):
         """Summary counts files with >3 authors as high risk."""
-        history = {
-            "entries": [
-                {
-                    "timestamp": "2026-01-20T10:00:00Z",
-                    "author_email": "a@x.com",
-                    "files": [{"path": "risky.py", "added_lines": 10, "deleted_lines": 0}],
-                },
-                {
-                    "timestamp": "2026-01-21T10:00:00Z",
-                    "author_email": "b@x.com",
-                    "files": [{"path": "risky.py", "added_lines": 10, "deleted_lines": 0}],
-                },
-                {
-                    "timestamp": "2026-01-22T10:00:00Z",
-                    "author_email": "c@x.com",
-                    "files": [{"path": "risky.py", "added_lines": 10, "deleted_lines": 0}],
-                },
-                {
-                    "timestamp": "2026-01-23T10:00:00Z",
-                    "author_email": "d@x.com",
-                    "files": [{"path": "risky.py", "added_lines": 10, "deleted_lines": 0}],
-                },
-                {
-                    "timestamp": "2026-01-24T10:00:00Z",
-                    "author_email": "a@x.com",
-                    "files": [{"path": "safe.py", "added_lines": 10, "deleted_lines": 0}],
-                },
-            ]
-        }
+        history = [
+            make_commit(["risky.py"], author_email="a@x.com"),
+            make_commit(["risky.py"], author_email="b@x.com"),
+            make_commit(["risky.py"], author_email="c@x.com"),
+            make_commit(["risky.py"], author_email="d@x.com"),
+            make_commit(["safe.py"], author_email="a@x.com"),
+        ]
 
         with patch("black_box_unlock.analysis.fetch_git_history") as mock_fetch:
             mock_fetch.return_value = history
@@ -361,15 +307,12 @@ class TestRunAnalysisWithCIData:
     @patch("black_box_unlock.analysis.fetch_git_history")
     def test_includes_build_failures_in_file_forensics(self, mock_history, mock_ci):
         """File forensics includes build_failures from CI data."""
-        mock_history.return_value = {
-            "entries": [
-                {
-                    "timestamp": "2026-01-26T10:00:00Z",
-                    "author_email": "test@example.com",
-                    "files": [{"path": "src/main.py", "added_lines": 10, "deleted_lines": 5}],
-                }
-            ]
-        }
+        mock_history.return_value = [
+            make_commit(
+                author_email="test@example.com",
+                files=[{"path": "src/main.py", "added_lines": 10, "deleted_lines": 5}],
+            )
+        ]
         mock_ci.return_value = {"src/main.py": 2}
 
         result = run_analysis(Path("/fake/repo"), days=30, include_ci=True)
@@ -381,15 +324,12 @@ class TestRunAnalysisWithCIData:
     @patch("black_box_unlock.analysis.fetch_git_history")
     def test_defaults_build_failures_to_zero_when_file_not_in_ci_data(self, mock_history, mock_ci):
         """Files not in CI data get build_failures=0."""
-        mock_history.return_value = {
-            "entries": [
-                {
-                    "timestamp": "2026-01-26T10:00:00Z",
-                    "author_email": "test@example.com",
-                    "files": [{"path": "src/main.py", "added_lines": 10, "deleted_lines": 5}],
-                }
-            ]
-        }
+        mock_history.return_value = [
+            make_commit(
+                author_email="test@example.com",
+                files=[{"path": "src/main.py", "added_lines": 10, "deleted_lines": 5}],
+            )
+        ]
         mock_ci.return_value = {"src/other.py": 3}  # Different file
 
         result = run_analysis(Path("/fake/repo"), days=30, include_ci=True)
@@ -401,15 +341,12 @@ class TestRunAnalysisWithCIData:
     @patch("black_box_unlock.analysis.fetch_git_history")
     def test_skips_ci_fetch_when_include_ci_is_false(self, mock_history, mock_ci):
         """Does not call _fetch_ci_failures when include_ci=False."""
-        mock_history.return_value = {
-            "entries": [
-                {
-                    "timestamp": "2026-01-26T10:00:00Z",
-                    "author_email": "test@example.com",
-                    "files": [{"path": "src/main.py", "added_lines": 10, "deleted_lines": 5}],
-                }
-            ]
-        }
+        mock_history.return_value = [
+            make_commit(
+                author_email="test@example.com",
+                files=[{"path": "src/main.py", "added_lines": 10, "deleted_lines": 5}],
+            )
+        ]
 
         run_analysis(Path("/fake/repo"), days=30, include_ci=False)
 
@@ -419,15 +356,12 @@ class TestRunAnalysisWithCIData:
     @patch("black_box_unlock.analysis.fetch_git_history")
     def test_include_ci_defaults_to_true(self, mock_history, mock_ci):
         """include_ci parameter defaults to True."""
-        mock_history.return_value = {
-            "entries": [
-                {
-                    "timestamp": "2026-01-26T10:00:00Z",
-                    "author_email": "test@example.com",
-                    "files": [{"path": "src/main.py", "added_lines": 10, "deleted_lines": 5}],
-                }
-            ]
-        }
+        mock_history.return_value = [
+            make_commit(
+                author_email="test@example.com",
+                files=[{"path": "src/main.py", "added_lines": 10, "deleted_lines": 5}],
+            )
+        ]
         mock_ci.return_value = {}
 
         run_analysis(Path("/fake/repo"), days=30)
@@ -436,16 +370,13 @@ class TestRunAnalysisWithCIData:
 
     def test_includes_bugfix_commit_counts(self):
         """File forensics include bugfix_commits from commit messages."""
-        history = {
-            "entries": [
-                {
-                    "timestamp": "2026-01-20T10:00:00Z",
-                    "author_email": "a@x.com",
-                    "message": "fix: crash on empty input",
-                    "files": [{"path": "src/auth.py", "added_lines": 5, "deleted_lines": 1}],
-                },
-            ]
-        }
+        history = [
+            make_commit(
+                author_email="a@x.com",
+                message="fix: crash on empty input",
+                files=[{"path": "src/auth.py", "added_lines": 5, "deleted_lines": 1}],
+            )
+        ]
 
         with patch("black_box_unlock.analysis.fetch_git_history") as mock_fetch:
             mock_fetch.return_value = history
@@ -464,7 +395,7 @@ class TestFlakyStepsInPipeline:
 
         from black_box_unlock.cicd.models import FlakyStep
 
-        mock_hist.return_value = {"entries": []}
+        mock_hist.return_value = []
         mock_ci.return_value = {}
         mock_flaky.return_value = [
             FlakyStep(
@@ -486,7 +417,7 @@ class TestFlakyStepsInPipeline:
     @patch("black_box_unlock.analysis.detect_flaky_steps")
     @patch("black_box_unlock.analysis.fetch_git_history")
     def test_no_ci_skips_flaky_fetch(self, mock_hist, mock_flaky):
-        mock_hist.return_value = {"entries": []}
+        mock_hist.return_value = []
 
         run_analysis(Path("/fake/repo"), days=30, include_ci=False)
 
@@ -496,7 +427,7 @@ class TestFlakyStepsInPipeline:
     @patch("black_box_unlock.analysis._fetch_ci_failures")
     @patch("black_box_unlock.analysis.fetch_git_history")
     def test_flaky_fetch_failure_degrades_gracefully(self, mock_hist, mock_ci, mock_flaky):
-        mock_hist.return_value = {"entries": []}
+        mock_hist.return_value = []
         mock_ci.return_value = {}
         mock_flaky.side_effect = Exception("gh not authenticated")
 
@@ -513,7 +444,7 @@ class TestFlakyStepsInPipeline:
 
         from black_box_unlock.cicd.models import FlakyStep
 
-        mock_hist.return_value = {"entries": []}
+        mock_hist.return_value = []
         mock_ci.return_value = {}
         mock_flaky.return_value = [
             FlakyStep(
@@ -562,16 +493,12 @@ class TestFetchCIFailures:
 
 class TestAutoXray:
     def _history(self):
-        return {
-            "entries": [
-                {
-                    "timestamp": "2026-06-01T10:00:00+00:00",
-                    "author_email": "a@x.com",
-                    "message": "feat: x",
-                    "files": [{"path": "mod.py", "added_lines": 5, "deleted_lines": 0}],
-                }
-            ]
-        }
+        return [
+            make_commit(
+                author_email="a@x.com",
+                files=[{"path": "mod.py", "added_lines": 5, "deleted_lines": 0}],
+            )
+        ]
 
     def test_top_files_get_functions(self, tmp_path):
         from black_box_unlock.core.models import FileXRay, FunctionChurn

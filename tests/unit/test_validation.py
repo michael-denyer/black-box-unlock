@@ -7,7 +7,9 @@ from unittest.mock import patch
 import pytest
 
 from black_box_unlock.core.exceptions import InsufficientHistoryError
+from black_box_unlock.git.log import Commit
 from black_box_unlock.validation import spearman_rho, split_history, validate_repo
+from tests.factories import make_commit
 
 INDENTED = "def f(x):\n    if x:\n        return 1\n    return 0\n"
 FLAT = "X = 1\nY = 2\n"
@@ -17,13 +19,8 @@ def _days_ago(n: int) -> str:
     return (datetime.now(timezone.utc) - timedelta(days=n)).isoformat()
 
 
-def _entry(timestamp: str, message: str = "feat: x", paths: list[str] | None = None) -> dict:
-    return {
-        "timestamp": timestamp,
-        "author_email": "a@x.com",
-        "message": message,
-        "files": [{"path": p, "added_lines": 1, "deleted_lines": 0} for p in (paths or ["a.py"])],
-    }
+def _entry(timestamp: str, message: str = "feat: x", paths: list[str] | None = None) -> Commit:
+    return make_commit(paths or ["a.py"], timestamp=timestamp, message=message)
 
 
 class TestSpearmanRho:
@@ -53,47 +50,43 @@ class TestSplitHistory:
     CUTOFF = datetime(2026, 3, 1, tzinfo=timezone.utc)
 
     def test_partitions_entries_at_cutoff(self):
-        history = {
-            "entries": [
-                _entry("2026-05-01T10:00:00+00:00"),
-                _entry("2026-01-01T10:00:00+00:00"),
-            ]
-        }
+        history = [
+            _entry("2026-05-01T10:00:00+00:00"),
+            _entry("2026-01-01T10:00:00+00:00"),
+        ]
         train, test = split_history(history, self.CUTOFF)
-        assert [e["timestamp"] for e in train["entries"]] == ["2026-01-01T10:00:00+00:00"]
-        assert [e["timestamp"] for e in test["entries"]] == ["2026-05-01T10:00:00+00:00"]
+        assert [c.timestamp for c in train] == [datetime(2026, 1, 1, 10, 0, tzinfo=timezone.utc)]
+        assert [c.timestamp for c in test] == [datetime(2026, 5, 1, 10, 0, tzinfo=timezone.utc)]
 
     def test_entry_exactly_at_cutoff_goes_to_test(self):
-        history = {"entries": [_entry("2026-03-01T00:00:00+00:00")]}
+        history = [_entry("2026-03-01T00:00:00+00:00")]
         train, test = split_history(history, self.CUTOFF)
-        assert train["entries"] == []
-        assert len(test["entries"]) == 1
+        assert train == []
+        assert len(test) == 1
 
     def test_zulu_suffix_timestamps_parse(self):
         # git %aI emits +00:00 offsets but fixtures and other tools use Z
-        history = {"entries": [_entry("2026-01-01T10:00:00Z")]}
+        history = [_entry("2026-01-01T10:00:00Z")]
         train, test = split_history(history, self.CUTOFF)
-        assert len(train["entries"]) == 1
-        assert test["entries"] == []
+        assert len(train) == 1
+        assert test == []
 
     def test_empty_history(self):
-        train, test = split_history({"entries": []}, self.CUTOFF)
-        assert train["entries"] == []
-        assert test["entries"] == []
+        train, test = split_history([], self.CUTOFF)
+        assert train == []
+        assert test == []
 
 
-def _fake_history() -> dict:
+def _fake_history() -> list[Commit]:
     # Train half (older than the 50-day cutoff for days=100, split=0.5):
     # hot.py churns 3x, cold.py once. Test half: 2 bugfix commits touch hot.py.
-    return {
-        "entries": [
-            _entry(_days_ago(90), "feat: a", ["hot.py"]),
-            _entry(_days_ago(80), "feat: b", ["hot.py", "cold.py"]),
-            _entry(_days_ago(70), "feat: c", ["hot.py", "gone.py"]),
-            _entry(_days_ago(30), "fix: crash", ["hot.py"]),
-            _entry(_days_ago(10), "fix: regression", ["hot.py"]),
-        ]
-    }
+    return [
+        _entry(_days_ago(90), "feat: a", ["hot.py"]),
+        _entry(_days_ago(80), "feat: b", ["hot.py", "cold.py"]),
+        _entry(_days_ago(70), "feat: c", ["hot.py", "gone.py"]),
+        _entry(_days_ago(30), "fix: crash", ["hot.py"]),
+        _entry(_days_ago(10), "fix: regression", ["hot.py"]),
+    ]
 
 
 class TestValidateRepo:
@@ -125,12 +118,10 @@ class TestValidateRepo:
 
     def test_no_test_window_bugfixes_yields_none_share(self, tmp_path):
         (tmp_path / "hot.py").write_text(INDENTED)
-        history = {
-            "entries": [
-                _entry(_days_ago(90), "feat: a", ["hot.py"]),
-                _entry(_days_ago(10), "feat: quiet period", ["hot.py"]),
-            ]
-        }
+        history = [
+            _entry(_days_ago(90), "feat: a", ["hot.py"]),
+            _entry(_days_ago(10), "feat: quiet period", ["hot.py"]),
+        ]
         with patch("black_box_unlock.validation.fetch_git_history") as mock_fetch:
             mock_fetch.return_value = history
             result = validate_repo(tmp_path, days=100, split=0.5)
@@ -139,7 +130,7 @@ class TestValidateRepo:
 
     def test_empty_train_half_raises(self, tmp_path):
         (tmp_path / "hot.py").write_text(INDENTED)
-        history = {"entries": [_entry(_days_ago(10), "feat: a", ["hot.py"])]}
+        history = [_entry(_days_ago(10), "feat: a", ["hot.py"])]
         with patch("black_box_unlock.validation.fetch_git_history") as mock_fetch:
             mock_fetch.return_value = history
             with pytest.raises(InsufficientHistoryError):
@@ -147,7 +138,7 @@ class TestValidateRepo:
 
     def test_empty_test_half_raises(self, tmp_path):
         (tmp_path / "hot.py").write_text(INDENTED)
-        history = {"entries": [_entry(_days_ago(90), "feat: a", ["hot.py"])]}
+        history = [_entry(_days_ago(90), "feat: a", ["hot.py"])]
         with patch("black_box_unlock.validation.fetch_git_history") as mock_fetch:
             mock_fetch.return_value = history
             with pytest.raises(InsufficientHistoryError):

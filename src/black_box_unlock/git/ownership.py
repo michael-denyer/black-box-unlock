@@ -3,43 +3,25 @@
 from collections import defaultdict
 
 from ..core.models import FileOwnership
-
-# Type alias for git history JSON structure
-GitHistoryData = dict
+from .log import Commit
 
 
-def parse_ownership_from_history(
-    history: GitHistoryData,
-) -> list[FileOwnership]:  # [3c] Parse authors per file
-    """Parse git history entries into FileOwnership models.
+def parse_ownership_from_history(commits: list[Commit]) -> list[FileOwnership]:  # [3c]
+    """Aggregate unique authors and commit counts per file across the given commits.
 
-    Aggregates unique authors and commit counts per file across all entries.
-
-    Args:
-        history: Parsed git history dict with "entries" list.
-
-    Returns:
-        List of FileOwnership models, one per unique file path.
+    A missing or blank author email is recorded as "unknown".
     """
     file_authors: dict[str, set[str]] = defaultdict(set)
     file_commits: dict[str, int] = defaultdict(int)
 
-    for entry in history.get("entries", []):
-        author = entry.get("author_email", "").strip()
-        if not author:
-            author = "unknown"
-
-        for file_info in entry.get("files", []):
-            path = file_info["path"]
-            file_authors[path].add(author)
-            file_commits[path] += 1
+    for commit in commits:
+        author = commit.author_email.strip() or "unknown"
+        for file in commit.files:
+            file_authors[file.path].add(author)
+            file_commits[file.path] += 1
 
     return [
-        FileOwnership(
-            path=path,
-            authors=sorted(authors),
-            commits=file_commits[path],
-        )
+        FileOwnership(path=path, authors=sorted(authors), commits=file_commits[path])
         for path, authors in file_authors.items()
     ]
 

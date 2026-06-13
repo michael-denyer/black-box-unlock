@@ -161,6 +161,55 @@ class TestTornhillRatio:
         assert tornhill_ratio(0, 0, 5) == 0.0
 
 
+class TestFlakyStepStatsInvariant:
+    """The shared base enforces 0 <= flaky_count <= failures <= total_attempts."""
+
+    def _fields(self, **overrides):
+        from datetime import timezone
+
+        base = {
+            "job_name": "test (3.11)",
+            "step_name": "Run tests",
+            "first_seen": datetime(2026, 6, 1, tzinfo=timezone.utc),
+            "last_seen": datetime(2026, 6, 2, tzinfo=timezone.utc),
+            "total_attempts": 3,
+            "failures": 2,
+            "flaky_count": 1,
+        }
+        base.update(overrides)
+        return base
+
+    def test_accepts_consistent_counts(self):
+        from black_box_unlock.core.models import FlakyStepStats
+
+        stats = FlakyStepStats(**self._fields())
+        assert stats.flaky_count == 1
+
+    def test_rejects_flaky_count_above_failures(self):
+        from black_box_unlock.core.models import FlakyStepStats
+
+        with pytest.raises(ValueError):
+            FlakyStepStats(**self._fields(flaky_count=3, failures=2))
+
+    def test_rejects_failures_above_total_attempts(self):
+        from black_box_unlock.core.models import FlakyStepStats
+
+        with pytest.raises(ValueError):
+            FlakyStepStats(**self._fields(failures=5, total_attempts=3))
+
+    def test_rejects_negative_flaky_count(self):
+        from black_box_unlock.core.models import FlakyStepStats
+
+        with pytest.raises(ValueError):
+            FlakyStepStats(**self._fields(flaky_count=-1))
+
+    def test_invariant_inherited_by_summary_subclass(self):
+        from black_box_unlock.core.models import FlakyStepSummary
+
+        with pytest.raises(ValueError):
+            FlakyStepSummary(**self._fields(flaky_count=10, failures=1, total_attempts=2))
+
+
 class TestFunctionCoupling:
     def test_ratio_uses_min_revisions(self):
         from black_box_unlock.core.models import FunctionCoupling

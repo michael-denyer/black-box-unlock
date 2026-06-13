@@ -2,7 +2,7 @@
 
 from datetime import datetime, timezone
 
-from pydantic import BaseModel, computed_field, field_validator
+from pydantic import BaseModel, computed_field, field_validator, model_validator
 
 HIGH_RISK_AUTHOR_THRESHOLD = 3
 """Files with more than this many authors are considered coordination risks."""
@@ -220,6 +220,18 @@ class FlakyStepStats(BaseModel):
     total_attempts: int
     failures: int
     flaky_count: int
+
+    @model_validator(mode="after")
+    def _counts_consistent(self) -> "FlakyStepStats":
+        """Reject impossible counts: can't recover more often than you fail, or fail
+        more often than you run. Keeps flaky_rate in [0, 1] for every construction."""
+        if not 0 <= self.flaky_count <= self.failures <= self.total_attempts:
+            raise ValueError(
+                "flaky-step counts must satisfy 0 <= flaky_count <= failures <= "
+                f"total_attempts; got flaky_count={self.flaky_count}, "
+                f"failures={self.failures}, total_attempts={self.total_attempts}"
+            )
+        return self
 
     @computed_field
     @property

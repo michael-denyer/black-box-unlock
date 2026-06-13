@@ -530,6 +530,7 @@ class TestAutoXray:
                 result = run_analysis(tmp_path, days=30, include_ci=False, xray_top=1)
         assert result.files[0].functions[0].name == "f"
         assert result.summary.xrayed_files == 1
+        assert result.files[0].xray_failed is False  # a clean X-Ray is not flagged failed
 
     def test_xray_top_zero_disables(self, tmp_path):
         (tmp_path / "mod.py").write_text("def f():\n    return 1\n")
@@ -549,3 +550,6 @@ class TestAutoXray:
                 result = run_analysis(tmp_path, days=30, include_ci=False, xray_top=1)
         assert result.files[0].functions == []
         assert result.summary.xrayed_files == 0
+        # functions == [] alone can't distinguish a crash from "no functions";
+        # xray_failed makes the degraded result observable to JSON/MCP consumers.
+        assert result.files[0].xray_failed is True

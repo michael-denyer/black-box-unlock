@@ -151,6 +151,7 @@ def run_analysis(  # [2a] Main analysis pipeline
                 f.functions = xray_file(repo_path, f.path, days=days).functions
                 xrayed += 1
             except Exception as e:
+                f.xray_failed = True
                 logger.warning("X-Ray failed for {}: {}", f.path, e)
 
     # Compute summary

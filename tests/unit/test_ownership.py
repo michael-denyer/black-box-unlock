@@ -3,7 +3,7 @@
 import pytest
 
 from black_box_unlock.core.models import FileOwnership
-from black_box_unlock.git.ownership import calculate_file_ownership, parse_ownership_from_history
+from black_box_unlock.git.ownership import parse_ownership_from_history
 from tests.factories import make_commit
 
 
@@ -63,8 +63,8 @@ class TestFileOwnershipModel:
             FileOwnership(path="a.py", authors=["a@x.com"], commits=-1)
 
 
-class TestCalculateFileOwnership:
-    """Tests for calculate_file_ownership function."""
+class TestParseOwnershipFromHistory:
+    """Tests for parse_ownership_from_history function."""
 
     def test_calculates_ownership_from_history(self):
         """Calculates file ownership from git history entries."""
@@ -73,7 +73,7 @@ class TestCalculateFileOwnership:
             make_commit(["a.py"], author_email="bob@example.com"),
         ]
 
-        result = calculate_file_ownership(history)
+        result = parse_ownership_from_history(history)
 
         assert len(result) == 2
         a_ownership = next(o for o in result if o.path == "a.py")
@@ -89,7 +89,7 @@ class TestCalculateFileOwnership:
 
     def test_empty_data_returns_empty_list(self):
         """Empty history returns empty list."""
-        assert calculate_file_ownership([]) == []
+        assert parse_ownership_from_history([]) == []
 
     def test_same_author_multiple_commits_counted_once(self):
         """Same author across multiple commits is counted once per file."""
@@ -98,7 +98,7 @@ class TestCalculateFileOwnership:
             make_commit(["a.py"], author_email="alice@example.com"),
         ]
 
-        result = calculate_file_ownership(history)
+        result = parse_ownership_from_history(history)
 
         assert len(result) == 1
         assert result[0].author_count == 1
@@ -119,7 +119,3 @@ class TestCalculateFileOwnership:
 
         assert a_ownership.authors == ["unknown"]
         assert b_ownership.authors == ["unknown"]
-
-    def test_calculate_file_ownership_is_aliased(self):
-        """calculate_file_ownership is an alias for parse_ownership_from_history."""
-        assert calculate_file_ownership is parse_ownership_from_history

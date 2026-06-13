@@ -24,7 +24,3 @@ def parse_ownership_from_history(commits: list[Commit]) -> list[FileOwnership]: 
         FileOwnership(path=path, authors=sorted(authors), commits=file_commits[path])
         for path, authors in file_authors.items()
     ]
-
-
-# Backward compatibility alias
-calculate_file_ownership = parse_ownership_from_history

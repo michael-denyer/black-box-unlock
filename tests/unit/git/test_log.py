@@ -2,12 +2,13 @@
 
 import os
 import subprocess
+from datetime import datetime, timezone
 from unittest.mock import patch
 
 import pytest
 
 from black_box_unlock.core.exceptions import GitToolNotFoundError, NotAGitRepoError
-from black_box_unlock.git.log import _parse_log_output, fetch_git_history
+from black_box_unlock.git.log import Commit, CommitFile, _parse_log_output, fetch_git_history
 
 # \x01 marks a commit record; fields are tab-separated: iso-date, email, subject
 SAMPLE_LOG = (
@@ -22,29 +23,28 @@ SAMPLE_LOG = (
 
 
 class TestParseLogOutput:
-    def test_parses_commits_into_entries(self):
-        """Each commit becomes an entry with timestamp, author, message, files."""
-        data = _parse_log_output(SAMPLE_LOG)
+    def test_parses_commits_into_typed_models(self):
+        """Each commit becomes a Commit with a parsed timestamp, author, message, files."""
+        commits = _parse_log_output(SAMPLE_LOG)
 
-        assert len(data["entries"]) == 2
-        first = data["entries"][0]
-        assert first["timestamp"] == "2026-01-20T10:00:00+00:00"
-        assert first["author_email"] == "alice@example.com"
-        assert first["message"] == "feat: add auth"
-        assert first["files"] == [
-            {"path": "src/auth.py", "added_lines": 100, "deleted_lines": 20},
-            {"path": "src/user.py", "added_lines": 50, "deleted_lines": 10},
+        assert len(commits) == 2
+        first = commits[0]
+        assert first.timestamp == datetime(2026, 1, 20, 10, 0, 0, tzinfo=timezone.utc)
+        assert first.author_email == "alice@example.com"
+        assert first.message == "feat: add auth"
+        assert first.files == [
+            CommitFile(path="src/auth.py", added_lines=100, deleted_lines=20),
+            CommitFile(path="src/user.py", added_lines=50, deleted_lines=10),
         ]
 
     def test_skips_binary_files(self):
         """Binary numstat lines (- as counts) are skipped."""
-        data = _parse_log_output(SAMPLE_LOG)
+        commits = _parse_log_output(SAMPLE_LOG)
 
-        second = data["entries"][1]
-        assert second["files"] == [{"path": "src/auth.py", "added_lines": 30, "deleted_lines": 5}]
+        assert commits[1].files == [CommitFile(path="src/auth.py", added_lines=30, deleted_lines=5)]
 
-    def test_empty_log_gives_empty_entries(self):
-        assert _parse_log_output("") == {"entries": []}
+    def test_empty_log_gives_empty_list(self):
+        assert _parse_log_output("") == []
 
 
 class TestFetchGitHistory:
@@ -65,7 +65,7 @@ class TestFetchGitHistory:
         (tmp_path / ".git").mkdir()
         mock_run.return_value.stdout = SAMPLE_LOG
 
-        data = fetch_git_history(tmp_path, days=45)
+        commits = fetch_git_history(tmp_path, days=45)
 
         cmd = mock_run.call_args[0][0]
         assert cmd[0] == "git"
@@ -74,7 +74,7 @@ class TestFetchGitHistory:
         assert str(tmp_path) == cmd[cmd.index("-C") + 1]
         assert "--since=45 days ago" in cmd
         assert "--numstat" in cmd
-        assert len(data["entries"]) == 2
+        assert len(commits) == 2
 
     def test_unicode_paths_are_preserved(self, tmp_path):
         """Git core.quotePath=true would mangle non-ASCII paths; we must pass -c core.quotePath=false."""
@@ -114,14 +114,14 @@ class TestFetchGitHistory:
             env=git_env,
         )
 
-        data = fetch_git_history(tmp_path, days=30)
+        commits = fetch_git_history(tmp_path, days=30)
 
-        assert len(data["entries"]) == 1
-        paths = [f["path"] for f in data["entries"][0]["files"]]
+        assert len(commits) == 1
+        paths = [f.path for f in commits[0].files]
         assert "café.py" in paths
 
-    def test_empty_repo_returns_empty_entries(self, tmp_path):
-        """A freshly git-init'd repo with no commits should return empty entries, not raise."""
+    def test_empty_repo_returns_empty_list(self, tmp_path):
+        """A freshly git-init'd repo with no commits should return an empty list, not raise."""
         git_env = {
             "GIT_AUTHOR_NAME": "A",
             "GIT_AUTHOR_EMAIL": "a@x.com",
@@ -132,6 +132,22 @@ class TestFetchGitHistory:
         }
         subprocess.run(["git", "init", str(tmp_path)], check=True, capture_output=True, env=git_env)
 
-        data = fetch_git_history(tmp_path, days=30)
+        assert fetch_git_history(tmp_path, days=30) == []
 
-        assert data == {"entries": []}
+
+class TestCommitModel:
+    def test_parses_zulu_and_offset_timestamps(self):
+        """git emits +00:00; fixtures and other tools emit Z. Both must parse at the boundary."""
+        assert Commit(timestamp="2026-01-01T10:00:00Z").timestamp == datetime(
+            2026, 1, 1, 10, 0, 0, tzinfo=timezone.utc
+        )
+        assert Commit(timestamp="2026-01-01T10:00:00+00:00").timestamp == datetime(
+            2026, 1, 1, 10, 0, 0, tzinfo=timezone.utc
+        )
+
+    def test_defaults_keep_optional_fields_absent(self):
+        """author_email/message/files default empty so non-churn callers can omit them."""
+        commit = Commit(timestamp="2026-01-01T10:00:00Z")
+        assert commit.author_email == ""
+        assert commit.message == ""
+        assert commit.files == []

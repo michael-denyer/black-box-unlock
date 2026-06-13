@@ -2,6 +2,7 @@
 
 from black_box_unlock.core.models import TemporalCoupling
 from black_box_unlock.git.coupling import detect_temporal_coupling
+from tests.factories import make_commit
 
 
 class TestTemporalCouplingModel:
@@ -54,24 +55,10 @@ class TestDetectTemporalCoupling:
 
     def test_detects_two_files_changing_together(self):
         """Detects coupling when two files appear in same commits."""
-        history = {
-            "entries": [
-                {
-                    "timestamp": "2025-01-01T10:00:00Z",
-                    "files": [
-                        {"path": "a.py", "added_lines": 10, "deleted_lines": 0},
-                        {"path": "b.py", "added_lines": 5, "deleted_lines": 0},
-                    ],
-                },
-                {
-                    "timestamp": "2025-01-02T10:00:00Z",
-                    "files": [
-                        {"path": "a.py", "added_lines": 3, "deleted_lines": 1},
-                        {"path": "b.py", "added_lines": 2, "deleted_lines": 0},
-                    ],
-                },
-            ]
-        }
+        history = [
+            make_commit(["a.py", "b.py"]),
+            make_commit(["a.py", "b.py"]),
+        ]
 
         result = detect_temporal_coupling(history, min_ratio=0.0)
 
@@ -88,15 +75,13 @@ class TestDetectTemporalCoupling:
         """Includes pairs at or above the minimum ratio threshold."""
         # a.py: 2 commits, b.py: 4 commits, co-changes: 1
         # coupling_ratio = 1 / min(2, 4) = 0.5
-        history = {
-            "entries": [
-                {"files": [{"path": "a.py"}, {"path": "b.py"}]},
-                {"files": [{"path": "a.py"}]},
-                {"files": [{"path": "b.py"}]},
-                {"files": [{"path": "b.py"}]},
-                {"files": [{"path": "b.py"}]},
-            ]
-        }
+        history = [
+            make_commit(["a.py", "b.py"]),
+            make_commit(["a.py"]),
+            make_commit(["b.py"]),
+            make_commit(["b.py"]),
+            make_commit(["b.py"]),
+        ]
 
         result = detect_temporal_coupling(history, min_ratio=0.5)
         assert len(result) == 1
@@ -105,32 +90,20 @@ class TestDetectTemporalCoupling:
         """Excludes pairs below the minimum ratio threshold."""
         # a.py: 2 commits, b.py: 4 commits, co-changes: 1
         # coupling_ratio = 1 / min(2, 4) = 0.5
-        history = {
-            "entries": [
-                {"files": [{"path": "a.py"}, {"path": "b.py"}]},
-                {"files": [{"path": "a.py"}]},
-                {"files": [{"path": "b.py"}]},
-                {"files": [{"path": "b.py"}]},
-                {"files": [{"path": "b.py"}]},
-            ]
-        }
+        history = [
+            make_commit(["a.py", "b.py"]),
+            make_commit(["a.py"]),
+            make_commit(["b.py"]),
+            make_commit(["b.py"]),
+            make_commit(["b.py"]),
+        ]
 
         result = detect_temporal_coupling(history, min_ratio=0.6)
         assert len(result) == 0
 
     def test_alphabetical_ordering_avoids_duplicates(self):
         """Files are ordered alphabetically so (b, a) becomes (a, b)."""
-        history = {
-            "entries": [
-                {
-                    "timestamp": "2025-01-01T10:00:00Z",
-                    "files": [
-                        {"path": "zebra.py", "added_lines": 10, "deleted_lines": 0},
-                        {"path": "apple.py", "added_lines": 5, "deleted_lines": 0},
-                    ],
-                },
-            ]
-        }
+        history = [make_commit(["zebra.py", "apple.py"])]
 
         result = detect_temporal_coupling(history, min_ratio=0.0)
 
@@ -140,22 +113,7 @@ class TestDetectTemporalCoupling:
 
     def test_single_file_commits_produce_no_pairs(self):
         """Commits with only one file don't create any pairs."""
-        history = {
-            "entries": [
-                {
-                    "timestamp": "2025-01-01T10:00:00Z",
-                    "files": [
-                        {"path": "a.py", "added_lines": 10, "deleted_lines": 0},
-                    ],
-                },
-                {
-                    "timestamp": "2025-01-02T10:00:00Z",
-                    "files": [
-                        {"path": "b.py", "added_lines": 5, "deleted_lines": 0},
-                    ],
-                },
-            ]
-        }
+        history = [make_commit(["a.py"]), make_commit(["b.py"])]
 
         result = detect_temporal_coupling(history, min_ratio=0.0)
 
@@ -163,8 +121,4 @@ class TestDetectTemporalCoupling:
 
     def test_empty_data_returns_empty_list(self):
         """Empty history returns empty list."""
-        result = detect_temporal_coupling({}, min_ratio=0.0)
-        assert result == []
-
-        result = detect_temporal_coupling({"entries": []}, min_ratio=0.0)
-        assert result == []
+        assert detect_temporal_coupling([], min_ratio=0.0) == []

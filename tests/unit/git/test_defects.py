@@ -1,6 +1,7 @@
 """Unit tests for bug-fix commit detection."""
 
 from black_box_unlock.git.defects import bugfix_counts, is_bugfix_message
+from tests.factories import make_commit
 
 
 class TestIsBugfixMessage:
@@ -42,41 +43,17 @@ class TestIsBugfixMessage:
 
 class TestBugfixCounts:
     def test_counts_bugfix_commits_per_file(self):
-        history = {
-            "entries": [
-                {
-                    "timestamp": "2026-01-20T10:00:00Z",
-                    "author_email": "a@x.com",
-                    "message": "fix: auth crash",
-                    "files": [
-                        {"path": "src/auth.py", "added_lines": 5, "deleted_lines": 1},
-                        {"path": "src/user.py", "added_lines": 2, "deleted_lines": 0},
-                    ],
-                },
-                {
-                    "timestamp": "2026-01-21T10:00:00Z",
-                    "author_email": "a@x.com",
-                    "message": "feat: add profile page",
-                    "files": [{"path": "src/user.py", "added_lines": 50, "deleted_lines": 0}],
-                },
-                {
-                    "timestamp": "2026-01-22T10:00:00Z",
-                    "author_email": "a@x.com",
-                    "message": "hotfix: auth again",
-                    "files": [{"path": "src/auth.py", "added_lines": 3, "deleted_lines": 3}],
-                },
-            ]
-        }
+        history = [
+            make_commit(["src/auth.py", "src/user.py"], message="fix: auth crash"),
+            make_commit(["src/user.py"], message="feat: add profile page"),
+            make_commit(["src/auth.py"], message="hotfix: auth again"),
+        ]
 
         counts = bugfix_counts(history)
 
         assert counts == {"src/auth.py": 2, "src/user.py": 1}
 
     def test_entries_without_message_are_skipped(self):
-        history = {
-            "entries": [
-                {"timestamp": "2026-01-20T10:00:00Z", "author_email": "a@x.com", "files": []}
-            ]
-        }
+        history = [make_commit([], message="")]
 
         assert bugfix_counts(history) == {}

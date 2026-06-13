@@ -86,6 +86,77 @@ class TestCouplingWarnings:
         assert (tmp_path / ".bbu" / "cache.json").exists()
         assert (tmp_path / ".bbu" / ".gitignore").read_text() == "*\n"
 
+    @patch("black_box_unlock.guard.run_analysis")
+    def test_corrupt_cache_is_rebuilt_not_raised(self, mock_run, tmp_path):
+        """A corrupt (unparseable) but fresh cache must rebuild, not crash the guard."""
+        from datetime import datetime
+
+        from black_box_unlock.core.models import AnalysisResult, AnalysisSummary
+
+        cache = tmp_path / ".bbu" / "cache.json"
+        cache.parent.mkdir()
+        cache.write_text("{ this is not valid json")  # corrupt, fresh mtime
+        (tmp_path / ".git").mkdir()
+        mock_run.return_value = AnalysisResult(
+            repo="t",
+            analyzed_days=90,
+            generated_at=datetime(2026, 6, 12),
+            files=[],
+            summary=AnalysisSummary(total_files=0, high_risk_ownership=0, coupled_pairs=0),
+        )
+
+        warnings = coupling_warnings("src/auth.py", tmp_path)
+
+        mock_run.assert_called_once()  # corrupt content triggers a rebuild
+        assert warnings == []
+
+    @patch("black_box_unlock.guard.run_analysis")
+    def test_wrong_shape_cache_is_rebuilt_not_raised(self, mock_run, tmp_path):
+        """A parseable cache of the wrong shape must rebuild too, not crash or re-warn forever."""
+        from datetime import datetime
+
+        from black_box_unlock.core.models import AnalysisResult, AnalysisSummary
+
+        cache = tmp_path / ".bbu" / "cache.json"
+        cache.parent.mkdir()
+        cache.write_text("null")  # valid JSON, unusable shape, fresh mtime
+        (tmp_path / ".git").mkdir()
+        mock_run.return_value = AnalysisResult(
+            repo="t",
+            analyzed_days=90,
+            generated_at=datetime(2026, 6, 12),
+            files=[],
+            summary=AnalysisSummary(total_files=0, high_risk_ownership=0, coupled_pairs=0),
+        )
+
+        warnings = coupling_warnings("src/auth.py", tmp_path)
+
+        mock_run.assert_called_once()  # unusable shape triggers a rebuild
+        assert warnings == []
+
+    @patch("black_box_unlock.guard.run_analysis")
+    def test_cache_with_malformed_file_entry_is_rebuilt(self, mock_run, tmp_path):
+        """A files list whose entries lack the expected keys is treated as unusable."""
+        from datetime import datetime
+
+        from black_box_unlock.core.models import AnalysisResult, AnalysisSummary
+
+        cache = tmp_path / ".bbu" / "cache.json"
+        cache.parent.mkdir()
+        cache.write_text(json.dumps({"files": [{"no_path_here": True}]}))
+        (tmp_path / ".git").mkdir()
+        mock_run.return_value = AnalysisResult(
+            repo="t",
+            analyzed_days=90,
+            generated_at=datetime(2026, 6, 12),
+            files=[],
+            summary=AnalysisSummary(total_files=0, high_risk_ownership=0, coupled_pairs=0),
+        )
+
+        coupling_warnings("src/auth.py", tmp_path)
+
+        mock_run.assert_called_once()
+
     def test_warnings_sorted_and_capped_at_top_3(self, tmp_path):
         payload = {
             "files": [

@@ -287,6 +287,30 @@ class TestAnalyzeRepoJsonIntegrity:
         assert long_line in result.stdout
 
 
+class TestCouplingGuardCommand:
+    def test_unexpected_error_is_logged_and_exits_zero(self):
+        """A failure in the guard degrades to silence but leaves a diagnosable log line."""
+        from loguru import logger
+
+        messages: list[str] = []
+        sink = logger.add(messages.append, level="WARNING")
+        try:
+            # no-op configure_logging so the CLI callback doesn't drop the test sink
+            with (
+                patch("black_box_unlock.cli.configure_logging"),
+                patch(
+                    "black_box_unlock.guard.coupling_warnings",
+                    side_effect=RuntimeError("boom"),
+                ),
+            ):
+                result = runner.invoke(app, ["coupling-guard", "src/a.py"])
+        finally:
+            logger.remove(sink)
+
+        assert result.exit_code == 0
+        assert any("src/a.py" in m for m in messages)
+
+
 class TestXrayMinCoupling:
     def test_min_coupling_forwarded(self):
         with patch("black_box_unlock.git.xray.xray_file") as mock_xray:

@@ -44,7 +44,7 @@ rho 0.36, top-10% share 36% over 22 touches, coverage 47%.
 - Complexity is measured from current file contents, not contents at the
   cutoff — mild future leakage; it is the same proxy the shipped tool uses.
 - Bug-fix detection is message-based (fix/bug/hotfix/defect/regression/revert,
-  excluding docs/style/test/chore-style prefixes); repos with unconventional
+  excluding docs/style/test/chore/ci/build/refactor-style prefixes); repos with unconventional
   commit messages under-count.
 - No significance testing; file counts and touch counts are listed so readers
   can judge sample sizes themselves.

@@ -52,3 +52,41 @@ class TestIndentationComplexity:
         f.write_bytes(b"\x00\x01" + b" " * 64 + b"\n" + b"\x00" * 32)
 
         assert indentation_complexity(f) == 0.0
+
+
+class TestDataAndGeneratedFilesScoreZero:
+    """Data/serialized/generated files inflate indentation complexity by sheer
+    size without representing code complexity, so they must not become hotspots."""
+
+    def test_json_data_is_zero(self, tmp_path):
+        f = tmp_path / "seeds.json"
+        f.write_text('{\n    "a": {\n        "b": 1\n    }\n}\n')  # deeply indented data
+        assert indentation_complexity(f) == 0.0
+
+    def test_yaml_config_still_scores(self, tmp_path):
+        # config/markup is a legitimate maintenance hotspot - a churning k8s/CI/
+        # spec YAML should stay visible, not be silenced like serialized data.
+        f = tmp_path / "deployment.yaml"
+        f.write_text("spec:\n  template:\n    containers:\n      - name: x\n")
+        assert indentation_complexity(f) > 0.0
+
+    def test_lockfile_is_zero(self, tmp_path):
+        f = tmp_path / "yarn.lock"
+        f.write_text("dep@1:\n  version 1\n    sub: x\n")
+        assert indentation_complexity(f) == 0.0
+
+    def test_package_lock_json_is_zero(self, tmp_path):
+        f = tmp_path / "package-lock.json"
+        f.write_text('{\n    "x": {\n        "y": 1\n    }\n}\n')
+        assert indentation_complexity(f) == 0.0
+
+    def test_minified_asset_is_zero(self, tmp_path):
+        f = tmp_path / "bundle.min.js"
+        f.write_text("    var a=1;\n        var b=2;\n")
+        assert indentation_complexity(f) == 0.0
+
+    def test_real_code_extension_still_scores(self, tmp_path):
+        # guard must be extension-scoped, not zero everything
+        f = tmp_path / "service.rb"
+        f.write_text("def f\n  if x\n    g\n  end\nend\n")
+        assert indentation_complexity(f) > 0.0

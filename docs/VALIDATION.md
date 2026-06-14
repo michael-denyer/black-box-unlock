@@ -45,7 +45,7 @@ rho 0.36, top-10% share 36% over 22 touches, coverage 47%.
   cutoff — mild future leakage; it is the same proxy the shipped tool uses.
 - Bug-fix detection is message-based (fix(ing)/bug/hotfix/defect/regression/revert
   plus repair verbs like correct/broke/crash/repair/fault/malfunction/stuck/hang,
-  excluding docs/style/test/chore/ci/build/refactor-style prefixes); repos with unconventional
+  excluding docs/style/test/chore/ci/build/refactor/feat-style prefixes); repos with unconventional
   commit messages under-count.
 - No significance testing; file counts and touch counts are listed so readers
   can judge sample sizes themselves.

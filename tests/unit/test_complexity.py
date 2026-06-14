@@ -2,6 +2,8 @@
 
 import json
 
+from loguru import logger
+
 from black_box_unlock.complexity import indentation_complexity, indentation_complexity_lines
 
 
@@ -175,4 +177,23 @@ class TestGeneratedFileComplexity:
     def test_handwritten_py_still_scores(self, tmp_path):
         f = tmp_path / "logic.py"
         f.write_text("def f():\n    if x:\n        return 1\n")
+        assert indentation_complexity(f) > 0.0
+
+    def test_generated_marker_emits_info_log(self, tmp_path):
+        f = tmp_path / "gen.py"
+        f.write_text("# @generated\ndef f():\n    return 1\n")
+        messages = []
+        handler_id = logger.add(messages.append, level="INFO")
+        try:
+            result = indentation_complexity(f)
+        finally:
+            logger.remove(handler_id)
+        assert result == 0.0
+        assert any("generator marker detected" in m for m in messages)
+
+    def test_generated_marker_beyond_2kb_still_scores(self, tmp_path):
+        f = tmp_path / "late_marker.py"
+        preamble = "if x:\n    y = 1\n" * 200
+        f.write_text(preamble + "# DO NOT EDIT\nx = 1\n")
+        assert len(preamble) > 2048
         assert indentation_complexity(f) > 0.0

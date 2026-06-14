@@ -33,6 +33,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - HTML treemap rendered blank when a path was both a file and a directory across
   history (duplicate Plotly node id blanks the whole treemap); node ids are now
   globally deduplicated
+- `analyze-repo` no longer crashes on a malformed-but-valid-JSON notebook
+  (cleared cell `source`, non-dict cell, non-dict top level); the indentation
+  scorer validates notebook shape at the parse boundary and degrades to 0, like
+  it already handles unparseable notebook JSON
+- A file scored 0 complexity because of a generator marker in its header is now
+  logged at INFO, so the suppression is discoverable with `-v` instead of the
+  file silently dropping off the hotspot ranking
 
 ### Changed
 

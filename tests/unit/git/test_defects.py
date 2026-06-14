@@ -92,6 +92,25 @@ class TestIsBugfixMessage:
         # word boundary: "Hangfire" must not trip the hang/hung term
         assert is_bugfix_message("feat: schedule jobs with Hangfire") is False
 
+    def test_feat_prefix_with_defect_noun_excluded(self):
+        assert is_bugfix_message("feat: add crash reporter") is False
+
+    def test_feat_scoped_prefix_excluded(self):
+        assert is_bugfix_message("feat(ui): repair broken layout") is False
+
+    def test_perf_prefix_with_fix_still_counts(self):
+        # perf is deliberately NOT excluded: perf commits are often real defect repairs
+        assert is_bugfix_message("perf: fix slow query") is True
+
+    def test_malfunction_detected(self):
+        assert is_bugfix_message("sensor malfunction after firmware update") is True
+
+    def test_faulty_detected(self):
+        assert is_bugfix_message("faulty retry backoff") is True
+
+    def test_correction_noun_detected(self):
+        assert is_bugfix_message("applied a correction to the totals") is True
+
 
 class TestBugfixCounts:
     def test_counts_bugfix_commits_per_file(self):

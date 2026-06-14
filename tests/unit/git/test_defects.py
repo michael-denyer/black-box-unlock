@@ -65,6 +65,32 @@ class TestIsBugfixMessage:
     def test_docs_prefix_stays_false(self):
         assert is_bugfix_message("docs: update readme") is False
 
+    def test_fixing_inflection_detected(self):
+        # the -ing form was missed by fix(es|ed)? - 9 real fixes in sampled repos
+        assert is_bugfix_message("Fixing Mobile Menu Scroll Issue") is True
+
+    def test_stuck_detected(self):
+        assert is_bugfix_message("job stuck in retry queue") is True
+
+    def test_hang_detected(self):
+        assert is_bugfix_message("worker hangs on shutdown") is True
+
+    def test_hung_detected(self):
+        assert is_bugfix_message("connection left hung after deploy") is True
+
+    def test_failure_word_is_not_bugfix(self):
+        # 'fail'/'failure' deliberately excluded: high false-positive on real repos
+        # (e.g. failure-handling features). Pin the decision against re-adding it.
+        assert is_bugfix_message("track kit activation failure") is False
+
+    def test_error_word_is_not_bugfix(self):
+        # 'error' deliberately excluded: dominated by feature work ("add error handling")
+        assert is_bugfix_message("add error handling for API timeouts") is False
+
+    def test_hangfire_library_no_false_positive(self):
+        # word boundary: "Hangfire" must not trip the hang/hung term
+        assert is_bugfix_message("feat: schedule jobs with Hangfire") is False
+
 
 class TestBugfixCounts:
     def test_counts_bugfix_commits_per_file(self):

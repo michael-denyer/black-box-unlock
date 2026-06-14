@@ -19,7 +19,7 @@ NON_DEFECT_PREFIX = re.compile(
 
 BUGFIX_PATTERN = re.compile(
     r"("
-    r"\bfix(es|ed)?\b"
+    r"\bfix(es|ed|ing)?\b"
     r"|\bbug(fix)?\b"
     r"|\bhotfix\b"
     r"|\bdefect\b"
@@ -30,6 +30,8 @@ BUGFIX_PATTERN = re.compile(
     r"|\brepair(s|ed|ing)?\b"
     r"|\bfault(y)?\b"
     r"|\bmalfunction(s|ed|ing)?\b"
+    r"|\bstuck\b"
+    r"|\b(hang(s|ing)?|hung)\b"
     r")",
     re.IGNORECASE,
 )

@@ -20,32 +20,44 @@ def build_treemap_data(files: list[FileForensics]) -> dict:  # [5b] Plotly treem
     colors: list[int] = [0]  # Root color
     hovertext: list[str] = [""]  # Root has no hover
 
-    # Track directories we've already added
-    seen_dirs: set[str] = set()
+    used_ids: set[str] = {""}
+    dir_id_by_path: dict[str, str] = {}  # dir path -> the unique id assigned to its node
+
+    def unique_id(desired: str) -> str:
+        """A globally unique id. Plotly's treemap renders nothing if any id repeats,
+        which happens when a path is both a file and a directory across history."""
+        if desired not in used_ids:
+            used_ids.add(desired)
+            return desired
+        n = 2
+        while f"{desired}#{n}" in used_ids:
+            n += 1
+        collision_free = f"{desired}#{n}"
+        used_ids.add(collision_free)
+        return collision_free
 
     for file in files:
         parts = file.path.split("/")
 
-        # Build directory hierarchy
+        # Build directory hierarchy (full path keys the node; id may be disambiguated)
         current_parent_id = ""  # Start from root (empty string id)
         for i, part in enumerate(parts[:-1]):  # All but last (which is the file)
-            # Build the full path to this directory for uniqueness
             dir_path = "/".join(parts[: i + 1])
 
-            if dir_path not in seen_dirs:
-                seen_dirs.add(dir_path)
-                ids.append(dir_path)
+            if dir_path not in dir_id_by_path:
+                node_id = unique_id(dir_path)
+                dir_id_by_path[dir_path] = node_id
+                ids.append(node_id)
                 labels.append(part)
                 parents.append(current_parent_id)
                 values.append(0)
                 colors.append(0)
                 hovertext.append(dir_path)
 
-            # Update parent id for next level - use full path
-            current_parent_id = dir_path
+            current_parent_id = dir_id_by_path[dir_path]
 
-        # Add the file
-        ids.append(file.path)
+        # Add the file (its id may collide with a same-named directory node)
+        ids.append(unique_id(file.path))
         labels.append(parts[-1])
         parents.append(current_parent_id)
         values.append(file.lines_changed)

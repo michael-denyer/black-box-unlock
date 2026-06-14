@@ -5,6 +5,8 @@ import re
 from collections.abc import Iterable
 from pathlib import Path
 
+from loguru import logger
+
 TAB_SIZE = 4
 
 # Serialized-data, generated, and asset files accumulate indentation by sheer
@@ -129,6 +131,7 @@ def indentation_complexity(file_path: Path, tab_size: int = TAB_SIZE) -> float:
         return _ipynb_code_complexity(text, tab_size)
 
     if _has_generated_marker(text):
+        logger.info("Scoring {} as 0 complexity: generator marker detected", file_path)
         return 0.0
 
     return indentation_complexity_lines(text.splitlines(), tab_size)

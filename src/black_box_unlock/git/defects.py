@@ -18,7 +18,19 @@ NON_DEFECT_PREFIX = re.compile(
 )
 
 BUGFIX_PATTERN = re.compile(
-    r"(\bfix(es|ed)?\b|\bbug(fix)?\b|\bhotfix\b|\bdefect\b|\bregression\b)",
+    r"("
+    r"\bfix(es|ed)?\b"
+    r"|\bbug(fix)?\b"
+    r"|\bhotfix\b"
+    r"|\bdefect\b"
+    r"|\bregression\b"
+    r"|\bcorrect(ed|ing|ion)\b"
+    r"|\bbroke(n)?\b"
+    r"|\bcrash(es|ed|ing)?\b"
+    r"|\brepair(s|ed|ing)?\b"
+    r"|\bfault(y)?\b"
+    r"|\bmalfunction(s|ed|ing)?\b"
+    r")",
     re.IGNORECASE,
 )
 

@@ -40,6 +40,31 @@ class TestIsBugfixMessage:
         # a revert is a defect signal regardless of what it reverts
         assert is_bugfix_message('Revert "docs: add diagram"') is True
 
+    def test_real_world_correcting_message(self):
+        msg = "Messed up the condition here causing all Reps to lose actions menu in CSR. Correcting it here"
+        assert is_bugfix_message(msg) is True
+
+    def test_broken_pipeline(self):
+        assert is_bugfix_message("broken pipeline after merge") is True
+
+    def test_service_crash(self):
+        assert is_bugfix_message("service crash on null kit") is True
+
+    def test_repair_flaky_retry(self):
+        assert is_bugfix_message("repair flaky retry") is True
+
+    def test_feat_prefix_with_correct_stays_false(self):
+        assert is_bugfix_message("feat: add correct rounding") is False
+
+    def test_bare_correct_without_defect_verb_stays_false(self):
+        assert is_bugfix_message("ensure correct behavior") is False
+
+    def test_refactor_prefix_stays_false(self):
+        assert is_bugfix_message("refactor: rename") is False
+
+    def test_docs_prefix_stays_false(self):
+        assert is_bugfix_message("docs: update readme") is False
+
 
 class TestBugfixCounts:
     def test_counts_bugfix_commits_per_file(self):

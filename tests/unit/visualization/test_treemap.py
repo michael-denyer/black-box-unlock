@@ -167,6 +167,46 @@ class TestBuildTreemapData:
         auth_idx = result["ids"].index("src/auth")
         assert result["parents"][auth_idx] == "src"
 
+    def test_file_path_colliding_with_directory_gets_unique_ids(self):
+        """A path that is both a file and a directory (across history) must not
+        produce duplicate Plotly ids - a single duplicate blanks the whole treemap."""
+        files = [
+            FileForensics(
+                path="a/b",  # a file at this path...
+                commits=3,
+                lines_changed=30,
+                authors=["x@e.com"],
+                coupled_with=[],
+            ),
+            FileForensics(
+                path="a/b/c.py",  # ...and a directory of the same path
+                commits=2,
+                lines_changed=20,
+                authors=["x@e.com"],
+                coupled_with=[],
+            ),
+        ]
+
+        result = build_treemap_data(files)
+        ids = result["ids"]
+
+        # Plotly requires globally unique ids; every parent must reference an id.
+        assert len(ids) == len(set(ids))
+        assert set(result["parents"]) - {""} <= set(ids)
+
+        # Both nodes labelled "b" survive: the directory (value 0) and the file
+        # leaf (lines_changed=30).
+        b_values = sorted(
+            result["values"][i] for i, lbl in enumerate(result["labels"]) if lbl == "b"
+        )
+        assert b_values == [0, 30]
+
+        # c.py is parented under the directory node (value 0), not the file leaf.
+        c_idx = ids.index("a/b/c.py")
+        parent_idx = ids.index(result["parents"][c_idx])
+        assert result["labels"][parent_idx] == "b"
+        assert result["values"][parent_idx] == 0
+
     def test_hovertext_includes_file_details(self):
         """Hovertext contains file metadata for tooltips."""
         files = [

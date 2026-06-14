@@ -37,10 +37,10 @@ src/black_box_unlock/
 
 | Signal | Source | Formula |
 |--------|--------|---------|
-| Hotspot score | git + file contents | commits x indentation complexity (serialized-data/lockfile/generated-asset files score 0) |
+| Hotspot score | git + file contents | commits x indentation complexity (serialized-data/lockfile/generated-asset files and generator-marked files score 0; notebooks scored over code cells) |
 | Temporal coupling | git | co_changes / min(commits_a, commits_b), threshold 0.3 |
 | Ownership risk | git | > 3 authors |
-| Bug-fix commits | git messages | fix/bug/hotfix/defect/regression/revert markers, excluding docs/style/test/chore/ci/build/refactor-prefixed commits |
+| Bug-fix commits | git messages | fix(ing)/bug/hotfix/defect/regression/revert + repair verbs (correct/broke/crash/repair/fault/malfunction/stuck/hang) markers, excluding docs/style/test/chore/ci/build/refactor-prefixed commits |
 | Build failures | gh CLI | files changed in failing workflow runs |
 | Flaky steps | gh api | step failed attempt N, passed attempt M>N (re-runs only) |
 

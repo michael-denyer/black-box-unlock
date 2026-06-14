@@ -37,7 +37,7 @@ src/black_box_unlock/
 
 | Signal | Source | Formula |
 |--------|--------|---------|
-| Hotspot score | git + file contents | commits x indentation complexity |
+| Hotspot score | git + file contents | commits x indentation complexity (serialized-data/lockfile/generated-asset files score 0) |
 | Temporal coupling | git | co_changes / min(commits_a, commits_b), threshold 0.3 |
 | Ownership risk | git | > 3 authors |
 | Bug-fix commits | git messages | fix/bug/hotfix/defect/regression/revert markers, excluding docs/style/test/chore/ci/build/refactor-prefixed commits |

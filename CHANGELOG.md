@@ -30,6 +30,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   total_attempts), keeping `flaky_rate` within [0, 1]
 - Bug-fix prefix exclusion list in CLAUDE.md, ARCHITECTURE.md and VALIDATION.md
   corrected to match the code (the list also excludes `ci`/`build`/`refactor`)
+- HTML treemap rendered blank when a path was both a file and a directory across
+  history (duplicate Plotly node id blanks the whole treemap); node ids are now
+  globally deduplicated
+
+### Changed
+
+- Hotspot complexity ignores serialized-data, lockfile, and generated-asset
+  files (`.json`/`.jsonl`/`.csv`/`.tsv`/`.lock`/`.map`/`.svg`/`*.min.js|css`) so
+  a giant JSON seed or lockfile can no longer rank as the top hotspot.
+  Config/markup (`.yaml`/`.yml`/`.xml`) and notebooks stay scored — a churning
+  manifest or API spec is a legitimate hotspot. The bug-fix axis still flags any
+  of these if they genuinely churn. (Validated: on a clean code repo hotspot↔
+  bug-fix Spearman is 0.93; on a data-heavy repo top-decile share improved
+  0.40→0.41 as data blobs left the ranking.)
 
 ## [1.1.0] - 2026-06-12
 

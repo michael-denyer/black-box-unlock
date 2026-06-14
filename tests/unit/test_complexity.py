@@ -129,6 +129,33 @@ class TestNotebookComplexity:
         assert indentation_complexity(f) == 1.0
 
 
+class TestMalformedNotebookScoresZero:
+    def test_source_is_null(self, tmp_path):
+        f = tmp_path / "null_source.ipynb"
+        f.write_text(json.dumps({"cells": [{"cell_type": "code", "source": None}]}))
+        assert indentation_complexity(f) == 0.0
+
+    def test_cell_is_string_not_dict(self, tmp_path):
+        f = tmp_path / "str_cell.ipynb"
+        f.write_text(json.dumps({"cells": ["not a dict"]}))
+        assert indentation_complexity(f) == 0.0
+
+    def test_cell_is_int_not_dict(self, tmp_path):
+        f = tmp_path / "int_cell.ipynb"
+        f.write_text(json.dumps({"cells": [1, 2, 3]}))
+        assert indentation_complexity(f) == 0.0
+
+    def test_top_level_is_list_not_dict(self, tmp_path):
+        f = tmp_path / "top_list.ipynb"
+        f.write_text(json.dumps([1, 2, 3]))
+        assert indentation_complexity(f) == 0.0
+
+    def test_source_list_of_ints(self, tmp_path):
+        f = tmp_path / "int_source.ipynb"
+        f.write_text(json.dumps({"cells": [{"cell_type": "code", "source": [1, 2, 3]}]}))
+        assert indentation_complexity(f) == 0.0
+
+
 class TestGeneratedFileComplexity:
     def test_protoc_generated_py_scores_zero(self, tmp_path):
         f = tmp_path / "proto_pb2.py"

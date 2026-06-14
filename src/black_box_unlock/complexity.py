@@ -37,7 +37,7 @@ _GENERATED_MARKER = re.compile(
 
 
 def _is_data_or_generated(file_path: Path) -> bool:
-    """True for serialized-data, config, lockfile, or minified/generated files."""
+    """True for serialized-data, lockfile, asset, or minified/generated files."""
     name = file_path.name.lower()
     if name.endswith(GENERATED_SUFFIXES):
         return True
@@ -55,14 +55,21 @@ def _ipynb_code_complexity(text: str, tab_size: int = TAB_SIZE) -> float:
         nb = json.loads(text)
     except json.JSONDecodeError:
         return 0.0
+    if not isinstance(nb, dict):
+        return 0.0
     total = 0.0
     for cell in nb.get("cells", []):
+        if not isinstance(cell, dict):
+            continue
         if cell.get("cell_type") != "code":
             continue
-        source = cell.get("source", "")
-        lines = (
-            source.splitlines() if isinstance(source, str) else [ln.rstrip("\n") for ln in source]
-        )
+        source = cell.get("source")
+        if isinstance(source, str):
+            lines = source.splitlines()
+        elif isinstance(source, list):
+            lines = [str(ln).rstrip("\n") for ln in source]
+        else:
+            continue
         total += indentation_complexity_lines(lines, tab_size)
     return total
 

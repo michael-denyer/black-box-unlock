@@ -53,7 +53,8 @@ class TestIsBugfixMessage:
     def test_repair_flaky_retry(self):
         assert is_bugfix_message("repair flaky retry") is True
 
-    def test_feat_prefix_with_correct_stays_false(self):
+    def test_feat_add_correct_rounding_stays_false_no_inflection(self):
+        # stays False because "correct" lacks an -ed/-ing/-ion inflection, not because feat: is an excluded prefix
         assert is_bugfix_message("feat: add correct rounding") is False
 
     def test_bare_correct_without_defect_verb_stays_false(self):

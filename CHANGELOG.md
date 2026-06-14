@@ -55,6 +55,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   high-false-positive (feature work like "add error handling"); a precision test
   pins the rejection. Lifted a data-heavy repo's detected fixes 128→140 with no
   precision loss on a clean repo.
+- `feat:`-prefixed commits are now excluded from defect classification. The
+  broadened vocabulary made feature commits mentioning a defect noun (`feat: add
+  crash reporter`) count as fixes, inflating feature files' bug-fix density.
+  `perf:` stays counted, since perf commits are often genuine defect repairs.
 
 ## [1.1.0] - 2026-06-12
 

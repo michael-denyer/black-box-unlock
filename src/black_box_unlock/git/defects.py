@@ -1,6 +1,6 @@
 """Bug-fix commit detection from commit messages.
 
-Precision rule: conventional-commit prefixes docs/style/test/chore/ci/build/refactor
+Precision rule: conventional-commit prefixes docs/style/test/chore/ci/build/refactor/feat
 are excluded from defect classification — fixing a typo in docs is not a defect repair
 in the Tornhill sense. Reverts are always counted regardless of what they revert.
 """
@@ -12,8 +12,9 @@ from .log import Commit
 
 REVERT_PATTERN = re.compile(r"\brevert\b", re.IGNORECASE)
 
+# why: feat is excluded because a feature commit mentioning a defect noun is about its subject, not a repair; perf is deliberately NOT excluded because perf commits are often real defect repairs.
 NON_DEFECT_PREFIX = re.compile(
-    r"^(docs|style|test|chore|ci|build|refactor)(\(.+?\))?:",
+    r"^(docs|style|test|chore|ci|build|refactor|feat)(\(.+?\))?:",
     re.IGNORECASE,
 )
 
@@ -40,7 +41,7 @@ BUGFIX_PATTERN = re.compile(
 def is_bugfix_message(message: str) -> bool:
     """True when a commit message indicates a defect repair.
 
-    Reverts always count. Conventional-commit prefixes docs/style/test/chore/ci/build/refactor
+    Reverts always count. Conventional-commit prefixes docs/style/test/chore/ci/build/refactor/feat
     are excluded even when the message contains bugfix keywords.
     """
     if REVERT_PATTERN.search(message):

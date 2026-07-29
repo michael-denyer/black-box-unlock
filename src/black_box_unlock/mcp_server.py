@@ -122,7 +122,7 @@ def get_ownership(
 
 
 @mcp.tool()
-def get_ci_failures(repo_path: str = ".") -> list[dict]:
+def get_ci_failures(repo_path: str = ".") -> dict:
     """Files implicated in failing CI runs, most-failing first.
 
     Scans the repository's last 100 workflow runs (not limited by a day window).
@@ -131,18 +131,26 @@ def get_ci_failures(repo_path: str = ".") -> list[dict]:
     result = _safe_analysis(repo_path, 30, include_ci=True)
     failing = [f for f in result.files if f.build_failures > 0]
     failing.sort(key=lambda f: f.build_failures, reverse=True)
-    return [{"path": f.path, "build_failures": f.build_failures} for f in failing]
+    return {
+        "status": result.ci_status.state.value,
+        "errors": result.ci_status.errors,
+        "files": [{"path": f.path, "build_failures": f.build_failures} for f in failing],
+    }
 
 
 @mcp.tool()
-def get_flaky_steps(repo_path: str = ".") -> list[dict]:
+def get_flaky_steps(repo_path: str = ".") -> dict:
     """CI steps that failed then passed on re-run (unreliable tests/infra).
 
     Scans the repository's last 100 workflow runs (not limited by a day window).
     """
     # days=30: canonical window for cache reuse; CI signals are run-count-based, not day-based
     result = _safe_analysis(repo_path, 30, include_ci=True)
-    return [s.model_dump(mode="json") for s in result.flaky_steps]
+    return {
+        "status": result.ci_status.state.value,
+        "errors": result.ci_status.errors,
+        "steps": [s.model_dump(mode="json") for s in result.flaky_steps],
+    }
 
 
 @mcp.tool()

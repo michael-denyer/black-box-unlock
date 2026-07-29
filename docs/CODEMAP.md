@@ -94,10 +94,9 @@ Orchestrates forensic analysis by combining data from multiple sources.
 
 | ID | Component | Description | File:Line |
 |----|-----------|-------------|-----------|
-| 2a | run_analysis | Main analysis pipeline | [analysis.py:78](../src/black_box_unlock/analysis.py#L78) |
-| 2a.1 | _fetch_ci_failures | Fetch CI failure counts per file | [analysis.py:31](../src/black_box_unlock/analysis.py#L31) |
-| 2a.2 | _fetch_flaky_steps | Fetch flaky CI step summaries | [analysis.py:49](../src/black_box_unlock/analysis.py#L49) |
-| 2b | export_to_json | Serialize result to JSON | [analysis.py:174](../src/black_box_unlock/analysis.py#L174) |
+| 2a | run_analysis | Main analysis pipeline | [analysis.py:30](../src/black_box_unlock/analysis.py#L30) |
+| 2a.1 | collect_ci_signals | Collect failure and flaky-step data from one typed run snapshot | [github_actions.py:153](../src/black_box_unlock/cicd/github_actions.py#L153) |
+| 2b | export_to_json | Serialize result to JSON | [analysis.py:155](../src/black_box_unlock/analysis.py#L155) |
 
 #### Analysis Pipeline [2a]
 
@@ -110,7 +109,8 @@ flowchart LR
     subgraph Parse["Parse & Detect"]
         Churn[parse_history_entries]
         Owner[parse_ownership_from_history]
-        Couple[detect_temporal_coupling]
+        Couple[analyze_temporal_coupling]
+        CI[collect_ci_signals]
     end
 
     subgraph Join["Aggregate"]
@@ -126,6 +126,7 @@ flowchart LR
     GitLog --> Churn
     GitLog --> Owner
     GitLog --> Couple
+    CI --> Index
     Churn --> Index
     Owner --> Index
     Couple --> Build
@@ -144,13 +145,16 @@ Domain logic for extracting forensic signals from git history.
 |----|-----------|-------------|-----------|
 | 3a | parse_history_entries | Parse git log dict to FileChurn list | [churn.py:12](../src/black_box_unlock/git/churn.py#L12) |
 | 3a.1 | extract_file_churn | Extract churn from git repo | [churn.py:43](../src/black_box_unlock/git/churn.py#L43) |
-| 3b | detect_temporal_coupling | Find co-changing files | [coupling.py:10](../src/black_box_unlock/git/coupling.py#L10) |
+| 3b | analyze_temporal_coupling | Find co-changing files and count ignored bulk changesets | [coupling.py:19](../src/black_box_unlock/git/coupling.py#L19) |
 | 3c | parse_ownership_from_history | Parse authors per file from git log | [ownership.py:11](../src/black_box_unlock/git/ownership.py#L11) |
 
 #### Coupling Detection Formula [3b]
 
 ```text
 coupling_ratio = co_change_count / min(commits_a, commits_b)
+
+Commits touching more than 50 files still contribute to each file's commit
+count, but are excluded from pair generation to avoid quadratic noise.
 
 Interpretation:
   ≥0.30 (30%) → Hidden dependency (Tornhill threshold)
@@ -166,11 +170,11 @@ Pydantic models and shared infrastructure.
 
 | ID | Component | Description | File:Line |
 |----|-----------|-------------|-----------|
-| 4a | FileChurn | Churn metrics per file | [models.py:25](../src/black_box_unlock/core/models.py#L25) |
-| 4a.1 | TemporalCoupling | File pair co-change | [models.py:50](../src/black_box_unlock/core/models.py#L50) |
-| 4a.2 | FileOwnership | Authors per file | [models.py:72](../src/black_box_unlock/core/models.py#L72) |
-| 4a.3 | FileForensics | Combined forensics | [models.py:111](../src/black_box_unlock/core/models.py#L111) |
-| 4a.4 | AnalysisResult | Complete analysis output | [models.py:187](../src/black_box_unlock/core/models.py#L187) |
+| 4a | FileChurn | Churn metrics per file | [models.py:35](../src/black_box_unlock/core/models.py#L35) |
+| 4a.1 | TemporalCoupling | File pair co-change | [models.py:60](../src/black_box_unlock/core/models.py#L60) |
+| 4a.2 | FileOwnership | Authors per file | [models.py:79](../src/black_box_unlock/core/models.py#L79) |
+| 4a.3 | FileForensics | Combined forensics | [models.py:163](../src/black_box_unlock/core/models.py#L163) |
+| 4a.4 | AnalysisResult | Complete analysis output, parameters, and signal status | [models.py:286](../src/black_box_unlock/core/models.py#L286) |
 | 4b | Exceptions | Custom exception classes | [exceptions.py:4](../src/black_box_unlock/core/exceptions.py#L4) |
 | 4c | configure_logging | Loguru configuration | [logging.py:8](../src/black_box_unlock/core/logging.py#L8) |
 
@@ -213,6 +217,8 @@ classDiagram
         repo: str
         files: list[FileForensics]
         summary: AnalysisSummary
+        parameters: AnalysisParameters
+        ci_status: SignalStatus
     }
 
     FileChurn --> FileForensics : aggregated
@@ -290,8 +296,8 @@ src/black_box_unlock/
 ├── cli.py                   # [1a] Typer CLI
 ├── complexity.py            # Indentation-depth complexity proxy
 ├── analysis.py              # [2a] Orchestration
-├── mcp_server.py            # bbu-mcp FastMCP server (six read tools)
-├── guard.py                 # Coupling guard cache + warnings (edit hook)
+├── mcp_server.py            # bbu-mcp FastMCP server (seven read tools)
+├── guard.py                 # Typed coupling-only cache + warnings (edit hook)
 ├── core/
 │   ├── models.py            # [4a] Pydantic models
 │   ├── exceptions.py        # [4b] Custom exceptions
@@ -299,12 +305,12 @@ src/black_box_unlock/
 ├── git/
 │   ├── log.py               # Native git log --numstat extraction
 │   ├── churn.py             # [3a] FileChurn extraction
-│   ├── coupling.py          # [3b] Coupling detection
+│   ├── coupling.py          # [3b] Coupling detection + bulk-commit cap
 │   ├── ownership.py         # [3c] Ownership parsing
 │   └── defects.py           # Bug-fix commit detection
 ├── cicd/
-│   ├── models.py            # WorkflowRun, BuildFailure, FlakyStep
-│   └── github_actions.py    # gh CLI fetchers, flaky detection
+│   ├── models.py            # Typed WorkflowRun/Job/Step, CIAnalysis, FlakyStep
+│   └── github_actions.py    # One run snapshot, partial-result-aware collection
 └── visualization/
     ├── html.py              # [5a] HTML report
     ├── treemap.py           # [5b] Plotly treemap
@@ -318,6 +324,6 @@ src/black_box_unlock/
 | Tool | Purpose | Notes |
 |------|---------|-------|
 | git | Git history extraction | Native `git log --numstat` — no external tools needed |
-| gh CLI | GitHub Actions data | Optional; CI signals empty if absent/unauthenticated |
+| gh CLI | GitHub Actions data | Optional; unavailable/partial status is explicit and successful data is preserved |
 | Plotly 2.27.0 | Treemap visualization | CDN-loaded JavaScript |
 | Cytoscape 3.28.1 | Graph visualization | CDN-loaded JavaScript |

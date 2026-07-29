@@ -5,16 +5,16 @@ from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch
 
-from black_box_unlock.analysis import (
-    _fetch_ci_failures,
-    export_to_json,
-    run_analysis,
-)
+from black_box_unlock.analysis import export_to_json, run_analysis
+from black_box_unlock.cicd.models import CIAnalysis
 from black_box_unlock.core.models import (
     AnalysisResult,
     AnalysisSummary,
     CouplingInfo,
     FileForensics,
+    FlakyStepSummary,
+    SignalState,
+    SignalStatus,
 )
 from tests.factories import make_commit
 
@@ -242,6 +242,25 @@ class TestRunAnalysis:
 
         assert [f.path for f in result.files] == sorted(names)
 
+    def test_records_parameters_and_ignored_bulk_changesets(self):
+        history = [make_commit([f"generated/{i}.py" for i in range(51)])]
+        with patch("black_box_unlock.analysis.fetch_git_history", return_value=history):
+            result = run_analysis(
+                Path("/fake/repo"),
+                days=45,
+                min_coupling=0.75,
+                include_ci=False,
+                xray_top=0,
+            )
+
+        assert result.parameters.model_dump() == {
+            "min_coupling": 0.75,
+            "include_ci": False,
+            "xray_top": 0,
+            "max_coupled_files_per_commit": 50,
+        }
+        assert result.summary.ignored_large_changesets == 1
+
 
 class TestExportToJson:
     """Tests for export_to_json function."""
@@ -312,76 +331,82 @@ class TestExportToJson:
         assert parsed["files"][0]["is_high_risk"] is True
 
 
-class TestRunAnalysisWithCIData:
-    """Tests for CI data integration in analysis."""
+class TestCIInPipeline:
+    """CI collection crosses one typed seam into repository analysis."""
 
-    @patch("black_box_unlock.analysis._fetch_ci_failures")
+    @patch("black_box_unlock.analysis.collect_ci_signals")
     @patch("black_box_unlock.analysis.fetch_git_history")
-    def test_includes_build_failures_in_file_forensics(self, mock_history, mock_ci):
-        """File forensics includes build_failures from CI data."""
+    def test_includes_ci_data_and_status(self, mock_history, mock_ci):
         mock_history.return_value = [
             make_commit(
                 author_email="test@example.com",
                 files=[{"path": "src/main.py", "added_lines": 10, "deleted_lines": 5}],
             )
         ]
-        mock_ci.return_value = {"src/main.py": 2}
+        mock_ci.return_value = CIAnalysis(
+            status=SignalStatus(state=SignalState.available),
+            file_failures={"src/main.py": 2},
+            flaky_steps=[
+                FlakyStepSummary(
+                    job_name="test",
+                    step_name="Run tests",
+                    first_seen=datetime(2026, 6, 1),
+                    last_seen=datetime(2026, 6, 2),
+                    total_attempts=2,
+                    failures=1,
+                    flaky_count=1,
+                )
+            ],
+        )
 
         result = run_analysis(Path("/fake/repo"), days=30, include_ci=True)
 
-        main_file = next(f for f in result.files if f.path == "src/main.py")
+        main_file = next(file for file in result.files if file.path == "src/main.py")
         assert main_file.build_failures == 2
+        assert result.flaky_steps[0].step_name == "Run tests"
+        assert result.ci_status.state is SignalState.available
 
-    @patch("black_box_unlock.analysis._fetch_ci_failures")
+    @patch("black_box_unlock.analysis.collect_ci_signals")
     @patch("black_box_unlock.analysis.fetch_git_history")
-    def test_defaults_build_failures_to_zero_when_file_not_in_ci_data(self, mock_history, mock_ci):
-        """Files not in CI data get build_failures=0."""
-        mock_history.return_value = [
-            make_commit(
-                author_email="test@example.com",
-                files=[{"path": "src/main.py", "added_lines": 10, "deleted_lines": 5}],
-            )
-        ]
-        mock_ci.return_value = {"src/other.py": 3}  # Different file
+    def test_ci_only_files_remain_visible(self, mock_history, mock_ci):
+        mock_history.return_value = []
+        mock_ci.return_value = CIAnalysis(
+            status=SignalStatus(state=SignalState.available),
+            file_failures={"src/old_failure.py": 3},
+        )
 
-        result = run_analysis(Path("/fake/repo"), days=30, include_ci=True)
+        result = run_analysis(Path("/fake/repo"), include_ci=True, xray_top=0)
 
-        main_file = next(f for f in result.files if f.path == "src/main.py")
-        assert main_file.build_failures == 0
-
-    @patch("black_box_unlock.analysis._fetch_ci_failures")
-    @patch("black_box_unlock.analysis.fetch_git_history")
-    def test_skips_ci_fetch_when_include_ci_is_false(self, mock_history, mock_ci):
-        """Does not call _fetch_ci_failures when include_ci=False."""
-        mock_history.return_value = [
-            make_commit(
-                author_email="test@example.com",
-                files=[{"path": "src/main.py", "added_lines": 10, "deleted_lines": 5}],
-            )
+        assert [(file.path, file.build_failures) for file in result.files] == [
+            ("src/old_failure.py", 3)
         ]
 
-        run_analysis(Path("/fake/repo"), days=30, include_ci=False)
+    @patch("black_box_unlock.analysis.collect_ci_signals")
+    @patch("black_box_unlock.analysis.fetch_git_history")
+    def test_no_ci_skips_collection_and_records_disabled(self, mock_history, mock_ci):
+        mock_history.return_value = []
+
+        result = run_analysis(Path("/fake/repo"), include_ci=False)
 
         mock_ci.assert_not_called()
+        assert result.ci_status.state is SignalState.disabled
+        assert result.parameters.include_ci is False
 
-    @patch("black_box_unlock.analysis._fetch_ci_failures")
+    @patch("black_box_unlock.analysis.collect_ci_signals")
     @patch("black_box_unlock.analysis.fetch_git_history")
     def test_include_ci_defaults_to_true(self, mock_history, mock_ci):
-        """include_ci parameter defaults to True."""
-        mock_history.return_value = [
-            make_commit(
-                author_email="test@example.com",
-                files=[{"path": "src/main.py", "added_lines": 10, "deleted_lines": 5}],
-            )
-        ]
-        mock_ci.return_value = {}
+        mock_history.return_value = []
+        mock_ci.return_value = CIAnalysis(
+            status=SignalStatus(state=SignalState.unavailable, errors=["gh unavailable"])
+        )
 
-        run_analysis(Path("/fake/repo"), days=30)
+        result = run_analysis(Path("/fake/repo"))
 
-        mock_ci.assert_called_once()
+        mock_ci.assert_called_once_with(repo_path=Path("/fake/repo"), limit=100)
+        assert result.ci_status.state is SignalState.unavailable
+        assert result.ci_status.errors == ["gh unavailable"]
 
     def test_includes_bugfix_commit_counts(self):
-        """File forensics include bugfix_commits from commit messages."""
         history = [
             make_commit(
                 author_email="a@x.com",
@@ -390,117 +415,11 @@ class TestRunAnalysisWithCIData:
             )
         ]
 
-        with patch("black_box_unlock.analysis.fetch_git_history") as mock_fetch:
-            mock_fetch.return_value = history
-            result = run_analysis(Path("/fake/repo"), days=30)
+        with patch("black_box_unlock.analysis.fetch_git_history", return_value=history):
+            result = run_analysis(Path("/fake/repo"), days=30, include_ci=False)
 
-        auth = next(f for f in result.files if f.path == "src/auth.py")
+        auth = next(file for file in result.files if file.path == "src/auth.py")
         assert auth.bugfix_commits == 1
-
-
-class TestFlakyStepsInPipeline:
-    @patch("black_box_unlock.analysis.detect_flaky_steps")
-    @patch("black_box_unlock.analysis._fetch_ci_failures")
-    @patch("black_box_unlock.analysis.fetch_git_history")
-    def test_populates_flaky_steps(self, mock_hist, mock_ci, mock_flaky):
-        from datetime import datetime
-
-        from black_box_unlock.cicd.models import FlakyStep
-
-        mock_hist.return_value = []
-        mock_ci.return_value = {}
-        mock_flaky.return_value = [
-            FlakyStep(
-                job_name="test (3.11)",
-                step_name="Run tests",
-                first_seen=datetime(2026, 6, 1),
-                last_seen=datetime(2026, 6, 2),
-                total_attempts=2,
-                failures=1,
-                flaky_count=1,
-            )
-        ]
-
-        result = run_analysis(Path("/fake/repo"), days=30, include_ci=True)
-
-        assert len(result.flaky_steps) == 1
-        assert result.flaky_steps[0].step_name == "Run tests"
-
-    @patch("black_box_unlock.analysis.detect_flaky_steps")
-    @patch("black_box_unlock.analysis.fetch_git_history")
-    def test_no_ci_skips_flaky_fetch(self, mock_hist, mock_flaky):
-        mock_hist.return_value = []
-
-        run_analysis(Path("/fake/repo"), days=30, include_ci=False)
-
-        mock_flaky.assert_not_called()
-
-    @patch("black_box_unlock.analysis.detect_flaky_steps")
-    @patch("black_box_unlock.analysis._fetch_ci_failures")
-    @patch("black_box_unlock.analysis.fetch_git_history")
-    def test_flaky_fetch_failure_degrades_gracefully(self, mock_hist, mock_ci, mock_flaky):
-        mock_hist.return_value = []
-        mock_ci.return_value = {}
-        mock_flaky.side_effect = Exception("gh not authenticated")
-
-        result = run_analysis(Path("/fake/repo"), days=30, include_ci=True)
-
-        assert result.flaky_steps == []
-
-    @patch("black_box_unlock.analysis.detect_flaky_steps")
-    @patch("black_box_unlock.analysis._fetch_ci_failures")
-    @patch("black_box_unlock.analysis.fetch_git_history")
-    def test_merges_duplicate_steps_across_runs(self, mock_hist, mock_ci, mock_flaky):
-        """The same (job, step) flaky in two different runs becomes one summary."""
-        from datetime import datetime
-
-        from black_box_unlock.cicd.models import FlakyStep
-
-        mock_hist.return_value = []
-        mock_ci.return_value = {}
-        mock_flaky.return_value = [
-            FlakyStep(
-                job_name="test (3.11)",
-                step_name="Run tests",
-                first_seen=datetime(2026, 6, 1),
-                last_seen=datetime(2026, 6, 2),
-                total_attempts=2,
-                failures=1,
-                flaky_count=1,
-            ),
-            FlakyStep(
-                job_name="test (3.11)",
-                step_name="Run tests",
-                first_seen=datetime(2026, 6, 3),
-                last_seen=datetime(2026, 6, 4),
-                total_attempts=3,
-                failures=2,
-                flaky_count=2,
-            ),
-        ]
-
-        result = run_analysis(Path("/fake/repo"), days=30, include_ci=True)
-
-        assert len(result.flaky_steps) == 1
-        merged = result.flaky_steps[0]
-        assert merged.total_attempts == 5
-        assert merged.failures == 3
-        assert merged.flaky_count == 3
-        assert merged.first_seen == datetime(2026, 6, 1)
-        assert merged.last_seen == datetime(2026, 6, 4)
-
-
-class TestFetchCIFailures:
-    """Tests for _fetch_ci_failures helper."""
-
-    @patch("black_box_unlock.analysis.fetch_workflow_runs")
-    def test_returns_empty_dict_on_exception(self, mock_fetch):
-        """Returns empty dict when CI fetch fails."""
-        mock_fetch.side_effect = Exception("GitHub API unavailable")
-
-        result = _fetch_ci_failures(Path("."))
-
-        assert result == {}
 
 
 class TestAutoXray:

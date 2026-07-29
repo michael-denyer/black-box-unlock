@@ -7,62 +7,24 @@ from pathlib import Path
 
 from loguru import logger
 
-from .cicd.github_actions import (
-    aggregate_file_failures,
-    build_failures_from_runs,
-    detect_flaky_steps,
-    fetch_workflow_runs,
-    summarize_flaky_steps,
-)
+from .cicd.github_actions import collect_ci_signals
+from .cicd.models import CIAnalysis
 from .complexity import indentation_complexity
 from .core.models import (
+    AnalysisParameters,
     AnalysisResult,
     AnalysisSummary,
     CouplingInfo,
     FileForensics,
-    FlakyStepSummary,
+    SignalState,
+    SignalStatus,
 )
 from .git.churn import parse_history_entries
-from .git.coupling import detect_temporal_coupling
+from .git.coupling import analyze_temporal_coupling
 from .git.defects import bugfix_counts
 from .git.log import fetch_git_history
 from .git.ownership import parse_ownership_from_history
 from .git.xray import xray_file
-
-
-def _fetch_ci_failures(repo_path: Path) -> dict[str, int]:
-    """Fetch CI failure counts per file.
-
-    Args:
-        repo_path: Path to the git repository.
-
-    Returns:
-        Dict mapping file path to failure count.
-    """
-    try:
-        runs = fetch_workflow_runs(limit=100, repo_path=repo_path)
-        failures = build_failures_from_runs(runs, repo_path=repo_path)
-        return aggregate_file_failures(failures)
-    except Exception as e:
-        logger.warning("CI failure data unavailable, continuing without it: {}", e)
-        return {}
-
-
-def _fetch_flaky_steps(repo_path: Path) -> list[FlakyStepSummary]:
-    """Fetch flaky CI steps summarized per (job, step); degrade to empty on any failure.
-
-    Args:
-        repo_path: Path to the git repository.
-
-    Returns:
-        List of FlakyStepSummary objects, one per unique (job, step) pair.
-    """
-    try:
-        steps = detect_flaky_steps(repo_path=repo_path, limit=100)
-    except Exception as e:
-        logger.warning("Flaky step data unavailable, continuing without it: {}", e)
-        return []
-    return summarize_flaky_steps(steps)
 
 
 def run_analysis(  # [2a] Main analysis pipeline
@@ -89,17 +51,19 @@ def run_analysis(  # [2a] Main analysis pipeline
     """
     history = fetch_git_history(repo_path, days)
 
-    # Fetch CI data if requested
-    ci_failures: dict[str, int] = {}
-    flaky_steps: list[FlakyStepSummary] = []
+    ci_analysis = CIAnalysis(
+        status=SignalStatus(state=SignalState.disabled),
+    )
     if include_ci:
-        ci_failures = _fetch_ci_failures(repo_path)
-        flaky_steps = _fetch_flaky_steps(repo_path)
+        ci_analysis = collect_ci_signals(repo_path=repo_path, limit=100)
+        for error in ci_analysis.status.errors:
+            logger.warning("CI data degraded: {}", error)
 
     # Parse individual analyses
     churn_list = parse_history_entries(history)
     ownership_list = parse_ownership_from_history(history)
-    coupling_list = detect_temporal_coupling(history, min_ratio=min_coupling)
+    coupling_analysis = analyze_temporal_coupling(history, min_ratio=min_coupling)
+    coupling_list = coupling_analysis.couplings
     defect_counts = bugfix_counts(history)
 
     # Index by path for joining
@@ -117,7 +81,11 @@ def run_analysis(  # [2a] Main analysis pipeline
         )
 
     # All unique paths
-    all_paths = set(churn_by_path.keys()) | set(ownership_by_path.keys())
+    all_paths = (
+        set(churn_by_path.keys())
+        | set(ownership_by_path.keys())
+        | set(ci_analysis.file_failures.keys())
+    )
 
     # Build FileForensics for each file
     files: list[FileForensics] = []
@@ -133,7 +101,7 @@ def run_analysis(  # [2a] Main analysis pipeline
                 complexity=indentation_complexity(repo_path / path),
                 authors=ownership.authors if ownership else [],
                 coupled_with=coupling_by_file.get(path, []),
-                build_failures=ci_failures.get(path, 0),
+                build_failures=ci_analysis.file_failures.get(path, 0),
                 bugfix_commits=defect_counts.get(path, 0),
             )
         )
@@ -167,12 +135,19 @@ def run_analysis(  # [2a] Main analysis pipeline
         analyzed_days=days,
         generated_at=datetime.now(timezone.utc),
         files=files,
-        flaky_steps=flaky_steps,
+        parameters=AnalysisParameters(
+            min_coupling=min_coupling,
+            include_ci=include_ci,
+            xray_top=xray_top,
+        ),
+        ci_status=ci_analysis.status,
+        flaky_steps=ci_analysis.flaky_steps,
         summary=AnalysisSummary(
             total_files=len(files),
             high_risk_ownership=high_risk_count,
             coupled_pairs=coupled_pairs,
             xrayed_files=xrayed,
+            ignored_large_changesets=coupling_analysis.ignored_large_changesets,
         ),
     )
 

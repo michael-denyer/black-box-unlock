@@ -1,5 +1,6 @@
 """HTML report generator for forensic analysis."""
 
+import html
 import json
 
 from black_box_unlock.core.models import AnalysisResult
@@ -306,7 +307,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 <body>
     <div class="container">
         <h1>Code Forensics Report</h1>
-        <p class="subtitle">{repo} &bull; {days} days analyzed &bull; Generated {generated_at}</p>
+        <p class="subtitle">{repo} &bull; {days} days analyzed &bull; Generated {generated_at} &bull; CI data: {ci_status}</p>
 
         <div class="summary">
             <div class="stat-card">
@@ -328,15 +329,15 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             <div class="help-grid">
                 <div class="help-item">
                     <h4>Hotspot Score</h4>
-                    <p>Commits × Lines Changed. High scores indicate files that change frequently and extensively—prime candidates for refactoring or closer review.</p>
+                    <p>Commits × indentation complexity. High scores identify frequently changed code with deep nesting.</p>
                 </div>
                 <div class="help-item">
                     <h4>High Risk Ownership</h4>
-                    <p>Files with 4+ authors and high churn. Diffuse ownership often leads to inconsistent patterns and more defects.</p>
+                    <p>Files with more than 3 authors. Diffuse ownership can increase coordination risk.</p>
                 </div>
                 <div class="help-item">
                     <h4>Coupled Pairs</h4>
-                    <p>Files that change together >30% of the time. Hidden dependencies that may indicate architectural issues or missing abstractions.</p>
+                    <p>Files that change together at least {min_coupling} of the time. Hidden dependencies may indicate missing abstractions.</p>
                 </div>
                 <div class="help-item">
                     <h4>Treemap Visualization</h4>
@@ -779,8 +780,18 @@ FILE_ROW_TEMPLATE = """                <tr>
                 </tr>"""
 
 
+def _escape_html(value: object) -> str:
+    """Escape repository-controlled text before inserting it into markup."""
+    return html.escape(str(value), quote=True)
+
+
+def _json_for_script(value: object) -> str:
+    """Serialize JSON without emitting HTML parser control characters."""
+    return json.dumps(value).replace("&", "\\u0026").replace("<", "\\u003c").replace(">", "\\u003e")
+
+
 def _get_severity_class(
-    value: int, max_val: int, prefix: str
+    value: float, max_val: float, prefix: str
 ) -> str:  # [5a.1] Severity CSS class mapping
     """Return CSS class based on value relative to max."""
     if max_val == 0:
@@ -823,7 +834,7 @@ def generate_html_report(result: AnalysisResult) -> str:  # [5a] Generate comple
         coupling_html = ""
         if file.coupled_with:
             coupling_items = [
-                f'<span class="coupling-item">{c.file} ({c.ratio:.0%})</span>'
+                f'<span class="coupling-item">{_escape_html(c.file)} ({c.ratio:.0%})</span>'
                 for c in file.coupled_with
             ]
             coupling_html = " ".join(coupling_items)
@@ -832,7 +843,7 @@ def generate_html_report(result: AnalysisResult) -> str:  # [5a] Generate comple
 
         file_rows.append(
             FILE_ROW_TEMPLATE.format(
-                path=file.path,
+                path=_escape_html(file.path),
                 hotspot_score=file.hotspot_score,
                 hotspot_class=_get_severity_class(file.hotspot_score, max_hotspot, "hotspot"),
                 commits=file.commits,
@@ -853,13 +864,15 @@ def generate_html_report(result: AnalysisResult) -> str:  # [5a] Generate comple
     coupling_data = build_coupling_graph_data(result.files)
 
     return HTML_TEMPLATE.format(
-        repo=result.repo,
+        repo=_escape_html(result.repo),
         days=result.analyzed_days,
         generated_at=result.generated_at.strftime("%Y-%m-%d %H:%M"),
+        ci_status=_escape_html(result.ci_status.state.value),
+        min_coupling=f"{result.parameters.min_coupling:.0%}",
         total_files=result.summary.total_files,
         high_risk=result.summary.high_risk_ownership,
         coupled_pairs=result.summary.coupled_pairs,
         file_rows="\n".join(file_rows),
-        treemap_json=json.dumps(treemap_data),
-        coupling_json=json.dumps(coupling_data),
+        treemap_json=_json_for_script(treemap_data),
+        coupling_json=_json_for_script(coupling_data),
     )

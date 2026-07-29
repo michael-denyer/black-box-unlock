@@ -12,8 +12,8 @@ src/black_box_unlock/
 ├── cli.py                  # Typer CLI: bbu analyze-repo / version
 ├── complexity.py           # Indentation-depth complexity proxy
 ├── analysis.py             # Pipeline: fetch -> parse -> join -> AnalysisResult
-├── mcp_server.py           # FastMCP server: bbu-mcp (six read tools, cached)
-├── guard.py                # Coupling guard: cached analysis for the edit hook
+├── mcp_server.py           # FastMCP server: bbu-mcp (seven read tools, cached)
+├── guard.py                # Coupling guard: small typed cache for the edit hook
 ├── core/
 │   ├── models.py           # Pydantic models (FileForensics, AnalysisResult, ...)
 │   ├── exceptions.py       # NotAGitRepoError, GitToolNotFoundError
@@ -21,12 +21,12 @@ src/black_box_unlock/
 ├── git/
 │   ├── log.py              # Native git log --numstat extraction
 │   ├── churn.py            # FileChurn aggregation
-│   ├── coupling.py         # Temporal coupling (Tornhill ratio)
+│   ├── coupling.py         # Temporal coupling (Tornhill ratio, bulk-commit cap)
 │   ├── ownership.py        # Authors per file
 │   └── defects.py          # Bug-fix commit detection
 ├── cicd/
-│   ├── models.py           # WorkflowRun, BuildFailure, FlakyStep
-│   └── github_actions.py   # gh CLI fetchers, flaky detection
+│   ├── models.py           # Typed workflow, job, step, and CI result models
+│   └── github_actions.py   # One run snapshot, failure + flaky-step collection
 └── visualization/          # FROZEN - no new features
     ├── html.py             # Tabbed HTML report
     ├── treemap.py          # Plotly hotspot treemap
@@ -38,7 +38,7 @@ src/black_box_unlock/
 | Signal | Source | Formula |
 |--------|--------|---------|
 | Hotspot score | git + file contents | commits x indentation complexity (serialized-data/lockfile/generated-asset files and generator-marked files score 0; notebooks scored over code cells) |
-| Temporal coupling | git | co_changes / min(commits_a, commits_b), threshold 0.3 |
+| Temporal coupling | git | co_changes / min(commits_a, commits_b), threshold 0.3; commits touching >50 files are excluded from pair generation |
 | Ownership risk | git | > 3 authors |
 | Bug-fix commits | git messages | fix(ing)/bug/hotfix/defect/regression/revert + repair verbs (correct/broke/crash/repair/fault/malfunction/stuck/hang) markers, excluding docs/style/test/chore/ci/build/refactor/feat-prefixed commits |
 | Build failures | gh CLI | files changed in failing workflow runs |
@@ -62,7 +62,8 @@ flowchart LR
 
 - Not a git repo -> `NotAGitRepoError`, CLI prints error, exit 1
 - git missing -> `GitToolNotFoundError`, same handling
-- gh missing/unauthenticated -> loguru warning, CI signals empty, analysis continues
+- gh missing/unauthenticated -> `ci_status.state` is `unavailable`, errors are reported, analysis continues
+- one failed CI detail request -> `ci_status.state` is `partial`; successful run data is preserved
 
 ## Roadmap
 

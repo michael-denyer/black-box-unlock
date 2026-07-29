@@ -1,30 +1,41 @@
-"""Unit tests for the coupling guard."""
+"""Tests for the coupling guard's public interface and cache contract."""
 
 import json
+import os
+import time
 from unittest.mock import patch
 
+import pytest
+
 from black_box_unlock.guard import coupling_warnings
+from tests.factories import make_commit
 
 
-def _cache_payload() -> dict:
+def _cache_payload(files: dict | None = None) -> dict:
     return {
-        "files": [
-            {
-                "path": "src/auth.py",
-                "coupled_with": [
-                    {"file": "src/token.py", "ratio": 0.8},
-                    {"file": "src/util.py", "ratio": 0.3},
-                ],
-            },
-        ]
+        "version": 1,
+        "generated_at": "2026-06-12T10:00:00Z",
+        "files": files
+        if files is not None
+        else {
+            "src/auth.py": [
+                {"file": "src/token.py", "ratio": 0.8},
+                {"file": "src/util.py", "ratio": 0.3},
+            ]
+        },
+        "ignored_large_changesets": 0,
     }
+
+
+def _write_cache(repo, payload) -> None:
+    cache = repo / ".bbu" / "cache.json"
+    cache.parent.mkdir()
+    cache.write_text(payload if isinstance(payload, str) else json.dumps(payload))
 
 
 class TestCouplingWarnings:
     def test_warns_above_threshold_only(self, tmp_path):
-        cache = tmp_path / ".bbu" / "cache.json"
-        cache.parent.mkdir()
-        cache.write_text(json.dumps(_cache_payload()))
+        _write_cache(tmp_path, _cache_payload())
 
         warnings = coupling_warnings("src/auth.py", tmp_path, threshold=0.5)
 
@@ -33,23 +44,19 @@ class TestCouplingWarnings:
         assert "80%" in warnings[0]
 
     def test_tied_ratios_break_by_path_ascending(self, tmp_path):
-        """Equal ratios must name files deterministically, not in cache order."""
-        payload = {
-            "files": [
+        _write_cache(
+            tmp_path,
+            _cache_payload(
                 {
-                    "path": "src/hub.py",
-                    "coupled_with": [
+                    "src/hub.py": [
                         {"file": "zeta.py", "ratio": 1.0},
                         {"file": "alpha.py", "ratio": 1.0},
                         {"file": "mid.py", "ratio": 1.0},
                         {"file": "beta.py", "ratio": 1.0},
-                    ],
-                },
-            ]
-        }
-        cache = tmp_path / ".bbu" / "cache.json"
-        cache.parent.mkdir()
-        cache.write_text(json.dumps(payload))
+                    ]
+                }
+            ),
+        )
 
         warnings = coupling_warnings("src/hub.py", tmp_path)
 
@@ -58,158 +65,68 @@ class TestCouplingWarnings:
         assert "mid.py" in warnings[2]
         assert "+1 more" in warnings[3]
 
-    def test_unknown_file_no_warnings(self, tmp_path):
-        cache = tmp_path / ".bbu" / "cache.json"
-        cache.parent.mkdir()
-        cache.write_text(json.dumps(_cache_payload()))
+    def test_unknown_file_has_no_warnings(self, tmp_path):
+        _write_cache(tmp_path, _cache_payload())
 
         assert coupling_warnings("src/new.py", tmp_path) == []
 
-    @patch("black_box_unlock.guard.run_analysis")
-    def test_builds_cache_when_missing(self, mock_run, tmp_path):
-        from datetime import datetime
+    @patch("black_box_unlock.guard.fetch_git_history")
+    def test_missing_cache_builds_minimal_versioned_snapshot(self, mock_history, tmp_path):
+        mock_history.return_value = [
+            make_commit(["src/auth.py", "src/token.py"]),
+            make_commit(["src/auth.py", "src/token.py"]),
+        ]
 
-        from black_box_unlock.core.models import AnalysisResult, AnalysisSummary
+        warnings = coupling_warnings("src/auth.py", tmp_path)
 
-        (tmp_path / ".git").mkdir()
-        mock_run.return_value = AnalysisResult(
-            repo="t",
-            analyzed_days=90,
-            generated_at=datetime(2026, 6, 12),
-            files=[],
-            summary=AnalysisSummary(total_files=0, high_risk_ownership=0, coupled_pairs=0),
-        )
-
-        coupling_warnings("src/auth.py", tmp_path)
-
-        mock_run.assert_called_once()
-        assert (tmp_path / ".bbu" / "cache.json").exists()
+        mock_history.assert_called_once_with(tmp_path, 90)
+        assert "src/token.py" in warnings[0]
+        payload = json.loads((tmp_path / ".bbu" / "cache.json").read_text())
+        assert set(payload) == {
+            "version",
+            "generated_at",
+            "files",
+            "ignored_large_changesets",
+        }
         assert (tmp_path / ".bbu" / ".gitignore").read_text() == "*\n"
 
-    @patch("black_box_unlock.guard.run_analysis")
-    def test_corrupt_cache_is_rebuilt_not_raised(self, mock_run, tmp_path):
-        """A corrupt (unparseable) but fresh cache must rebuild, not crash the guard."""
-        from datetime import datetime
+    @pytest.mark.parametrize(
+        "payload",
+        [
+            "{ this is not valid json",
+            "null",
+            {"files": [{"path": "src/auth.py", "coupled_with": [{}]}]},
+            _cache_payload({"src/auth.py": [{}]}),
+        ],
+    )
+    @patch("black_box_unlock.guard.fetch_git_history")
+    def test_unusable_fresh_cache_is_rebuilt(self, mock_history, payload, tmp_path):
+        _write_cache(tmp_path, payload)
+        mock_history.return_value = []
 
-        from black_box_unlock.core.models import AnalysisResult, AnalysisSummary
+        assert coupling_warnings("src/auth.py", tmp_path) == []
 
+        mock_history.assert_called_once_with(tmp_path, 90)
+        rebuilt = json.loads((tmp_path / ".bbu" / "cache.json").read_text())
+        assert rebuilt["version"] == 1
+        assert rebuilt["files"] == {}
+
+    @patch("black_box_unlock.guard.fetch_git_history")
+    def test_stale_cache_is_rebuilt(self, mock_history, tmp_path):
+        _write_cache(tmp_path, _cache_payload())
         cache = tmp_path / ".bbu" / "cache.json"
-        cache.parent.mkdir()
-        cache.write_text("{ this is not valid json")  # corrupt, fresh mtime
-        (tmp_path / ".git").mkdir()
-        mock_run.return_value = AnalysisResult(
-            repo="t",
-            analyzed_days=90,
-            generated_at=datetime(2026, 6, 12),
-            files=[],
-            summary=AnalysisSummary(total_files=0, high_risk_ownership=0, coupled_pairs=0),
-        )
-
-        warnings = coupling_warnings("src/auth.py", tmp_path)
-
-        mock_run.assert_called_once()  # corrupt content triggers a rebuild
-        assert warnings == []
-
-    @patch("black_box_unlock.guard.run_analysis")
-    def test_wrong_shape_cache_is_rebuilt_not_raised(self, mock_run, tmp_path):
-        """A parseable cache of the wrong shape must rebuild too, not crash or re-warn forever."""
-        from datetime import datetime
-
-        from black_box_unlock.core.models import AnalysisResult, AnalysisSummary
-
-        cache = tmp_path / ".bbu" / "cache.json"
-        cache.parent.mkdir()
-        cache.write_text("null")  # valid JSON, unusable shape, fresh mtime
-        (tmp_path / ".git").mkdir()
-        mock_run.return_value = AnalysisResult(
-            repo="t",
-            analyzed_days=90,
-            generated_at=datetime(2026, 6, 12),
-            files=[],
-            summary=AnalysisSummary(total_files=0, high_risk_ownership=0, coupled_pairs=0),
-        )
-
-        warnings = coupling_warnings("src/auth.py", tmp_path)
-
-        mock_run.assert_called_once()  # unusable shape triggers a rebuild
-        assert warnings == []
-
-    @patch("black_box_unlock.guard.run_analysis")
-    def test_cache_with_malformed_file_entry_is_rebuilt(self, mock_run, tmp_path):
-        """A files list whose entries lack the expected keys is treated as unusable."""
-        from datetime import datetime
-
-        from black_box_unlock.core.models import AnalysisResult, AnalysisSummary
-
-        cache = tmp_path / ".bbu" / "cache.json"
-        cache.parent.mkdir()
-        cache.write_text(json.dumps({"files": [{"no_path_here": True}]}))
-        (tmp_path / ".git").mkdir()
-        mock_run.return_value = AnalysisResult(
-            repo="t",
-            analyzed_days=90,
-            generated_at=datetime(2026, 6, 12),
-            files=[],
-            summary=AnalysisSummary(total_files=0, high_risk_ownership=0, coupled_pairs=0),
-        )
+        old = time.time() - 25 * 3600
+        os.utime(cache, (old, old))
+        mock_history.return_value = []
 
         coupling_warnings("src/auth.py", tmp_path)
 
-        mock_run.assert_called_once()
+        mock_history.assert_called_once_with(tmp_path, 90)
 
-    def test_warnings_sorted_and_capped_at_top_3(self, tmp_path):
-        payload = {
-            "files": [
-                {
-                    "path": "src/hub.py",
-                    "coupled_with": [
-                        {"file": "a.py", "ratio": 0.55},
-                        {"file": "b.py", "ratio": 1.0},
-                        {"file": "c.py", "ratio": 0.7},
-                        {"file": "d.py", "ratio": 0.9},
-                        {"file": "e.py", "ratio": 0.6},
-                    ],
-                },
-            ]
-        }
-        cache = tmp_path / ".bbu" / "cache.json"
-        cache.parent.mkdir()
-        cache.write_text(json.dumps(payload))
-
-        warnings = coupling_warnings("src/hub.py", tmp_path, threshold=0.5)
-
-        assert len(warnings) == 4  # top 3 + the "+2 more" line
-        assert "b.py" in warnings[0] and "100%" in warnings[0]
-        assert "d.py" in warnings[1]
-        assert "c.py" in warnings[2]
-        assert "+2 more" in warnings[3]
-
-    def test_stale_cache_is_rebuilt_fresh_cache_served(self, tmp_path):
-        import os
-        import time as time_mod
-
-        cache = tmp_path / ".bbu" / "cache.json"
-        cache.parent.mkdir()
-        cache.write_text(json.dumps({"files": []}))
-        # fresh cache: no rebuild
-        with patch("black_box_unlock.guard.run_analysis") as mock_run:
-            coupling_warnings("x.py", tmp_path)
-            mock_run.assert_not_called()
-        # stale cache (25h old): rebuild
-        old = time_mod.time() - 25 * 3600
-        os.utime(cache, (old, old))
-        (tmp_path / ".git").mkdir()
-        from datetime import datetime
-
-        from black_box_unlock.core.models import AnalysisResult, AnalysisSummary
-
-        with patch("black_box_unlock.guard.run_analysis") as mock_run:
-            mock_run.return_value = AnalysisResult(
-                repo="t",
-                analyzed_days=90,
-                generated_at=datetime(2026, 6, 12),
-                files=[],
-                summary=AnalysisSummary(total_files=0, high_risk_ownership=0, coupled_pairs=0),
-            )
-            coupling_warnings("x.py", tmp_path)
-            mock_run.assert_called_once()
+    @pytest.mark.parametrize(
+        ("threshold", "top"),
+        [(-0.1, 3), (1.1, 3), (0.5, 0)],
+    )
+    def test_rejects_invalid_limits(self, threshold, top, tmp_path):
+        with pytest.raises(ValueError):
+            coupling_warnings("src/auth.py", tmp_path, threshold=threshold, top=top)

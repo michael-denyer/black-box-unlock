@@ -402,3 +402,77 @@ class TestGenerateHtmlReport:
         html = generate_html_report(result)
 
         assert "Build Failures" in html
+
+    def test_escapes_repository_and_file_names_in_markup(self):
+        marker = '<img src=x onerror="globalThis.BBU_INJECTED=1">'
+        result = AnalysisResult(
+            repo=marker,
+            analyzed_days=30,
+            generated_at=datetime(2026, 1, 25, 15, 30, 0),
+            files=[
+                FileForensics(
+                    path=marker,
+                    commits=1,
+                    lines_changed=1,
+                    authors=[],
+                    coupled_with=[CouplingInfo(file=marker, ratio=1.0)],
+                )
+            ],
+            summary=AnalysisSummary(
+                total_files=1,
+                high_risk_ownership=0,
+                coupled_pairs=1,
+            ),
+        )
+
+        html = generate_html_report(result)
+
+        assert marker not in html
+        assert "&lt;img src=x onerror=&quot;globalThis.BBU_INJECTED=1&quot;&gt;" in html
+
+    def test_inline_json_cannot_terminate_script_block(self):
+        marker = "</script><script>globalThis.BBU_INJECTED=1</script>"
+        result = AnalysisResult(
+            repo="test-repo",
+            analyzed_days=30,
+            generated_at=datetime(2026, 1, 25, 15, 30, 0),
+            files=[
+                FileForensics(
+                    path=marker,
+                    commits=1,
+                    lines_changed=1,
+                    authors=[],
+                    coupled_with=[],
+                )
+            ],
+            summary=AnalysisSummary(
+                total_files=1,
+                high_risk_ownership=0,
+                coupled_pairs=0,
+            ),
+        )
+
+        html = generate_html_report(result)
+
+        assert marker not in html
+        assert "\\u003c/script\\u003e" in html
+
+    def test_metric_help_matches_analysis_contract(self):
+        result = AnalysisResult(
+            repo="test-repo",
+            analyzed_days=30,
+            generated_at=datetime(2026, 1, 25, 15, 30, 0),
+            files=[],
+            summary=AnalysisSummary(
+                total_files=0,
+                high_risk_ownership=0,
+                coupled_pairs=0,
+            ),
+            parameters={"min_coupling": 0.75},
+        )
+
+        html = generate_html_report(result)
+
+        assert "Commits × indentation complexity" in html
+        assert "Files with more than 3 authors" in html
+        assert "75% of the time" in html

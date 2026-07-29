@@ -1,11 +1,15 @@
 """Core data models for forensic analysis."""
 
 from datetime import datetime, timezone
+from enum import Enum
 
-from pydantic import BaseModel, computed_field, field_validator, model_validator
+from pydantic import BaseModel, Field, computed_field, field_validator, model_validator
 
 HIGH_RISK_AUTHOR_THRESHOLD = 3
 """Files with more than this many authors are considered coordination risks."""
+
+DEFAULT_MAX_COUPLED_FILES_PER_COMMIT = 50
+"""Bulk changesets above this size do not contribute temporal-coupling pairs."""
 
 
 def _validate_non_empty_path(v: str) -> str:
@@ -108,7 +112,7 @@ class CouplingInfo(BaseModel):
     """Coupling relationship for display."""
 
     file: str
-    ratio: float
+    ratio: float = Field(ge=0.0, le=1.0)
 
 
 class FunctionChurn(BaseModel):
@@ -153,7 +157,7 @@ class FileXRay(BaseModel):
     revisions_analyzed: int
     revision_cap_hit: bool
     functions: list[FunctionChurn]
-    coupling: list[FunctionCoupling] = []
+    coupling: list[FunctionCoupling] = Field(default_factory=list)
 
 
 class FileForensics(BaseModel):  # [4a.3] Combined forensics
@@ -167,7 +171,7 @@ class FileForensics(BaseModel):  # [4a.3] Combined forensics
     coupled_with: list[CouplingInfo]
     build_failures: int = 0
     bugfix_commits: int = 0
-    functions: list[FunctionChurn] = []
+    functions: list[FunctionChurn] = Field(default_factory=list)
     xray_failed: bool = False
     """True when an X-Ray attempt on this file raised; lets consumers tell a crash
     from a file that genuinely has no attributable functions (both leave functions empty)."""
@@ -208,6 +212,7 @@ class AnalysisSummary(BaseModel):
     high_risk_ownership: int
     coupled_pairs: int
     xrayed_files: int = 0
+    ignored_large_changesets: int = 0
 
 
 class FlakyStepStats(BaseModel):
@@ -250,6 +255,34 @@ class FlakyStepSummary(FlakyStepStats):
     """Flaky-step counts merged across runs, included in AnalysisResult."""
 
 
+class SignalState(str, Enum):
+    """Availability of an optional analysis signal."""
+
+    available = "available"
+    partial = "partial"
+    unavailable = "unavailable"
+    disabled = "disabled"
+
+
+class SignalStatus(BaseModel):
+    """Availability and diagnostics for an optional signal."""
+
+    state: SignalState = SignalState.disabled
+    errors: list[str] = Field(default_factory=list)
+
+
+class AnalysisParameters(BaseModel):
+    """Inputs and policies needed to interpret an analysis result."""
+
+    min_coupling: float = Field(default=0.3, ge=0.0, le=1.0)
+    include_ci: bool = False
+    xray_top: int = Field(default=0, ge=0)
+    max_coupled_files_per_commit: int = Field(
+        default=DEFAULT_MAX_COUPLED_FILES_PER_COMMIT,
+        ge=2,
+    )
+
+
 class AnalysisResult(BaseModel):  # [4a.4] Complete analysis output
     """Complete analysis output."""
 
@@ -258,4 +291,6 @@ class AnalysisResult(BaseModel):  # [4a.4] Complete analysis output
     generated_at: datetime
     files: list[FileForensics]
     summary: AnalysisSummary
-    flaky_steps: list[FlakyStepSummary] = []
+    parameters: AnalysisParameters = Field(default_factory=AnalysisParameters)
+    ci_status: SignalStatus = Field(default_factory=SignalStatus)
+    flaky_steps: list[FlakyStepSummary] = Field(default_factory=list)

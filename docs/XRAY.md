@@ -66,20 +66,9 @@ small windows from producing noise, a pair is reported only when it shares at
 least 2 commits **and** meets the ratio threshold (`--min-coupling`, default
 0.3). Edit one half of a strong pair, check the other.
 
-Real output (this repo, `bbu xray src/black_box_unlock/analysis.py`):
-
-```json
-"coupling": [
-  {
-    "function_a": "_fetch_ci_failures",
-    "function_b": "run_analysis",
-    "shared_revisions": 3,
-    "revisions_a": 3,
-    "revisions_b": 8,
-    "coupling_ratio": 1.0
-  }
-]
-```
+The exact pairs depend on the selected history window and current source
+layout; use `bbu xray <path>` to inspect the current evidence rather than
+relying on a stored example.
 
 ## Performance
 

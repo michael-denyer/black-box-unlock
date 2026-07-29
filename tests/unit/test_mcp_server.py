@@ -13,6 +13,8 @@ from black_box_unlock.core.models import (
     AnalysisSummary,
     CouplingInfo,
     FileForensics,
+    SignalState,
+    SignalStatus,
 )
 
 
@@ -42,6 +44,7 @@ def _result() -> AnalysisResult:
             ),
         ],
         summary=AnalysisSummary(total_files=2, high_risk_ownership=0, coupled_pairs=1),
+        ci_status=SignalStatus(state=SignalState.available),
     )
 
 
@@ -83,7 +86,22 @@ class TestMcpTools:
 
         failures = mcp_server.get_ci_failures(repo_path=".")
 
-        assert failures == [{"path": "src/auth.py", "build_failures": 2}]
+        assert failures == {
+            "status": "available",
+            "errors": [],
+            "files": [{"path": "src/auth.py", "build_failures": 2}],
+        }
+
+    def test_get_flaky_steps_reports_signal_status(self, mock_analysis):
+        mock_analysis.return_value = _result()
+
+        flaky = mcp_server.get_flaky_steps(repo_path=".")
+
+        assert flaky == {
+            "status": "available",
+            "errors": [],
+            "steps": [],
+        }
 
     def test_get_ownership_unknown_file_raises(self, mock_analysis):
         mock_analysis.return_value = _result()

@@ -122,3 +122,23 @@ class TestDetectTemporalCoupling:
     def test_empty_data_returns_empty_list(self):
         """Empty history returns empty list."""
         assert detect_temporal_coupling([], min_ratio=0.0) == []
+
+    def test_bulk_changeset_does_not_create_coupling_pairs(self):
+        history = [make_commit([f"generated/{i}.py" for i in range(51)])]
+
+        assert detect_temporal_coupling(history, min_ratio=0.0) == []
+
+    def test_bulk_changes_still_count_as_file_revisions(self):
+        bulk_files = ["a.py", "b.py", *[f"generated/{i}.py" for i in range(49)]]
+        history = [
+            make_commit(bulk_files),
+            make_commit(["a.py", "b.py"]),
+        ]
+
+        result = detect_temporal_coupling(history, min_ratio=0.5)
+
+        assert len(result) == 1
+        assert result[0].co_change_count == 1
+        assert result[0].commits_a == 2
+        assert result[0].commits_b == 2
+        assert result[0].coupling_ratio == 0.5

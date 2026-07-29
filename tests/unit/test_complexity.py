@@ -179,6 +179,17 @@ class TestGeneratedFileComplexity:
         f.write_text("def f():\n    if x:\n        return 1\n")
         assert indentation_complexity(f) > 0.0
 
+    def test_marker_words_inside_source_do_not_suppress_handwritten_code(self, tmp_path):
+        f = tmp_path / "generator_tool.py"
+        f.write_text(
+            'GENERATED_MARKERS = "do not edit|@generated|automatically generated"\n'
+            "def render():\n"
+            "    if enabled:\n"
+            "        return 1\n"
+        )
+
+        assert indentation_complexity(f) > 0.0
+
     def test_generated_marker_emits_info_log(self, tmp_path):
         f = tmp_path / "gen.py"
         f.write_text("# @generated\ndef f():\n    return 1\n")

@@ -1,251 +1,127 @@
-"""GitHub Actions CI/CD integration via gh CLI."""
+"""GitHub Actions CI signal collection through one typed run snapshot."""
 
 import json
 import subprocess
 from collections import Counter, defaultdict
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
-from ..core.models import FlakyStepSummary
-from .models import BuildFailure, FlakyStep, WorkflowRun
+from ..core.models import FlakyStepSummary, SignalState, SignalStatus
+from .models import CIAnalysis, FlakyStep, WorkflowJob, WorkflowRun
 
 
 def parse_workflow_runs(gh_json: list[dict]) -> list[WorkflowRun]:
-    """Parse gh run list JSON output into WorkflowRun objects.
-
-    Args:
-        gh_json: List of dicts from gh run list --json output.
-
-    Returns:
-        List of WorkflowRun objects.
-    """
+    """Parse GitHub REST workflow-run objects at the external seam."""
     return [
         WorkflowRun(
-            run_id=item["databaseId"],
-            workflow_name=item["workflowName"],
-            commit_sha=item["headSha"],
+            run_id=item["id"],
+            workflow_name=item["name"],
+            commit_sha=item["head_sha"],
             conclusion=item["conclusion"] or "unknown",
-            created_at=datetime.fromisoformat(item["createdAt"].replace("Z", "+00:00")),
+            created_at=item["created_at"],
+            run_attempt=item.get("run_attempt", 1),
         )
         for item in gh_json
     ]
 
 
 def fetch_workflow_runs(limit: int = 100, repo_path: Path = Path(".")) -> list[WorkflowRun]:
-    """Fetch recent workflow runs via gh CLI.
-
-    Args:
-        limit: Maximum number of runs to fetch.
-        repo_path: Path to the git repository (sets cwd for gh subprocess).
-
-    Returns:
-        List of WorkflowRun objects.
-
-    Raises:
-        subprocess.CalledProcessError: If gh command fails.
-    """
-    cmd = [
-        "gh",
-        "run",
-        "list",
-        "--limit",
-        str(limit),
-        "--json",
-        "databaseId,workflowName,headSha,conclusion,createdAt",
-    ]
-    result = subprocess.run(cmd, capture_output=True, text=True, check=True, cwd=repo_path)
-    gh_json = json.loads(result.stdout)
-    return parse_workflow_runs(gh_json)
-
-
-def get_files_changed(commit_sha: str, repo_path: Path = Path(".")) -> list[str]:
-    """Get list of files changed in a commit.
-
-    Args:
-        commit_sha: Git commit SHA.
-        repo_path: Path to the git repository (sets cwd for git subprocess).
-
-    Returns:
-        List of file paths changed in the commit.
-
-    Raises:
-        subprocess.CalledProcessError: If git command fails (e.g., invalid SHA).
-    """
-    cmd = [
-        "git",
-        "show",
-        "--name-only",
-        "--format=",  # Suppress commit info, only show files
-        commit_sha,
-    ]
-    result = subprocess.run(cmd, capture_output=True, text=True, check=True, cwd=repo_path)
-    return [line for line in result.stdout.strip().split("\n") if line.strip()]
-
-
-def build_failures_from_runs(
-    runs: list[WorkflowRun], repo_path: Path = Path(".")
-) -> list[BuildFailure]:
-    """Build failure objects for failed runs with file attribution.
-
-    Args:
-        runs: List of workflow runs.
-        repo_path: Path to the git repository (sets cwd for git subprocess).
-
-    Returns:
-        List of BuildFailure objects for failed runs.
-
-    Raises:
-        subprocess.CalledProcessError: If git command fails for any commit SHA.
-    """
-    failures = []
-    for run in runs:
-        if not run.is_failure:
-            continue
-        files = get_files_changed(run.commit_sha, repo_path=repo_path)
-        failures.append(
-            BuildFailure(
-                run_id=run.run_id,
-                workflow_name=run.workflow_name,
-                commit_sha=run.commit_sha,
-                files_changed=files,
-                failed_at=run.created_at,
-                conclusion=run.conclusion,
-            )
-        )
-    return failures
-
-
-def aggregate_file_failures(failures: list[BuildFailure]) -> dict[str, int]:
-    """Aggregate failure counts per file.
-
-    Args:
-        failures: List of build failures.
-
-    Returns:
-        Dict mapping file path to failure count.
-    """
-    counts: Counter[str] = Counter()
-    for failure in failures:
-        counts.update(failure.files_changed)
-    return dict(counts)
-
-
-def fetch_all_runs(limit: int = 100, repo_path: Path = Path(".")) -> list[dict]:
-    """Fetch workflow runs via REST API.
-
-    Args:
-        limit: Maximum number of runs to fetch.
-        repo_path: Path to the git repository (sets cwd for gh subprocess).
-
-    Returns:
-        List of workflow run dicts from GitHub API.
-
-    Raises:
-        subprocess.CalledProcessError: If gh command fails.
-    """
+    """Fetch one typed workflow-run snapshot through the GitHub REST API."""
     cmd = [
         "gh",
         "api",
         f"/repos/{{owner}}/{{repo}}/actions/runs?per_page={limit}",
     ]
     result = subprocess.run(cmd, capture_output=True, text=True, check=True, cwd=repo_path)
-    return json.loads(result.stdout)["workflow_runs"]
+    return parse_workflow_runs(json.loads(result.stdout)["workflow_runs"])
 
 
-def fetch_jobs_for_run(run_id: int, repo_path: Path = Path(".")) -> list[dict]:
-    """Fetch jobs+steps for a run, across ALL retry attempts.
+def get_files_changed(commit_sha: str, repo_path: Path = Path(".")) -> list[str]:
+    """Return files changed in a commit from the analyzed local repository."""
+    cmd = [
+        "git",
+        "show",
+        "--name-only",
+        "--format=",
+        commit_sha,
+    ]
+    result = subprocess.run(cmd, capture_output=True, text=True, check=True, cwd=repo_path)
+    return [line for line in result.stdout.splitlines() if line.strip()]
 
-    Args:
-        run_id: GitHub Actions run ID.
-        repo_path: Repository whose gh context to use (sets cwd).
 
-    Returns:
-        List of job dicts with steps; each job carries its run_attempt.
-
-    Raises:
-        subprocess.CalledProcessError: If gh command fails.
-    """
+def fetch_jobs_for_run(run_id: int, repo_path: Path = Path(".")) -> list[WorkflowJob]:
+    """Fetch all jobs and retry attempts for one workflow run."""
     cmd = [
         "gh",
         "api",
         f"/repos/{{owner}}/{{repo}}/actions/runs/{run_id}/jobs?filter=all&per_page=100",
     ]
     result = subprocess.run(cmd, capture_output=True, text=True, check=True, cwd=repo_path)
-    return json.loads(result.stdout)["jobs"]
+    return [WorkflowJob.model_validate(item) for item in json.loads(result.stdout)["jobs"]]
 
 
-def flaky_steps_from_jobs(jobs: list[dict]) -> list[FlakyStep]:
-    """Detect flaky steps within one run's jobs across retry attempts.
+@dataclass
+class _StepHistory:
+    attempts: list[tuple[int, str]] = field(default_factory=list)
+    first_seen: datetime | None = None
+    last_seen: datetime | None = None
 
-    A step is flaky when it failed in an earlier attempt and succeeded
-    in a later one. Jobs must carry run_attempt (use filter=all).
+    def observe(self, attempt: int, conclusion: str, completed_at: datetime | None) -> None:
+        self.attempts.append((attempt, conclusion))
+        if completed_at is None:
+            return
+        if self.first_seen is None or completed_at < self.first_seen:
+            self.first_seen = completed_at
+        if self.last_seen is None or completed_at > self.last_seen:
+            self.last_seen = completed_at
 
-    Args:
-        jobs: Job dicts from /actions/runs/{id}/jobs?filter=all, each
-            carrying run_attempt and a list of steps.
 
-    Returns:
-        List of FlakyStep objects, one per job/step combination that
-        recovered on a strictly later attempt.
-    """
-    step_stats: dict[tuple[str, str], dict] = defaultdict(
-        lambda: {
-            "attempts": [],  # (run_attempt, conclusion)
-            "first_seen": None,
-            "last_seen": None,
-        }
-    )
-
+def flaky_steps_from_jobs(jobs: list[WorkflowJob]) -> list[FlakyStep]:
+    """Detect steps that failed and then passed on a later run attempt."""
+    histories: dict[tuple[str, str], _StepHistory] = defaultdict(_StepHistory)
     for job in jobs:
-        attempt = job.get("run_attempt", 1)
-        for step in job.get("steps", []):
-            conclusion = step.get("conclusion")
-            if conclusion not in ("success", "failure"):
+        for step in job.steps:
+            if step.conclusion not in ("success", "failure"):
                 continue
-            stats = step_stats[(job["name"], step["name"])]
-            stats["attempts"].append((attempt, conclusion))
-
-            completed = step.get("completed_at")
-            if completed:
-                ts = datetime.fromisoformat(completed.replace("Z", "+00:00"))
-                if stats["first_seen"] is None or ts < stats["first_seen"]:
-                    stats["first_seen"] = ts
-                if stats["last_seen"] is None or ts > stats["last_seen"]:
-                    stats["last_seen"] = ts
+            histories[(job.name, step.name)].observe(
+                job.run_attempt,
+                step.conclusion,
+                step.completed_at,
+            )
 
     flaky: list[FlakyStep] = []
     now = datetime.now(timezone.utc)
-    for (job_name, step_name), stats in step_stats.items():
-        attempts = sorted(stats["attempts"])
-        failures = sum(1 for _, c in attempts if c == "failure")
+    for (job_name, step_name), history in histories.items():
+        attempts = sorted(history.attempts)
+        failures = sum(1 for _, conclusion in attempts if conclusion == "failure")
         flaky_count = sum(
             1
-            for i, (attempt_i, conclusion) in enumerate(attempts)
+            for index, (attempt, conclusion) in enumerate(attempts)
             if conclusion == "failure"
-            and any(c == "success" for a, c in attempts[i + 1 :] if a > attempt_i)
-        )
-        if flaky_count == 0:
-            continue
-        flaky.append(
-            FlakyStep(
-                job_name=job_name,
-                step_name=step_name,
-                first_seen=stats["first_seen"] or now,
-                last_seen=stats["last_seen"] or now,
-                total_attempts=len(attempts),
-                failures=failures,
-                flaky_count=flaky_count,
+            and any(
+                later_conclusion == "success"
+                for later_attempt, later_conclusion in attempts[index + 1 :]
+                if later_attempt > attempt
             )
         )
+        if flaky_count:
+            flaky.append(
+                FlakyStep(
+                    job_name=job_name,
+                    step_name=step_name,
+                    first_seen=history.first_seen or now,
+                    last_seen=history.last_seen or now,
+                    total_attempts=len(attempts),
+                    failures=failures,
+                    flaky_count=flaky_count,
+                )
+            )
     return flaky
 
 
 def summarize_flaky_steps(steps: list[FlakyStep]) -> list[FlakyStepSummary]:
-    """Merge per-run flaky observations into one summary per (job, step).
-
-    Counts (attempts, failures, recoveries) sum across observations; the seen
-    window spans the earliest first_seen to the latest last_seen.
-    """
+    """Merge per-run observations into one summary per job and step."""
     summaries: dict[tuple[str, str], FlakyStepSummary] = {}
     for step in steps:
         key = (step.job_name, step.step_name)
@@ -260,33 +136,56 @@ def summarize_flaky_steps(steps: list[FlakyStep]) -> list[FlakyStepSummary]:
                 failures=step.failures,
                 flaky_count=step.flaky_count,
             )
-        else:
-            summary.total_attempts += step.total_attempts
-            summary.failures += step.failures
-            summary.flaky_count += step.flaky_count
-            summary.first_seen = min(summary.first_seen, step.first_seen)
-            summary.last_seen = max(summary.last_seen, step.last_seen)
-    return list(summaries.values())
-
-
-def detect_flaky_steps(repo_path: Path = Path("."), limit: int = 100) -> list[FlakyStep]:
-    """Detect flaky CI steps by inspecting re-run workflow runs.
-
-    Only runs with run_attempt > 1 are inspected (one jobs call each),
-    so the API cost is 1 + number-of-reruns, not 1 + number-of-runs.
-
-    Args:
-        repo_path: Repository whose gh context to use (sets cwd).
-        limit: Maximum number of workflow runs to scan.
-
-    Returns:
-        List of FlakyStep objects across all inspected re-run runs.
-    """
-    runs = fetch_all_runs(limit=limit, repo_path=repo_path)
-    flaky: list[FlakyStep] = []
-    for run in runs:
-        if run.get("run_attempt", 1) <= 1:
             continue
-        jobs = fetch_jobs_for_run(run["id"], repo_path=repo_path)
-        flaky.extend(flaky_steps_from_jobs(jobs))
-    return flaky
+        summary.total_attempts += step.total_attempts
+        summary.failures += step.failures
+        summary.flaky_count += step.flaky_count
+        summary.first_seen = min(summary.first_seen, step.first_seen)
+        summary.last_seen = max(summary.last_seen, step.last_seen)
+    return sorted(summaries.values(), key=lambda step: (step.job_name, step.step_name))
+
+
+def _error_message(context: str, error: Exception) -> str:
+    detail = str(error).strip() or type(error).__name__
+    return f"{context}: {detail}"
+
+
+def collect_ci_signals(repo_path: Path = Path("."), limit: int = 100) -> CIAnalysis:
+    """Collect build failures and flaky steps from one workflow-run snapshot.
+
+    A run-specific failure produces a partial result and preserves other runs.
+    Failure to acquire the run snapshot produces an explicit unavailable result.
+    """
+    try:
+        runs = fetch_workflow_runs(limit=limit, repo_path=repo_path)
+    except Exception as error:
+        return CIAnalysis(
+            status=SignalStatus(
+                state=SignalState.unavailable,
+                errors=[str(error).strip() or type(error).__name__],
+            )
+        )
+
+    file_failures: Counter[str] = Counter()
+    flaky_observations: list[FlakyStep] = []
+    errors: list[str] = []
+    for run in runs:
+        if run.is_failure:
+            try:
+                file_failures.update(get_files_changed(run.commit_sha, repo_path=repo_path))
+            except Exception as error:
+                errors.append(_error_message(f"files for run {run.run_id}", error))
+        if run.run_attempt > 1:
+            try:
+                jobs = fetch_jobs_for_run(run.run_id, repo_path=repo_path)
+            except Exception as error:
+                errors.append(_error_message(f"jobs for run {run.run_id}", error))
+            else:
+                flaky_observations.extend(flaky_steps_from_jobs(jobs))
+
+    state = SignalState.partial if errors else SignalState.available
+    return CIAnalysis(
+        status=SignalStatus(state=state, errors=errors),
+        file_failures=dict(file_failures),
+        flaky_steps=summarize_flaky_steps(flaky_observations),
+    )

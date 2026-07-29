@@ -36,6 +36,8 @@ Register the MCP server in Claude Code (`.mcp.json`):
 
 Tools: `get_hotspots`, `get_file_forensics`, `get_coupled_files`,
 `get_ownership`, `get_ci_failures`, `get_flaky_steps`, `xray_file`.
+The two CI tools return `status` and `errors` alongside their data, so an
+unavailable or partial GitHub response is distinguishable from a clean result.
 
 The Claude Code plugin in this repo adds `/analyze`, `/hotspots`, a
 `git-forensics` agent, and an ambient coupling guard that warns when you
@@ -87,7 +89,7 @@ bbu xray src/hot_file.py --days 365
 | Signal | Description |
 |--------|-------------|
 | **Hotspot Score** | commits × indentation complexity - identifies unstable complex code |
-| **Temporal Coupling** | Files changing together >30% reveal hidden dependencies |
+| **Temporal Coupling** | Files changing together above the configured threshold reveal hidden dependencies; bulk commits touching >50 files are excluded from pair generation |
 | **Ownership Risk** | >3 authors + high churn = coordination problems |
 | **Build Failures** | Files appearing in CI failures = fragile code |
 | **Bug-fix Density** | Count of defect-repair commits per file |
@@ -116,6 +118,8 @@ The HTML report includes three interactive views:
 - **Coupling** - Cytoscape.js network graph of temporal coupling
 
 The HTML report is feature-frozen; new signals land in JSON and MCP only.
+It displays the coupling threshold used and whether CI data was available,
+partial, unavailable, or disabled.
 
 ```mermaid
 flowchart LR

@@ -15,7 +15,6 @@
   "ignores": [
     ".venv/**",
     ".planning/**",
-    ".beads/**",
     "docs/plans/**",
     "commands/**",
     "agents/**",

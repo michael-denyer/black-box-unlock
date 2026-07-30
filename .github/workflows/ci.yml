@@ -30,10 +30,10 @@ jobs:
         run: uv sync --all-extras --dev
 
       - name: Run prek checks
-        # Lychee's Linux binary targets Ubuntu 24.04's glibc. It runs in the
-        # links job below; mmdc stays here for Ubuntu 22.04's Chromium sandbox.
+        # Lychee runs in the Ubuntu 24.04 links job below. The branch guard is
+        # local-only; CI must also validate the post-merge commit on main.
         env:
-          SKIP: lychee
+          SKIP: lychee,no-commit-to-branch
         run: uv run prek run --all-files
 
   links:

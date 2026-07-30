@@ -6,7 +6,7 @@
 
 **MANDATORY WORKFLOW:**
 
-1. **Run quality gates** (if code changed) - Tests, linters, builds
+1. **Run quality gates** (if code changed) - `uv run prek run --all-files` and relevant tests
 2. **Review the change** - Check the diff and working tree for unintended edits
 3. **PUSH TO REMOTE** - This is MANDATORY:
 

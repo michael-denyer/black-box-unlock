@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Local Git hooks now run through `prek`, with fast repository hygiene,
+  configuration syntax, lockfile, Ruff, Markdown, and Mermaid checks mirrored
+  in CI
+
 ## [1.3.0] - 2026-07-30
 
 ### Added

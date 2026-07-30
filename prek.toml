@@ -1,0 +1,82 @@
+#:schema https://www.schemastore.org/prek.json
+
+minimum_prek_version = "0.4.11"
+
+[[repos]]
+repo = "builtin"
+hooks = [
+  {
+    id = "trailing-whitespace",
+    args = ["--markdown-linebreak-ext=md"]
+  },
+  { id = "end-of-file-fixer" },
+  {
+    id = "check-added-large-files",
+    args = ["--maxkb=2048"]
+  },
+  { id = "check-case-conflict" },
+  { id = "check-illegal-windows-names" },
+  {
+    id = "check-merge-conflict",
+    args = ["--assume-in-merge"]
+  },
+  { id = "check-json" },
+  { id = "check-toml" },
+  { id = "check-yaml" },
+  { id = "check-symlinks" },
+  { id = "destroyed-symlinks" },
+  { id = "fix-byte-order-marker" },
+  { id = "forbid-new-submodules" },
+  { id = "detect-private-key" },
+  { id = "check-shebang-scripts-are-executable" },
+  { id = "check-executables-have-shebangs" },
+  { id = "no-commit-to-branch" }
+]
+
+[[repos]]
+repo = "https://github.com/astral-sh/ruff-pre-commit"
+rev = "v0.15.17"
+hooks = [
+  {
+    id = "ruff",
+    args = ["--fix"]
+  },
+  { id = "ruff-format" }
+]
+
+[[repos]]
+repo = "https://github.com/DavidAnson/markdownlint-cli2"
+rev = "v0.22.1"
+hooks = [{ id = "markdownlint-cli2" }]
+
+[[repos]]
+repo = "local"
+hooks = [
+  {
+    id = "uv-lock-check",
+    name = "uv lock is current",
+    language = "system",
+    entry = "uv lock --check",
+    files = '^(pyproject\.toml|uv\.lock)$',
+    pass_filenames = false
+  },
+  {
+    id = "maid",
+    name = "maid (mermaid syntax)",
+    language = "node",
+    additional_dependencies = ["@probelabs/maid@0.0.29"],
+    entry = "maid",
+    types = ["markdown"]
+  },
+  {
+    id = "mmdc",
+    name = "mmdc (mermaid renderer parity)",
+    language = "node",
+    additional_dependencies = [
+      "@mermaid-js/mermaid-cli@11.15.0",
+      "puppeteer@24"
+    ],
+    entry = """bash -c 'set -e; for f in "$@"; do mmdc -i "$f" -o /tmp/mmdc-validate.md; done' --""",
+    types = ["markdown"]
+  }
+]

@@ -40,7 +40,7 @@ dev = [
     "pytest-xdist>=3.5.0",
     # Pinned: prek rev and CI must run the identical ruff (version drift
     # means local hooks and CI disagree about violations)
-    "ruff==0.15.17",
+    "ruff==0.15.22",
 ]
 
 [project.scripts]
@@ -54,7 +54,7 @@ Issues = "https://github.com/michael-denyer/black-box-unlock/issues"
 
 [build-system]
 # Exact pin: a compromised build backend executes arbitrary code at install time
-requires = ["hatchling==1.30.1"]
+requires = ["hatchling==1.31.0"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
@@ -83,5 +83,5 @@ dev = [
     # Exact pins keep local and CI diagnostics stable. Both tools may add
     # findings in ordinary releases.
     "pyrefly==1.1.1",
-    "zizmor==1.26.1",
+    "zizmor==1.28.0",
 ]

@@ -35,8 +35,8 @@
     <main id="main">
       <header class="report-header">
         <div>
-          <div class="eyebrow">Investigation overview</div>
-          <h1>Where should attention go first?</h1>
+          <div class="eyebrow">Code forensics report</div>
+          <h1>Repository evidence overview</h1>
           <p id="report-provenance" class="muted"></p>
         </div>
         <div class="header-tools">
@@ -63,6 +63,17 @@
         <article class="stat-card"><strong id="stat-xray">0</strong><span>files X-rayed</span></article>
       </section>
 
+      <section class="panel leads-panel" aria-labelledby="investigation-leads-heading">
+        <div class="leads-heading">
+          <div>
+            <div class="eyebrow">What to do next</div>
+            <h2 id="investigation-leads-heading">Investigation leads</h2>
+          </div>
+          <p>Evidence-backed starting points, not automated conclusions.</p>
+        </div>
+        <div id="investigation-leads" class="lead-grid" aria-live="polite"></div>
+      </section>
+
       <section id="panel-investigation" class="tab-panel" role="tabpanel"
                aria-labelledby="tab-investigation">
         <div class="workspace">
@@ -83,10 +94,11 @@
               <div id="file-grid" data-testid="file-grid" aria-describedby="file-grid-help"></div>
             </section>
 
-            <figure class="panel chart-panel risk-panel">
+            <figure class="panel chart-panel landscape-panel">
               <figcaption>
-                <div><h2>Change frequency × complexity</h2>
-                  <p>Upper-right files combine repeated change with difficult code.</p></div>
+                <div><h2>Change landscape</h2>
+                  <p>Grouped by code area. Tile area compresses lines changed to keep smaller files visible.
+                    Colour is hotspot rank.</p></div>
                 <button class="icon-button" data-focus-grid aria-label="View these files in the grid"
                         title="View in file grid">
                   <svg aria-hidden="true" viewBox="0 0 20 20">
@@ -94,8 +106,8 @@
                   </svg>
                 </button>
               </figcaption>
-              <div id="risk-matrix" class="chart" role="img"
-                   aria-label="Scatter plot of file revisions against indentation complexity"></div>
+              <div id="repository-map" class="chart" role="img"
+                   aria-label="Treemap of changed files grouped by code area"></div>
             </figure>
           </div>
 
@@ -120,11 +132,10 @@
               </section>
             </aside>
 
-            <figure class="panel chart-panel landscape-panel">
+            <figure class="panel chart-panel risk-panel">
               <figcaption>
-                <div><h2>Change landscape</h2>
-                  <p>Grouped by code area. Tile area compresses lines changed to keep smaller files visible.
-                    Colour is hotspot rank.</p></div>
+                <div><h2>Change frequency × complexity</h2>
+                  <p>Upper-right files combine repeated change with difficult code.</p></div>
                 <button class="icon-button" data-focus-grid aria-label="View these files in the grid"
                         title="View in file grid">
                   <svg aria-hidden="true" viewBox="0 0 20 20">
@@ -132,8 +143,8 @@
                   </svg>
                 </button>
               </figcaption>
-              <div id="repository-map" class="chart" role="img"
-                   aria-label="Treemap of changed files grouped by code area"></div>
+              <div id="risk-matrix" class="chart" role="img"
+                   aria-label="Scatter plot of file revisions against indentation complexity"></div>
             </figure>
           </div>
         </div>

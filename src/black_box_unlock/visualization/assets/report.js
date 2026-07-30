@@ -366,6 +366,118 @@
     );
   }
 
+  function investigationLead(label, title, evidence, next, actionLabel, onAction) {
+    const card = document.createElement("article");
+    card.className = "lead-card";
+    card.append(
+      text("span", label, "lead-kicker"),
+      text("h3", title),
+      text("p", evidence, "lead-evidence"),
+      text("p", `Do this next: ${next}`, "lead-next")
+    );
+    if (actionLabel && onAction) {
+      const action = text("button", actionLabel, "lead-action");
+      action.type = "button";
+      action.addEventListener("click", onAction);
+      card.append(action);
+    }
+    return card;
+  }
+
+  function updateInvestigationLeads() {
+    const container = document.getElementById("investigation-leads");
+    clear(container);
+    if (!activeFiles.length) {
+      container.append(text("p", "No files are available in this scope.", "empty-state"));
+      return;
+    }
+
+    const rankedFiles = [...activeFiles].sort(
+      (a, b) =>
+        (b.hotspot_score || 0) - (a.hotspot_score || 0) ||
+        (b.commits || 0) - (a.commits || 0) ||
+        a.path.localeCompare(b.path)
+    );
+    const hottest = rankedFiles[0];
+    const bugFixEvidence = hottest.bugfix_commits
+      ? ` · ${formatInteger(hottest.bugfix_commits)} bug-fix revisions`
+      : "";
+    const fileNext = (hottest.functions || []).length
+      ? "Inspect its function X-Ray and bug-fix history before changing it."
+      : "Inspect its change history and add focused tests before changing it.";
+    container.append(investigationLead(
+      "Start with the strongest file lead",
+      hottest.path,
+      `${formatInteger(hottest.commits)} revisions × complexity ${Number(hottest.complexity || 0).toFixed(1)} = hotspot ${formatInteger(Math.round(hottest.hotspot_score || 0))}${bugFixEvidence}.`,
+      fileNext,
+      "Inspect file",
+      () => {
+        selectFile(hottest.path, {focusPanel: true});
+        document.querySelector(".evidence-panel").scrollIntoView({block: "start"});
+      }
+    ));
+
+    const strongestPair = [...activeCouplings].sort(
+      (a, b) =>
+        (b.confidence_lower_bound || 0) - (a.confidence_lower_bound || 0) ||
+        (b.shared_revisions || 0) - (a.shared_revisions || 0) ||
+        a.key.localeCompare(b.key)
+    )[0];
+    if (strongestPair) {
+      container.append(investigationLead(
+        "Review these files together",
+        `${basename(strongestPair.file_a)} ↔ ${basename(strongestPair.file_b)}`,
+        `${formatInteger(strongestPair.shared_revisions)} shared revisions · ${formatPercent(strongestPair.confidence_lower_bound)} lower-bound confidence · ${formatPercent(strongestPair.raw_ratio)} raw.`,
+        "Include both files in the same impact review and test plan; then decide whether the relationship is intentional.",
+        "Open coupling evidence",
+        () => {
+          activatePanel("coupling");
+          const search = document.getElementById("coupling-search");
+          search.value = strongestPair.file_a;
+          applyCouplingSearch();
+          document.getElementById("panel-coupling").scrollIntoView({block: "start"});
+          search.focus();
+        }
+      ));
+    } else {
+      container.append(investigationLead(
+        "No repeated coupling in scope",
+        "Review files independently",
+        "No file pair has enough repeated shared revisions to support a coupling lead.",
+        "Use the ranked file evidence instead of inferring a relationship from one-off co-change.",
+        null,
+        null
+      ));
+    }
+
+    const topFiles = rankedFiles.slice(0, Math.min(5, rankedFiles.length));
+    const totalHotspot = rankedFiles.reduce((sum, file) => sum + (file.hotspot_score || 0), 0);
+    const concentratedHotspot = topFiles.reduce((sum, file) => sum + (file.hotspot_score || 0), 0);
+    const concentration = totalHotspot ? concentratedHotspot / totalHotspot : 0;
+    container.append(investigationLead(
+      "Allocate review effort",
+      totalHotspot
+        ? `Top ${formatInteger(topFiles.length)} files hold ${formatPercent(concentration)} of hotspot evidence`
+        : "No hotspot concentration in this scope",
+      totalHotspot
+        ? "The combined change-frequency and complexity signal is concentrated rather than evenly spread."
+        : "The hotspot score does not distinguish these files, so use the separate revision and complexity columns.",
+      totalHotspot
+        ? "Review the leading rows first; sample the rest after those files are understood."
+        : "Survey revisions and complexity separately instead of forcing a priority order.",
+      "Review top files",
+      () => {
+        activatePanel("investigation");
+        const search = document.getElementById("file-search");
+        search.value = "";
+        applyFileSearch();
+        fileTable.setSort(fileEvidenceSort);
+        document.getElementById("files-heading").scrollIntoView({block: "start"});
+        search.focus();
+      }
+    ));
+  }
+
   async function applyScope() {
     const roles = activeRoleSet();
     activeFiles = files.filter(file => roles.has(file.path_role));
@@ -383,6 +495,7 @@
     applyFileSearch();
     applyCouplingSearch();
     updateScopedSummary();
+    updateInvestigationLeads();
     updateRiskMatrix(activeFiles);
     updateRepositoryMap(activeFiles);
 
@@ -656,6 +769,7 @@
   initializeRepositoryMap();
   initializeSignals();
   updateScopedSummary();
+  updateInvestigationLeads();
   updateRiskMatrix(activeFiles);
   updateRepositoryMap(activeFiles);
   if (activeFiles.length) selectFile(activeFiles[0].path);

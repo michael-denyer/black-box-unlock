@@ -296,7 +296,8 @@ src/black_box_unlock/
 ├── cli.py                   # [1a] Typer CLI
 ├── complexity.py            # Indentation-depth complexity proxy
 ├── analysis.py              # [2a] Orchestration
-├── mcp_server.py            # bbu-mcp FastMCP server (seven read tools)
+├── mcp_server.py            # bbu-mcp cached signals plus fresh review tool
+├── review.py                # Changed-path evidence and bounded action selection
 ├── guard.py                 # Typed coupling-only cache + warnings (edit hook)
 ├── core/
 │   ├── models.py            # [4a] Pydantic models

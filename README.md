@@ -162,11 +162,15 @@ src/black_box_unlock/
 ## Development
 
 ```bash
+# Install development dependencies and the Git hook
+uv sync --all-extras --dev
+uv run prek install
+
+# Run every fast quality check
+uv run prek run --all-files
+
 # Run tests
 uv run pytest -v
-
-# Lint and format
-uv run ruff check . && uv run ruff format .
 
 # Verbose output for debugging
 bbu --verbose analyze-repo

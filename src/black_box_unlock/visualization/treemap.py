@@ -17,7 +17,7 @@ def build_treemap_data(files: list[FileForensics]) -> dict:  # [5b] Plotly treem
     labels: list[str] = [""]  # Root label (display name)
     parents: list[str] = [""]  # Root has no parent
     values: list[int] = [0]  # Root value
-    colors: list[int] = [0]  # Root color
+    colors: list[float] = [0]  # Root color
     hovertext: list[str] = [""]  # Root has no hover
 
     used_ids: set[str] = {""}

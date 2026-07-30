@@ -166,7 +166,7 @@ src/black_box_unlock/
 uv sync --all-extras --dev
 uv run prek install
 
-# Run every fast quality check
+# Run the same quality and security checks as CI
 uv run prek run --all-files
 
 # Run tests
@@ -175,6 +175,10 @@ uv run pytest -v
 # Verbose output for debugging
 bbu --verbose analyze-repo
 ```
+
+The `prek` gate covers repository hygiene, Ruff, Pyrefly, GitHub Actions
+linting, Markdown and link checks, Mermaid rendering, workflow security, and
+locked-dependency auditing. Link and dependency checks need network access.
 
 ## License
 

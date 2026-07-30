@@ -17,7 +17,7 @@ def _get_directory(path: str) -> str:  # [5c.1] Extract top-level dir
     return path.split("/")[0]
 
 
-def _make_node(path: str, churn: int) -> dict:  # [5c.2] Create graph node
+def _make_node(path: str, churn: float) -> dict:  # [5c.2] Create graph node
     """Create a Cytoscape.js node for a file.
 
     Args:
@@ -64,7 +64,7 @@ def build_coupling_graph_data(files: list[FileForensics]) -> dict:  # [5c] Cytos
             target = coupling.file
             source = file.path
 
-            edge_key = tuple(sorted([source, target]))
+            edge_key = (source, target) if source < target else (target, source)
             if edge_key in seen_edges:
                 continue
             seen_edges.add(edge_key)

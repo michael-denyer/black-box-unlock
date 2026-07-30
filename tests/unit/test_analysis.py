@@ -212,6 +212,28 @@ class TestRunAnalysis:
         assert len(a_file.coupled_with) == 1
         assert a_file.coupled_with[0].file == "b.py"
         assert a_file.coupled_with[0].ratio == 1.0
+        assert a_file.coupled_with[0].shared_revisions == 2
+        assert a_file.coupled_with[0].file_revisions == 2
+        assert a_file.coupled_with[0].coupled_file_revisions == 2
+        assert a_file.coupled_with[0].confidence_lower_bound > 0
+        assert result.couplings[0].co_change_count == 2
+
+    def test_ensure_paths_includes_a_current_file_without_history(self):
+        with (
+            patch("black_box_unlock.analysis.fetch_git_history", return_value=[]),
+            patch("black_box_unlock.analysis.indentation_complexity", return_value=7.0),
+        ):
+            result = run_analysis(
+                Path("/fake/repo"),
+                include_ci=False,
+                xray_top=0,
+                ensure_paths=frozenset({"src/new.py"}),
+            )
+
+        assert len(result.files) == 1
+        assert result.files[0].path == "src/new.py"
+        assert result.files[0].commits == 0
+        assert result.files[0].complexity == 7.0
 
     def test_summary_counts_high_risk_files(self):
         """Summary counts files with >3 authors as high risk."""

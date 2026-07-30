@@ -8,13 +8,17 @@ restart the server to pick up new commits.
 """
 
 from pathlib import Path
+from typing import Literal
 
 from mcp.server.fastmcp import FastMCP
 
 from .analysis import run_analysis
 from .core.exceptions import BlackBoxUnlockError
 from .core.models import AnalysisResult, FileForensics
+from .git.changes import BaseChange, StagedChange, WorkingTreeChange
 from .git.xray import xray_file as _xray_file
+from .review import ReviewParameters
+from .review import run_change_review as _run_change_review
 
 mcp = FastMCP("black-box-unlock")
 
@@ -179,6 +183,43 @@ def xray_file(
         )
     except BlackBoxUnlockError as e:
         raise ValueError(str(e)) from e
+    return result.model_dump(mode="json")
+
+
+@mcp.tool()
+def review_change(
+    repo_path: str = ".",
+    mode: Literal["base", "staged", "working_tree"] = "working_tree",
+    base_ref: str = "origin/main",
+    days: int = 90,
+    min_coupling: float = 0.3,
+    min_shared_revisions: int = 2,
+    include_ci: bool = False,
+) -> dict:
+    """Review a current change and return at most three evidence-backed actions.
+
+    ``base`` includes branch commits and all local layers from the merge base.
+    ``staged`` reads only the index. ``working_tree`` reads unstaged and
+    untracked files. Review always runs fresh; CI is opt-in.
+    """
+    selectors = {
+        "base": BaseChange(base_ref=base_ref),
+        "staged": StagedChange(),
+        "working_tree": WorkingTreeChange(),
+    }
+    try:
+        result = _run_change_review(
+            Path(repo_path),
+            selectors[mode],
+            ReviewParameters(
+                days=days,
+                min_coupling=min_coupling,
+                min_shared_revisions=min_shared_revisions,
+                include_ci=include_ci,
+            ),
+        )
+    except BlackBoxUnlockError as error:
+        raise ValueError(str(error)) from error
     return result.model_dump(mode="json")
 
 

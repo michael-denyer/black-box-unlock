@@ -1,7 +1,7 @@
 """Unit tests for temporal coupling detection."""
 
 from black_box_unlock.core.models import TemporalCoupling
-from black_box_unlock.git.coupling import detect_temporal_coupling
+from black_box_unlock.git.coupling import analyze_temporal_coupling, detect_temporal_coupling
 from tests.factories import make_commit
 
 
@@ -142,3 +142,36 @@ class TestDetectTemporalCoupling:
         assert result[0].commits_a == 2
         assert result[0].commits_b == 2
         assert result[0].coupling_ratio == 0.5
+
+    def test_repeated_evidence_ranks_ahead_of_a_perfect_one_off(self):
+        history = [
+            *[make_commit(["src/a.py", "tests/test_a.py"]) for _ in range(11)],
+            *[make_commit(["src/a.py"]) for _ in range(2)],
+            *[make_commit(["tests/test_a.py"]) for _ in range(2)],
+            make_commit(["src/one.py", "tests/test_one.py"]),
+        ]
+
+        result = analyze_temporal_coupling(history, min_ratio=0.0).couplings
+
+        assert (result[0].file_a, result[0].file_b) == (
+            "src/a.py",
+            "tests/test_a.py",
+        )
+        assert result[0].confidence_lower_bound > result[-1].confidence_lower_bound
+
+    def test_support_floor_excludes_one_off_pairs(self):
+        history = [
+            make_commit(["src/one.py", "tests/test_one.py"]),
+            make_commit(["src/repeated.py", "tests/test_repeated.py"]),
+            make_commit(["src/repeated.py", "tests/test_repeated.py"]),
+        ]
+
+        result = analyze_temporal_coupling(
+            history,
+            min_ratio=0.0,
+            min_shared_revisions=2,
+        ).couplings
+
+        assert [(pair.file_a, pair.file_b) for pair in result] == [
+            ("src/repeated.py", "tests/test_repeated.py")
+        ]

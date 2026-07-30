@@ -298,6 +298,8 @@ src/black_box_unlock/
 ├── analysis.py              # [2a] Orchestration
 ├── mcp_server.py            # bbu-mcp cached signals plus fresh review tool
 ├── review.py                # Changed-path evidence and bounded action selection
+├── config.py                # .bbu.toml and named review profile resolution
+├── path_roles.py            # Project and built-in path-role classification
 ├── guard.py                 # Typed coupling-only cache + warnings (edit hook)
 ├── core/
 │   ├── models.py            # [4a] Pydantic models
@@ -324,7 +326,7 @@ src/black_box_unlock/
 
 | Tool | Purpose | Notes |
 |------|---------|-------|
-| git | Git history extraction | Native `git log --numstat` — no external tools needed |
+| git | Git history extraction | Native `git log --numstat`; no external tools needed |
 | gh CLI | GitHub Actions data | Optional; unavailable/partial status is explicit and successful data is preserved |
 | Plotly 2.27.0 | Treemap visualization | CDN-loaded JavaScript |
 | Cytoscape 3.28.1 | Graph visualization | CDN-loaded JavaScript |

@@ -5,12 +5,48 @@ from datetime import datetime
 import pytest
 
 from black_box_unlock.core.models import (
+    FailedWorkflowRun,
     FileChurn,
     FileForensics,
     TemporalCoupling,
     coupling_info_for,
     wilson_lower_bound,
 )
+
+
+class TestFailedWorkflowRun:
+    def test_keeps_the_actionable_attribution_contract(self):
+        run = FailedWorkflowRun(
+            run_id=42,
+            workflow_name="CI",
+            run_url="https://github.com/example/repo/actions/runs/42",
+            commit_sha="abc123",
+            conclusion="timed_out",
+            created_at=datetime(2026, 7, 30),
+            implicated_paths=["src/main.py"],
+        )
+
+        assert run.model_dump(mode="json") == {
+            "run_id": 42,
+            "workflow_name": "CI",
+            "run_url": "https://github.com/example/repo/actions/runs/42",
+            "commit_sha": "abc123",
+            "conclusion": "timed_out",
+            "created_at": "2026-07-30T00:00:00",
+            "implicated_paths": ["src/main.py"],
+            "attribution": "changed_in_failed_commit",
+        }
+
+    def test_rejects_a_non_failure_conclusion(self):
+        with pytest.raises(ValueError):
+            FailedWorkflowRun(
+                run_id=42,
+                workflow_name="CI",
+                run_url="https://github.com/example/repo/actions/runs/42",
+                commit_sha="abc123",
+                conclusion="success",
+                created_at=datetime(2026, 7, 30),
+            )
 
 
 class TestCouplingEvidence:

@@ -1,4 +1,4 @@
-"""Deterministic release proof for the v1.3 change-review contract."""
+"""Deterministic release proof for the v1.4 change-review contract."""
 
 import json
 import os
@@ -33,6 +33,21 @@ def _commit(repo: Path, message: str) -> None:
 
 def _build_repository(repo: Path) -> None:
     _git(repo, "init")
+    (repo / ".bbu.toml").write_text(
+        """
+default_profile = "release"
+
+[[path_roles]]
+pattern = "app/**/*.vue"
+role = "source"
+
+[profiles.release]
+days = 365
+min_shared_revisions = 2
+include_ci = false
+""".strip()
+        + "\n"
+    )
     source = repo / "src" / "a.py"
     companion = repo / "tests" / "test_a.py"
     source.parent.mkdir()
@@ -53,6 +68,9 @@ def _build_repository(repo: Path) -> None:
     one_test.write_text("one = 1\n")
     _commit(repo, "one-off pair")
     source.write_text("value = 99\n")
+    custom_source = repo / "app" / "widget.vue"
+    custom_source.parent.mkdir()
+    custom_source.write_text("<template>ready</template>\n")
 
 
 def main() -> None:
@@ -78,6 +96,15 @@ def main() -> None:
     actions = cli_result["actions"]
     assert len(actions) <= 3
     assert actions == mcp_result["actions"]
+    assert cli_result["parameters"]["profile"] == "release"
+    assert cli_result["parameters"]["config_path"] == ".bbu.toml"
+    custom_file = next(
+        item for item in cli_result["files"] if item["change"]["path"] == "app/widget.vue"
+    )
+    assert custom_file["evidence"]["role"] == {
+        "role": "source",
+        "rule": "project:app/**/*.vue",
+    }
     coupling = actions[0]["evidence"][0]
     assert coupling["coupled_path"] == "tests/test_a.py"
     assert coupling["shared_revisions"] == 11

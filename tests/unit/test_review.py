@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from black_box_unlock.core.models import (
     AnalysisResult,
     AnalysisSummary,
+    FailedWorkflowRun,
     FileForensics,
     SignalStatus,
     TemporalCoupling,
@@ -16,6 +17,7 @@ from black_box_unlock.git.changes import (
     WorkingTreeChange,
     WorkingTreeProvenance,
 )
+from black_box_unlock.path_roles import PathRole, PathRoleRule
 from black_box_unlock.review import ChangeReview, NoChanges, ReviewParameters, project_change_review
 
 
@@ -164,3 +166,103 @@ def test_documentation_change_does_not_create_production_actions():
 
     assert isinstance(result, ChangeReview)
     assert result.actions == []
+
+
+def test_project_path_role_overrides_the_builtin_classifier():
+    result = project_change_review(
+        _change_set("templates/account.tmpl"),
+        _analysis(),
+        ReviewParameters(),
+        path_role_rules=(PathRoleRule(pattern="templates/**", role=PathRole.source),),
+    )
+
+    assert isinstance(result, ChangeReview)
+    assert result.files[0].evidence.role.model_dump() == {
+        "role": PathRole.source,
+        "rule": "project:templates/**",
+    }
+    test_action = next(action for action in result.actions if action.kind == "add_or_update_tests")
+    assert test_action.evidence.role_classifier_version == 2
+
+
+def test_ci_action_keeps_run_details_and_states_attribution_limit():
+    analysis = _analysis()
+    analysis.failed_ci_runs = [
+        FailedWorkflowRun(
+            run_id=42,
+            workflow_name="CI",
+            run_url="https://github.com/example/demo/actions/runs/42",
+            commit_sha="deadbeef",
+            conclusion="failure",
+            created_at=datetime(2026, 7, 29, tzinfo=timezone.utc),
+            implicated_paths=["src/a.py", "src/unrelated.py"],
+        )
+    ]
+
+    result = project_change_review(
+        _change_set("src/a.py"),
+        analysis,
+        ReviewParameters(include_ci=True),
+    )
+
+    assert isinstance(result, ChangeReview)
+    action = next(action for action in result.actions if action.kind == "inspect_ci_failures")
+    assert "not proven causal" in action.message
+    assert action.evidence[0].model_dump(mode="json") == {
+        "run_id": 42,
+        "workflow_name": "CI",
+        "run_url": "https://github.com/example/demo/actions/runs/42",
+        "commit_sha": "deadbeef",
+        "conclusion": "failure",
+        "created_at": "2026-07-29T00:00:00Z",
+        "implicated_changed_paths": ["src/a.py"],
+        "attribution": "changed_in_failed_commit",
+    }
+
+
+def test_failed_run_without_a_selected_path_does_not_create_an_action():
+    analysis = _analysis()
+    analysis.failed_ci_runs = [
+        FailedWorkflowRun(
+            run_id=42,
+            workflow_name="CI",
+            run_url="https://github.com/example/demo/actions/runs/42",
+            commit_sha="deadbeef",
+            conclusion="failure",
+            created_at=datetime(2026, 7, 29, tzinfo=timezone.utc),
+            implicated_paths=["src/unrelated.py"],
+        )
+    ]
+
+    result = project_change_review(
+        _change_set("src/a.py"),
+        analysis,
+        ReviewParameters(include_ci=True),
+    )
+
+    assert isinstance(result, ChangeReview)
+    assert all(action.kind != "inspect_ci_failures" for action in result.actions)
+
+
+def test_ci_evidence_cannot_create_an_action_when_the_signal_is_disabled():
+    analysis = _analysis()
+    analysis.failed_ci_runs = [
+        FailedWorkflowRun(
+            run_id=42,
+            workflow_name="CI",
+            run_url="https://github.com/example/demo/actions/runs/42",
+            commit_sha="deadbeef",
+            conclusion="failure",
+            created_at=datetime(2026, 7, 29, tzinfo=timezone.utc),
+            implicated_paths=["src/a.py"],
+        )
+    ]
+
+    result = project_change_review(
+        _change_set("src/a.py"),
+        analysis,
+        ReviewParameters(include_ci=False),
+    )
+
+    assert isinstance(result, ChangeReview)
+    assert all(action.kind != "inspect_ci_failures" for action in result.actions)

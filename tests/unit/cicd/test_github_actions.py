@@ -20,6 +20,7 @@ def _raw_run(**overrides) -> dict:
     payload = {
         "id": 123,
         "name": "CI",
+        "html_url": "https://github.com/example/repo/actions/runs/123",
         "head_sha": "abc123",
         "conclusion": "success",
         "created_at": "2026-01-26T10:00:00Z",
@@ -37,6 +38,7 @@ class TestParseWorkflowRuns:
             WorkflowRun(
                 run_id=123,
                 workflow_name="CI",
+                run_url="https://github.com/example/repo/actions/runs/123",
                 commit_sha="abc123",
                 conclusion="success",
                 created_at=datetime(2026, 1, 26, 10, 0, tzinfo=timezone.utc),

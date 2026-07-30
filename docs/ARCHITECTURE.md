@@ -14,6 +14,8 @@ src/black_box_unlock/
 ├── analysis.py             # Pipeline: fetch -> parse -> join -> AnalysisResult
 ├── mcp_server.py           # FastMCP server: cached signals + fresh review
 ├── review.py               # Pure review projection and bounded action policy
+├── config.py               # .bbu.toml parsing and named profile resolution
+├── path_roles.py           # Project and built-in path-role classifier
 ├── guard.py                # Coupling guard: small typed cache for the edit hook
 ├── core/
 │   ├── models.py           # Pydantic models (FileForensics, AnalysisResult, ...)
@@ -43,7 +45,7 @@ src/black_box_unlock/
 | Temporal coupling | git | co_changes / min(commits_a, commits_b), ordered by 95% Wilson lower bound; commits touching >50 files are excluded from pair generation |
 | Ownership risk | git | > 3 authors |
 | Bug-fix commits | git messages | fix(ing)/bug/hotfix/defect/regression/revert + repair verbs (correct/broke/crash/repair/fault/malfunction/stuck/hang) markers, excluding docs/style/test/chore/ci/build/refactor/feat-prefixed commits |
-| Build failures | gh CLI | files changed in failing workflow runs |
+| Build failures | gh CLI | failed workflow details plus paths changed in each failed commit; implication, not causality |
 | Flaky steps | gh api | step failed attempt N, passed attempt M>N (re-runs only) |
 
 ## Data flow
@@ -51,7 +53,8 @@ src/black_box_unlock/
 ```mermaid
 flowchart LR
     Git[git log --numstat] --> Parse[churn / coupling /<br/>ownership / defects]
-    GH[gh CLI + REST] --> CI[build failures /<br/>flaky steps]
+    GH[gh CLI + REST] --> CI[failed runs /<br/>flaky steps]
+    Config[.bbu.toml] --> Review
     Parse --> Join[run_analysis join]
     CI --> Join
     Join --> JSON[JSON]
@@ -72,9 +75,9 @@ flowchart LR
 - one failed CI detail request -> `ci_status.state` is `partial`; successful run data is preserved
 - missing review base -> `InvalidRevisionError`, CLI prints a clean error
 - unresolved merge conflict -> `ChangeSelectionError`; no misleading actions are returned
+- invalid `.bbu.toml` or unknown profile -> `ConfigurationError`; no review runs
 
-## Roadmap
+## Product constraints
 
-Tracked in the local issue tracker.
-Decided direction: agent-native (MCP + plugin) on top of corrected signals; HTML frozen;
-no IDE telemetry; no PR-flow dashboard signals.
+The product stays agent-native through MCP and the plugin. HTML is frozen.
+There is no IDE telemetry, PR-flow dashboard, or composite risk score.

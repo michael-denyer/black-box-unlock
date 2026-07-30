@@ -11,6 +11,7 @@ from black_box_unlock.core.models import (
     AnalysisResult,
     AnalysisSummary,
     CouplingInfo,
+    FailedWorkflowRun,
     FileForensics,
     FlakyStepSummary,
     SignalState,
@@ -368,6 +369,17 @@ class TestCIInPipeline:
         mock_ci.return_value = CIAnalysis(
             status=SignalStatus(state=SignalState.available),
             file_failures={"src/main.py": 2},
+            failed_runs=[
+                FailedWorkflowRun(
+                    run_id=42,
+                    workflow_name="CI",
+                    run_url="https://github.com/example/repo/actions/runs/42",
+                    commit_sha="abc123",
+                    conclusion="failure",
+                    created_at=datetime(2026, 6, 2),
+                    implicated_paths=["src/main.py"],
+                )
+            ],
             flaky_steps=[
                 FlakyStepSummary(
                     job_name="test",
@@ -386,6 +398,7 @@ class TestCIInPipeline:
         main_file = next(file for file in result.files if file.path == "src/main.py")
         assert main_file.build_failures == 2
         assert result.flaky_steps[0].step_name == "Run tests"
+        assert result.failed_ci_runs[0].run_id == 42
         assert result.ci_status.state is SignalState.available
 
     @patch("black_box_unlock.analysis.collect_ci_signals")

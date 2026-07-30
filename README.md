@@ -163,15 +163,25 @@ bbu validate --repo /path/to/repo --days 730
 
 ## HTML report
 
-The HTML report includes three interactive views:
+The HTML output is a self-contained investigation workspace:
 
-- **Table** - Sortable file metrics with severity coloring
-- **Hotspots** - Plotly treemap showing file churn by directory
-- **Coupling** - Cytoscape.js network graph of temporal coupling
+- **Files** - searchable, sortable metrics with a persistent evidence panel
+- **Risk matrix and change landscape** - two routes into the same selected file
+- **Coupling evidence** - confidence-first pairs with support and denominators
+- **CI and signals** - collection status, failed runs, flaky steps, and policy
 
-The HTML report is feature-frozen; new signals land in JSON and MCP only.
-It displays the coupling threshold used and whether CI data was available,
-partial, unavailable, or disabled.
+The report opens in **Code only** scope: source files and migrations, with
+coupling limited to pairs whose two endpoints are in that scope. Tests,
+configuration, documentation, generated files, and repository metadata remain
+available through the scope selector.
+
+Numeric evidence columns use proportional heat bars scaled to the current
+scope. The change landscape groups files by code area without repeating
+low-information repository path levels.
+
+Pinned ECharts and Tabulator assets are embedded in the document, so opening a
+saved report makes no CDN requests. Charts are supplementary: the evidence
+needed to interpret them remains in keyboard-operable grids and text panels.
 
 ```mermaid
 flowchart LR
@@ -179,8 +189,9 @@ flowchart LR
     CI[GitHub Actions] --> Analyze
     Analyze --> JSON[JSON Output]
     Analyze --> HTML[HTML Report]
-    HTML --> Treemap[Hotspot Treemap]
-    HTML --> Graph[Coupling Graph]
+    HTML --> Grid[Searchable Evidence]
+    HTML --> Matrix[Risk Matrix]
+    HTML --> Treemap[Repository Map]
 ```
 
 ## Architecture
@@ -195,7 +206,7 @@ src/black_box_unlock/
 ├── core/               # Pydantic models, exceptions, logging
 ├── git/                # Churn, coupling, ownership, defects, log extraction
 ├── cicd/               # CI/CD forensics (build failures, flaky steps via gh CLI)
-└── visualization/      # HTML, treemap, coupling graph (frozen)
+└── visualization/      # Offline HTML investigation workspace
 ```
 
 ## Development

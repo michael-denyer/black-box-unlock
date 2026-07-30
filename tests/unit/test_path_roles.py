@@ -51,6 +51,21 @@ def test_project_rules_are_first_match_wins_before_builtins():
     }
 
 
+@pytest.mark.parametrize(
+    "path",
+    [
+        "web/index.html",
+        "web/app.css",
+        "web/theme.scss",
+        "scripts/release.sh",
+        "db/schema.sql",
+        "web/App.vue",
+    ],
+)
+def test_product_assets_are_source_files(path):
+    assert classify_path_role(path).role is PathRole.source
+
+
 @pytest.mark.parametrize("pattern", ["", "/absolute/**", "../outside/**", "file[0-9].py"])
 def test_invalid_or_unsupported_patterns_fail_at_the_config_boundary(pattern):
     with pytest.raises(ValidationError):

@@ -29,8 +29,8 @@ flowchart TB
 
     subgraph Layer5["Visualization [5]"]
         HTML["HTML Report [5a]"]
-        Treemap["Treemap Data [5b]"]
-        Graph["Coupling Graph [5c]"]
+        Payload["Report Payload [5b]"]
+        Workspace["Investigation Workspace [5c-e]"]
     end
 
     CLI --> Analysis
@@ -42,8 +42,8 @@ flowchart TB
     Ownership --> Models
     Analysis --> Export
     Analysis --> HTML
-    HTML --> Treemap
-    HTML --> Graph
+    HTML --> Payload
+    HTML --> Workspace
     Models --> Exceptions
 ```
 
@@ -69,7 +69,7 @@ sequenceDiagram
         CLI->>User: JSON output
     else --output=html
         CLI->>Viz: generate_html_report()
-        Viz-->>CLI: HTML with treemap + graph
+        Viz-->>CLI: Offline investigation workspace
         CLI->>User: HTML output
     end
 ```
@@ -235,13 +235,11 @@ HTML report generation with interactive visualizations.
 
 | ID | Component | Description | File:Line |
 |----|-----------|-------------|-----------|
-| 5a | generate_html_report | Generate complete HTML | [html.py:807](../src/black_box_unlock/visualization/html.py#L807) |
-| 5a.1 | _get_severity_class | Severity CSS class mapping | [html.py:782](../src/black_box_unlock/visualization/html.py#L782) |
-| 5a.2 | HTML_TEMPLATE | Full HTML page template | [html.py:9](../src/black_box_unlock/visualization/html.py#L9) |
-| 5b | build_treemap_data | Plotly treemap format | [treemap.py:6](../src/black_box_unlock/visualization/treemap.py#L6) |
-| 5c | build_coupling_graph_data | Cytoscape.js graph format | [coupling_graph.py:40](../src/black_box_unlock/visualization/coupling_graph.py#L40) |
-| 5c.1 | _get_directory | Extract top-level dir | [coupling_graph.py:6](../src/black_box_unlock/visualization/coupling_graph.py#L6) |
-| 5c.2 | _make_node | Create graph node | [coupling_graph.py:20](../src/black_box_unlock/visualization/coupling_graph.py#L20) |
+| 5a | generate_html_report | Compose the offline document | [html.py](../src/black_box_unlock/visualization/html.py) |
+| 5b | build_report_payload | Preserve AnalysisResult and enrich raw pairs | [report_data.py](../src/black_box_unlock/visualization/report_data.py) |
+| 5c | report.js | Grids, selection state, charts, and signals | [report.js](../src/black_box_unlock/visualization/assets/report.js) |
+| 5d | report.html | Semantic investigation-workspace shell | [report.html](../src/black_box_unlock/visualization/assets/report.html) |
+| 5e | report.css | Responsive and accessible presentation | [report.css](../src/black_box_unlock/visualization/assets/report.css) |
 
 #### HTML Report Structure [5a]
 
@@ -252,23 +250,23 @@ flowchart TB
         Tabs[Tab Navigation]
     end
 
-    subgraph Views["Tab Views"]
-        Table[Table View]
-        Hotspots[Hotspots View]
-        Coupling[Coupling View]
+    subgraph Views["Investigation Views"]
+        Files[Searchable File Grid]
+        Evidence[Selected File Evidence]
+        Coupling[Confidence-first Coupling Grid]
     end
 
     subgraph Viz["Visualizations"]
-        Plotly[Plotly Treemap 5b]
-        Cytoscape[Cytoscape Graph 5c]
+        Matrix[ECharts Risk Matrix]
+        Map[ECharts Repository Map]
     end
 
     Report --> Views
-    Tabs --> Table
-    Tabs --> Hotspots
+    Tabs --> Files
     Tabs --> Coupling
-    Hotspots --> Plotly
-    Coupling --> Cytoscape
+    Files --> Evidence
+    Matrix --> Evidence
+    Map --> Evidence
 ```
 
 ---
@@ -315,9 +313,9 @@ src/black_box_unlock/
 │   ├── models.py            # Typed WorkflowRun/Job/Step, CIAnalysis, FlakyStep
 │   └── github_actions.py    # One run snapshot, partial-result-aware collection
 └── visualization/
-    ├── html.py              # [5a] HTML report
-    ├── treemap.py           # [5b] Plotly treemap
-    └── coupling_graph.py    # [5c] Cytoscape graph
+    ├── html.py              # [5a] Offline document composition
+    ├── report_data.py       # [5b] Deterministic report envelope
+    └── assets/              # [5c-e] Semantic shell, UI, styles, pinned vendors
 ```
 
 ---
@@ -328,5 +326,5 @@ src/black_box_unlock/
 |------|---------|-------|
 | git | Git history extraction | Native `git log --numstat`; no external tools needed |
 | gh CLI | GitHub Actions data | Optional; unavailable/partial status is explicit and successful data is preserved |
-| Plotly 2.27.0 | Treemap visualization | CDN-loaded JavaScript |
-| Cytoscape 3.28.1 | Graph visualization | CDN-loaded JavaScript |
+| ECharts 6.1.0 | Risk matrix and repository map | Pinned and embedded; Apache-2.0 |
+| Tabulator 6.5.2 | Virtualized evidence grids | Pinned and embedded; MIT |

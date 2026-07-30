@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'none'; connect-src 'none'; img-src data:; font-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; object-src 'none'; frame-src 'none'; form-action 'none'">
+  <title>Black Box Unlock · code forensics report</title>
+  <style>/*__TABULATOR_CSS__*/</style>
+  <style>/*__REPORT_CSS__*/</style>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to report</a>
+  <div class="app-shell">
+    <aside class="side-nav" aria-label="Report navigation">
+      <div class="brand">Black Box<br>Unlock <small>Code forensics</small></div>
+      <div class="nav-tabs" role="tablist" aria-label="Report sections">
+        <button class="nav-tab is-active" id="tab-investigation" role="tab"
+                aria-controls="panel-investigation" aria-selected="true" tabindex="0"
+                data-panel="investigation">Investigation</button>
+        <button class="nav-tab" id="tab-coupling" role="tab"
+                aria-controls="panel-coupling" aria-selected="false" tabindex="-1"
+                data-panel="coupling">Coupling evidence</button>
+        <button class="nav-tab" id="tab-signals" role="tab"
+                aria-controls="panel-signals" aria-selected="false" tabindex="-1"
+                data-panel="signals">CI &amp; signals</button>
+      </div>
+      <div class="side-meta">
+        <strong id="side-repo">Repository</strong>
+        <span id="side-window"></span>
+        <span>Offline report</span>
+      </div>
+    </aside>
+
+    <main id="main">
+      <header class="report-header">
+        <div>
+          <div class="eyebrow">Investigation overview</div>
+          <h1>Where should attention go first?</h1>
+          <p id="report-provenance" class="muted"></p>
+        </div>
+        <div class="header-tools">
+          <label class="scope-label" for="scope-select">
+            <span>Report scope</span>
+            <select id="scope-select" data-testid="scope-select">
+              <option value="code">Code only</option>
+              <option value="code-tests">Code + tests</option>
+              <option value="code-config">Code + tests + configuration</option>
+              <option value="all">All changed files</option>
+            </select>
+          </label>
+          <div class="confidence-note">
+            <strong>Evidence, not a verdict</strong>
+            <span>Signals remain separate and their supporting counts stay visible.</span>
+          </div>
+        </div>
+      </header>
+
+      <section class="summary" aria-label="Analysis summary">
+        <article class="stat-card"><strong id="stat-files">0</strong><span>files in scope</span></article>
+        <article class="stat-card"><strong id="stat-ownership">0</strong><span>ownership risks</span></article>
+        <article class="stat-card"><strong id="stat-couplings">0</strong><span>coupled pairs</span></article>
+        <article class="stat-card"><strong id="stat-xray">0</strong><span>files X-rayed</span></article>
+      </section>
+
+      <section id="panel-investigation" class="tab-panel" role="tabpanel"
+               aria-labelledby="tab-investigation">
+        <div class="workspace">
+          <section class="panel files-panel" aria-labelledby="files-heading">
+            <div class="panel-heading">
+              <div>
+                <h2 id="files-heading">Files ranked by hotspot evidence</h2>
+                <p><span id="file-count">0</span> matching files · select one to inspect</p>
+              </div>
+              <label class="search-label" for="file-search">
+                <span>Search files or owners</span>
+                <input id="file-search" data-testid="file-search" type="search"
+                       placeholder="Path or author…" autocomplete="off">
+              </label>
+            </div>
+            <p class="keyboard-hint" id="file-grid-help">Sort with column headers. Use Tab then Enter on Inspect.</p>
+            <div id="file-grid" data-testid="file-grid" aria-describedby="file-grid-help"></div>
+          </section>
+
+          <aside class="panel evidence-panel" aria-labelledby="selected-file-heading">
+            <div class="eyebrow">Selected file</div>
+            <h2 id="selected-file-heading" tabindex="-1">Choose a file</h2>
+            <p id="selected-path" class="mono muted">Select a row to inspect its evidence.</p>
+            <div id="selected-badges" class="badges"></div>
+            <div id="selected-metrics" class="metric-grid"></div>
+            <section class="evidence-section" aria-labelledby="ownership-heading">
+              <h3 id="ownership-heading">Ownership &amp; defects</h3>
+              <div id="selected-ownership" class="evidence-copy muted">No file selected.</div>
+            </section>
+            <section class="evidence-section" aria-labelledby="file-coupling-heading">
+              <h3 id="file-coupling-heading">Strongest coupling evidence</h3>
+              <div id="selected-couplings" class="evidence-list muted">No file selected.</div>
+            </section>
+            <section class="evidence-section" aria-labelledby="xray-heading">
+              <h3 id="xray-heading">Function X-Ray</h3>
+              <div id="selected-xray" class="evidence-list muted">No file selected.</div>
+            </section>
+          </aside>
+        </div>
+
+        <div class="chart-grid">
+          <figure class="panel chart-panel">
+            <figcaption>
+              <div><h2>Change frequency × complexity</h2>
+                <p>Upper-right files combine repeated change with difficult code.</p></div>
+              <button class="text-button" data-focus-grid>View the same files in the grid</button>
+            </figcaption>
+            <div id="risk-matrix" class="chart" role="img"
+                 aria-label="Scatter plot of file revisions against indentation complexity"></div>
+          </figure>
+          <figure class="panel chart-panel">
+            <figcaption>
+              <div><h2>Change landscape</h2>
+                <p>Grouped by code area. Tile size is lines changed; colour is hotspot rank.</p></div>
+              <button class="text-button" data-focus-grid>View the same files in the grid</button>
+            </figcaption>
+            <div id="repository-map" class="chart" role="img"
+                 aria-label="Treemap of changed files grouped by code area"></div>
+          </figure>
+        </div>
+      </section>
+
+      <section id="panel-coupling" class="tab-panel" role="tabpanel"
+               aria-labelledby="tab-coupling" hidden>
+        <section class="panel">
+          <div class="panel-heading">
+            <div><h2>Confidence-first temporal coupling</h2>
+              <p>Support comes before a flattering percentage. Both revision counts remain visible.</p></div>
+            <label class="search-label" for="coupling-search"><span>Search pairs</span>
+              <input id="coupling-search" data-testid="coupling-search" type="search"
+                     placeholder="Either file path…" autocomplete="off"></label>
+          </div>
+          <div class="explanation">
+            <strong>How to read this:</strong> raw ratio is shared revisions ÷ the smaller file revision count.
+            The 95% Wilson lower bound discounts perfect-looking results with tiny samples.
+          </div>
+          <div id="coupling-grid" data-testid="coupling-grid"></div>
+        </section>
+      </section>
+
+      <section id="panel-signals" class="tab-panel" role="tabpanel"
+               aria-labelledby="tab-signals" hidden>
+        <div class="signals-grid">
+          <section class="panel signal-card"><div class="eyebrow">Collection state</div>
+            <h2>CI evidence</h2><div id="ci-status"></div></section>
+          <section class="panel signal-card"><div class="eyebrow">Observed failures</div>
+            <h2>Failed workflow runs</h2><div id="failed-runs"></div></section>
+          <section class="panel signal-card"><div class="eyebrow">Recovered retries</div>
+            <h2>Flaky steps</h2><div id="flaky-steps"></div></section>
+          <section class="panel signal-card"><div class="eyebrow">Interpretation</div>
+            <h2>Analysis policy</h2><div id="analysis-policy"></div></section>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <footer>
+    Generated by Black Box Unlock · Apache ECharts 6.1.0 · Tabulator 6.5.2 ·
+    third-party licences are included with the installed package.
+  </footer>
+  <script id="bbu-report-data" type="application/json">__REPORT_DATA__</script>
+  <script>/*__ECHARTS_JS__*/</script>
+  <script>/*__TABULATOR_JS__*/</script>
+  <script>/*__REPORT_JS__*/</script>
+</body>
+</html>

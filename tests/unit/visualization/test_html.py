@@ -1,478 +1,120 @@
-"""Unit tests for HTML report generator."""
+"""Tests for the standalone HTML investigation report."""
 
-from datetime import datetime
+import re
+from datetime import datetime, timezone
 
 from black_box_unlock.core.models import (
     AnalysisResult,
     AnalysisSummary,
-    CouplingInfo,
     FileForensics,
+    TemporalCoupling,
 )
 from black_box_unlock.visualization.html import generate_html_report
 
 
-class TestGenerateHtmlReport:
-    """Tests for generate_html_report function."""
-
-    def test_generates_valid_html(self):
-        """Generates complete HTML document."""
-        result = AnalysisResult(
-            repo="test-repo",
-            analyzed_days=30,
-            generated_at=datetime(2026, 1, 25, 15, 30, 0),
-            files=[
-                FileForensics(
-                    path="src/auth.py",
-                    commits=10,
-                    lines_changed=200,
-                    authors=["alice@example.com"],
-                    coupled_with=[],
-                )
-            ],
-            summary=AnalysisSummary(
-                total_files=1,
-                high_risk_ownership=0,
-                coupled_pairs=0,
+def _result(*, repo: str = "test-repo", path: str = "src/auth.py") -> AnalysisResult:
+    return AnalysisResult(
+        repo=repo,
+        analyzed_days=30,
+        generated_at=datetime(2026, 1, 25, 15, 30, tzinfo=timezone.utc),
+        files=[
+            FileForensics(
+                path=path,
+                commits=10,
+                lines_changed=200,
+                complexity=20,
+                authors=["alice@example.com", "bob@example.com"],
+                coupled_with=[],
+                bugfix_commits=2,
+                build_failures=1,
             ),
-        )
-
-        html = generate_html_report(result)
-
-        assert "<!DOCTYPE html>" in html
-        assert "<html" in html
-        assert "</html>" in html
-        assert "test-repo" in html
-
-    def test_includes_summary_stats(self):
-        """Includes summary statistics in report."""
-        result = AnalysisResult(
-            repo="test-repo",
-            analyzed_days=30,
-            generated_at=datetime(2026, 1, 25, 15, 30, 0),
-            files=[],
-            summary=AnalysisSummary(
-                total_files=42,
-                high_risk_ownership=5,
-                coupled_pairs=8,
+            FileForensics(
+                path="src/user.py",
+                commits=12,
+                lines_changed=150,
+                complexity=8,
+                authors=["alice@example.com"],
+                coupled_with=[],
             ),
-        )
+        ],
+        couplings=[
+            TemporalCoupling(
+                file_a=path,
+                file_b="src/user.py",
+                co_change_count=8,
+                commits_a=10,
+                commits_b=12,
+            )
+        ],
+        summary=AnalysisSummary(
+            total_files=2,
+            high_risk_ownership=0,
+            coupled_pairs=1,
+            xrayed_files=0,
+        ),
+    )
 
-        html = generate_html_report(result)
 
-        assert "42" in html  # total files
-        assert "5" in html  # high risk
-        assert "8" in html  # coupled pairs
+def test_generates_one_complete_investigation_workspace() -> None:
+    document = generate_html_report(_result())
 
-    def test_includes_file_table(self):
-        """Includes table with file data."""
-        result = AnalysisResult(
-            repo="test-repo",
-            analyzed_days=30,
-            generated_at=datetime(2026, 1, 25, 15, 30, 0),
-            files=[
-                FileForensics(
-                    path="src/auth.py",
-                    commits=10,
-                    lines_changed=200,
-                    complexity=200.0,
-                    authors=["alice@example.com", "bob@example.com"],
-                    coupled_with=[CouplingInfo(file="src/user.py", ratio=0.8)],
-                )
-            ],
-            summary=AnalysisSummary(
-                total_files=1,
-                high_risk_ownership=0,
-                coupled_pairs=1,
-            ),
-        )
+    assert document.startswith("<!doctype html>")
+    assert document.endswith("</html>\n")
+    assert 'data-testid="file-grid"' in document
+    assert 'data-testid="coupling-grid"' in document
+    assert 'id="selected-file-heading"' in document
+    assert 'id="risk-matrix"' in document
+    assert 'id="repository-map"' in document
+    assert "Confidence-first temporal coupling" in document
 
-        html = generate_html_report(result)
 
-        assert "src/auth.py" in html
-        assert "<table" in html
-        assert "2000" in html  # hotspot score (10 commits * 200.0 complexity)
+def test_report_is_self_contained_and_denies_connections() -> None:
+    document = generate_html_report(_result())
 
-    def test_highlights_high_risk_files(self):
-        """High risk files are highlighted."""
-        result = AnalysisResult(
-            repo="test-repo",
-            analyzed_days=30,
-            generated_at=datetime(2026, 1, 25, 15, 30, 0),
-            files=[
-                FileForensics(
-                    path="src/risky.py",
-                    commits=10,
-                    lines_changed=200,
-                    authors=["a@x.com", "b@x.com", "c@x.com", "d@x.com"],
-                    coupled_with=[],
-                )
-            ],
-            summary=AnalysisSummary(
-                total_files=1,
-                high_risk_ownership=1,
-                coupled_pairs=0,
-            ),
-        )
+    external_resources = re.findall(
+        r"""(?:src|href)\s*=\s*["'](?:https?:)?//""",
+        document,
+        flags=re.IGNORECASE,
+    )
+    assert external_resources == []
+    assert "connect-src 'none'" in document
+    assert '<script src="' not in document
+    assert '<link rel="stylesheet"' not in document
+    assert "echarts.init" in document
+    assert "new Tabulator" in document
 
-        html = generate_html_report(result)
 
-        # Should have some indicator for high risk
-        assert "high-risk" in html or "warning" in html or "risk" in html.lower()
+def test_embeds_complete_confidence_evidence() -> None:
+    document = generate_html_report(_result())
 
-    def test_includes_coupling_info(self):
-        """Coupling information is shown for files."""
-        result = AnalysisResult(
-            repo="test-repo",
-            analyzed_days=30,
-            generated_at=datetime(2026, 1, 25, 15, 30, 0),
-            files=[
-                FileForensics(
-                    path="src/auth.py",
-                    commits=10,
-                    lines_changed=200,
-                    authors=["alice@example.com"],
-                    coupled_with=[
-                        CouplingInfo(file="src/user.py", ratio=0.8),
-                        CouplingInfo(file="src/token.py", ratio=0.5),
-                    ],
-                )
-            ],
-            summary=AnalysisSummary(
-                total_files=1,
-                high_risk_ownership=0,
-                coupled_pairs=2,
-            ),
-        )
+    assert '"shared_revisions":8' in document
+    assert '"revisions_a":10' in document
+    assert '"revisions_b":12' in document
+    assert '"denominator":10' in document
+    assert '"raw_ratio":0.8' in document
+    assert '"confidence_lower_bound":' in document
 
-        html = generate_html_report(result)
 
-        assert "src/user.py" in html
-        assert "src/token.py" in html
+def test_repository_strings_cannot_create_markup_or_end_data_script() -> None:
+    marker = '</script><img src=x onerror="globalThis.BBU_INJECTED=1">'
+    document = generate_html_report(_result(repo=marker, path=marker))
 
-    def test_includes_plotly_cdn(self):
-        """HTML includes Plotly.js CDN script."""
-        result = AnalysisResult(
-            repo="test-repo",
-            analyzed_days=30,
-            generated_at=datetime(2026, 1, 25, 15, 30, 0),
-            files=[],
-            summary=AnalysisSummary(
-                total_files=0,
-                high_risk_ownership=0,
-                coupled_pairs=0,
-            ),
-        )
+    assert marker not in document
+    assert "\\u003c/script\\u003e" in document
+    assert "\\u003cimg src=x onerror=" in document
 
-        html = generate_html_report(result)
 
-        assert "plotly" in html.lower()
-        assert "<script" in html
+def test_same_result_generates_identical_document() -> None:
+    result = _result()
 
-    def test_includes_tab_navigation(self):
-        """HTML includes tab navigation for Hotspots, Table, Coupling."""
-        result = AnalysisResult(
-            repo="test-repo",
-            analyzed_days=30,
-            generated_at=datetime(2026, 1, 25, 15, 30, 0),
-            files=[],
-            summary=AnalysisSummary(
-                total_files=0,
-                high_risk_ownership=0,
-                coupled_pairs=0,
-            ),
-        )
+    assert generate_html_report(result) == generate_html_report(result)
 
-        html = generate_html_report(result)
 
-        assert "Hotspots" in html
-        assert "Table" in html
-        assert "Coupling" in html
+def test_report_has_keyboard_and_non_canvas_evidence_paths() -> None:
+    document = generate_html_report(_result())
 
-    def test_includes_treemap_container(self):
-        """HTML includes container for Plotly treemap."""
-        result = AnalysisResult(
-            repo="test-repo",
-            analyzed_days=30,
-            generated_at=datetime(2026, 1, 25, 15, 30, 0),
-            files=[],
-            summary=AnalysisSummary(
-                total_files=0,
-                high_risk_ownership=0,
-                coupled_pairs=0,
-            ),
-        )
-
-        html = generate_html_report(result)
-
-        assert 'id="treemap"' in html or "treemap" in html.lower()
-
-    def test_embeds_treemap_data_as_json(self):
-        """Treemap data is embedded as JSON in the HTML."""
-        result = AnalysisResult(
-            repo="test-repo",
-            analyzed_days=30,
-            generated_at=datetime(2026, 1, 25, 15, 30, 0),
-            files=[
-                FileForensics(
-                    path="src/auth.py",
-                    commits=10,
-                    lines_changed=200,
-                    authors=["alice@example.com"],
-                    coupled_with=[],
-                )
-            ],
-            summary=AnalysisSummary(
-                total_files=1,
-                high_risk_ownership=0,
-                coupled_pairs=0,
-            ),
-        )
-
-        html = generate_html_report(result)
-
-        # Treemap data should be embedded as JSON
-        assert '"labels"' in html
-        assert '"parents"' in html
-        assert '"values"' in html
-        assert '"hovertext"' in html
-
-    def test_includes_cytoscape_cdn(self):
-        """HTML includes Cytoscape.js CDN script."""
-        result = AnalysisResult(
-            repo="test-repo",
-            analyzed_days=30,
-            generated_at=datetime(2026, 1, 25, 15, 30, 0),
-            files=[],
-            summary=AnalysisSummary(
-                total_files=0,
-                high_risk_ownership=0,
-                coupled_pairs=0,
-            ),
-        )
-
-        html = generate_html_report(result)
-
-        assert "cytoscape" in html.lower()
-
-    def test_includes_coupling_graph_container(self):
-        """HTML includes container for Cytoscape coupling graph."""
-        result = AnalysisResult(
-            repo="test-repo",
-            analyzed_days=30,
-            generated_at=datetime(2026, 1, 25, 15, 30, 0),
-            files=[],
-            summary=AnalysisSummary(
-                total_files=0,
-                high_risk_ownership=0,
-                coupled_pairs=0,
-            ),
-        )
-
-        html = generate_html_report(result)
-
-        assert 'id="coupling-graph"' in html
-
-    def test_embeds_coupling_data_as_json(self):
-        """Coupling graph data is embedded as JSON in the HTML."""
-        result = AnalysisResult(
-            repo="test-repo",
-            analyzed_days=30,
-            generated_at=datetime(2026, 1, 25, 15, 30, 0),
-            files=[
-                FileForensics(
-                    path="src/auth.py",
-                    commits=10,
-                    lines_changed=200,
-                    authors=["alice@example.com"],
-                    coupled_with=[CouplingInfo(file="src/user.py", ratio=0.8)],
-                )
-            ],
-            summary=AnalysisSummary(
-                total_files=1,
-                high_risk_ownership=0,
-                coupled_pairs=1,
-            ),
-        )
-
-        html = generate_html_report(result)
-
-        # Coupling graph data should be embedded as JSON
-        assert '"nodes"' in html
-        assert '"edges"' in html
-        assert '"directories"' in html
-        assert '"maxChurn"' in html
-
-    def test_coupling_slider_present(self):
-        """Coupling tab has slider control for top N edges."""
-        result = AnalysisResult(
-            repo="test-repo",
-            analyzed_days=30,
-            generated_at=datetime(2026, 1, 25, 15, 30, 0),
-            files=[],
-            summary=AnalysisSummary(
-                total_files=0,
-                high_risk_ownership=0,
-                coupled_pairs=0,
-            ),
-        )
-
-        html = generate_html_report(result)
-
-        assert 'id="edge-slider"' in html
-        assert 'id="edge-count"' in html
-
-    def test_filter_top_n_function_present(self):
-        """JavaScript includes filterTopN function."""
-        result = AnalysisResult(
-            repo="test-repo",
-            analyzed_days=30,
-            generated_at=datetime(2026, 1, 25, 15, 30, 0),
-            files=[],
-            summary=AnalysisSummary(
-                total_files=0,
-                high_risk_ownership=0,
-                coupled_pairs=0,
-            ),
-        )
-
-        html = generate_html_report(result)
-
-        assert "function filterTopN(" in html
-
-    def test_focus_functions_present(self):
-        """JavaScript includes focusNode and clearFocus functions."""
-        result = AnalysisResult(
-            repo="test-repo",
-            analyzed_days=30,
-            generated_at=datetime(2026, 1, 25, 15, 30, 0),
-            files=[],
-            summary=AnalysisSummary(
-                total_files=0,
-                high_risk_ownership=0,
-                coupled_pairs=0,
-            ),
-        )
-
-        html = generate_html_report(result)
-
-        assert "function focusNode(" in html
-        assert "function clearFocus(" in html
-
-    def test_tooltip_element_present(self):
-        """Coupling tab has tooltip element."""
-        result = AnalysisResult(
-            repo="test-repo",
-            analyzed_days=30,
-            generated_at=datetime(2026, 1, 25, 15, 30, 0),
-            files=[],
-            summary=AnalysisSummary(
-                total_files=0,
-                high_risk_ownership=0,
-                coupled_pairs=0,
-            ),
-        )
-
-        html = generate_html_report(result)
-
-        assert 'id="coupling-tooltip"' in html
-
-    def test_table_includes_build_failures_column(self):
-        """Table has Build Failures column header."""
-        result = AnalysisResult(
-            repo="test-repo",
-            analyzed_days=30,
-            generated_at=datetime(2026, 1, 25, 15, 30, 0),
-            files=[
-                FileForensics(
-                    path="src/auth.py",
-                    commits=10,
-                    lines_changed=200,
-                    authors=["alice@example.com"],
-                    coupled_with=[],
-                    build_failures=5,
-                )
-            ],
-            summary=AnalysisSummary(
-                total_files=1,
-                high_risk_ownership=0,
-                coupled_pairs=0,
-            ),
-        )
-
-        html = generate_html_report(result)
-
-        assert "Build Failures" in html
-
-    def test_escapes_repository_and_file_names_in_markup(self):
-        marker = '<img src=x onerror="globalThis.BBU_INJECTED=1">'
-        result = AnalysisResult(
-            repo=marker,
-            analyzed_days=30,
-            generated_at=datetime(2026, 1, 25, 15, 30, 0),
-            files=[
-                FileForensics(
-                    path=marker,
-                    commits=1,
-                    lines_changed=1,
-                    authors=[],
-                    coupled_with=[CouplingInfo(file=marker, ratio=1.0)],
-                )
-            ],
-            summary=AnalysisSummary(
-                total_files=1,
-                high_risk_ownership=0,
-                coupled_pairs=1,
-            ),
-        )
-
-        html = generate_html_report(result)
-
-        assert marker not in html
-        assert "&lt;img src=x onerror=&quot;globalThis.BBU_INJECTED=1&quot;&gt;" in html
-
-    def test_inline_json_cannot_terminate_script_block(self):
-        marker = "</script><script>globalThis.BBU_INJECTED=1</script>"
-        result = AnalysisResult(
-            repo="test-repo",
-            analyzed_days=30,
-            generated_at=datetime(2026, 1, 25, 15, 30, 0),
-            files=[
-                FileForensics(
-                    path=marker,
-                    commits=1,
-                    lines_changed=1,
-                    authors=[],
-                    coupled_with=[],
-                )
-            ],
-            summary=AnalysisSummary(
-                total_files=1,
-                high_risk_ownership=0,
-                coupled_pairs=0,
-            ),
-        )
-
-        html = generate_html_report(result)
-
-        assert marker not in html
-        assert "\\u003c/script\\u003e" in html
-
-    def test_metric_help_matches_analysis_contract(self):
-        result = AnalysisResult(
-            repo="test-repo",
-            analyzed_days=30,
-            generated_at=datetime(2026, 1, 25, 15, 30, 0),
-            files=[],
-            summary=AnalysisSummary(
-                total_files=0,
-                high_risk_ownership=0,
-                coupled_pairs=0,
-            ),
-            parameters={"min_coupling": 0.75},
-        )
-
-        html = generate_html_report(result)
-
-        assert "Commits × indentation complexity" in html
-        assert "Files with more than 3 authors" in html
-        assert "75% of the time" in html
+    assert 'role="tablist"' in document
+    assert 'aria-controls="panel-coupling"' in document
+    assert "Use Tab then Enter on Inspect." in document
+    assert "Sort with column headers." in document
+    assert "Both revision counts remain visible." in document

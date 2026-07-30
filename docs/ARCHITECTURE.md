@@ -2,7 +2,7 @@
 
 Code forensics tool based on Adam Tornhill's "Your Code as a Crime Scene".
 Signals are extracted from git history and GitHub Actions, joined per file,
-and served as JSON, an HTML report (frozen), MCP tools (`bbu-mcp`), a fresh
+and served as JSON, an offline HTML investigation report, MCP tools (`bbu-mcp`), a fresh
 change-review decision, and an ambient coupling-guard hook for Claude Code.
 
 ## Module layout
@@ -31,10 +31,10 @@ src/black_box_unlock/
 ├── cicd/
 │   ├── models.py           # Typed workflow, job, step, and CI result models
 │   └── github_actions.py   # One run snapshot, failure + flaky-step collection
-└── visualization/          # FROZEN - no new features
-    ├── html.py             # Tabbed HTML report
-    ├── treemap.py          # Plotly hotspot treemap
-    └── coupling_graph.py   # Cytoscape coupling graph
+└── visualization/
+    ├── html.py             # Offline document composition + package resources
+    ├── report_data.py      # AnalysisResult + confidence-enriched raw pairs
+    └── assets/             # Investigation UI, ECharts, and Tabulator
 ```
 
 ## Signals
@@ -58,7 +58,7 @@ flowchart LR
     Parse --> Join[run_analysis join]
     CI --> Join
     Join --> JSON[JSON]
-    Join --> HTML[HTML report - frozen]
+    Join --> HTML[Offline investigation report]
     Join --> MCP[bbu-mcp tools]
     Join --> Guard[coupling guard hook]
     Git --> Change[typed change selection]

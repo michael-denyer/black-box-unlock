@@ -60,6 +60,7 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/black_box_unlock"]
+include = ["src/black_box_unlock/visualization/assets/**"]
 
 [tool.ruff]
 line-length = 100

@@ -155,7 +155,7 @@ def test_report_uses_compact_desktop_density() -> None:
     document = generate_html_report(_result())
 
     assert "font-size: 14px;" in document
-    assert 'height: "390px"' in document
+    assert 'height: "100%"' in document
     assert ".tabulator-row { min-height: 36px;" in document
     assert "padding: 6px 8px;" in document
 
@@ -221,7 +221,16 @@ def test_workspace_cards_fit_their_content_and_use_compact_grid_actions() -> Non
     document = generate_html_report(_result())
 
     assert ".workspace {" in document
-    assert "#file-grid { height: min(570px, calc(100vh - 300px)); min-height: 390px; }" in document
+    assert 'grid-template-areas: "files evidence" "landscape risk";' in document
+    assert ".workspace-column { display: contents; }" in document
+    assert ".files-panel { grid-area: files; display: flex;" in document
+    assert ".evidence-panel { grid-area: evidence;" in document
+    assert ".landscape-panel { grid-area: landscape; }" in document
+    assert ".risk-panel { grid-area: risk; }" in document
+    assert "#file-grid { min-height: 570px; flex: 1; }" in document
+    assert "height: min(570px, calc(100vh - 300px))" not in document
+    assert document.count('height: "100%"') == 2
+    assert ".chart { height: 400px;" in document
     assert document.count('class="workspace-column ') == 2
     assert 'class="workspace-column workspace-primary"' in document
     assert 'class="workspace-column workspace-secondary"' in document

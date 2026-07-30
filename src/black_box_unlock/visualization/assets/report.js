@@ -274,7 +274,7 @@
     fileTable = new Tabulator("#file-grid", {
       data: rows,
       index: "path",
-      height: "390px",
+      height: "100%",
       layout: "fitDataStretch",
       selectableRows: 1,
       initialSort: fileEvidenceSort,

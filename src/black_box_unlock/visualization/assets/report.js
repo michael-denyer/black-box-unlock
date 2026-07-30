@@ -13,6 +13,27 @@
   let couplingTable;
   let riskChart;
   let mapChart;
+  const scopeRoles = {
+    code: new Set(["source", "migration"]),
+    "code-tests": new Set(["source", "migration", "test"]),
+    "code-config": new Set(["source", "migration", "test", "config"]),
+    all: new Set(["source", "migration", "test", "config", "docs", "generated", "other"]),
+  };
+  let activeFiles = files.filter(file => scopeRoles.code.has(file.path_role));
+  let activeCouplings = couplings.filter(
+    pair => scopeRoles.code.has(pair.role_a) && scopeRoles.code.has(pair.role_b)
+  );
+  let chartFiles = activeFiles;
+  const fileEvidenceSort = [
+    {column: "hotspot_score", dir: "desc"},
+    {column: "commits", dir: "desc"},
+    {column: "path", dir: "asc"},
+  ];
+  const couplingEvidenceSort = [
+    {column: "confidence_lower_bound", dir: "desc"},
+    {column: "shared_revisions", dir: "desc"},
+    {column: "raw_ratio", dir: "desc"},
+  ];
 
   couplings.forEach((pair, index) => {
     [pair.file_a, pair.file_b].forEach(path => {
@@ -46,6 +67,15 @@
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
 
+  function activeRoleSet() {
+    return scopeRoles[document.getElementById("scope-select").value];
+  }
+
+  function pairIsInScope(pair) {
+    const roles = activeRoleSet();
+    return roles.has(pair.role_a) && roles.has(pair.role_b);
+  }
+
   function couplingSentence(pair) {
     return `${formatInteger(pair.shared_revisions)} shared / min(${formatInteger(pair.revisions_a)}, ${formatInteger(pair.revisions_b)}) revisions · ${formatPercent(pair.raw_ratio)} raw · ${formatPercent(pair.confidence_lower_bound)} lower bound`;
   }
@@ -76,11 +106,11 @@
 
     const badges = document.getElementById("selected-badges");
     clear(badges);
+    addBadge(badges, file.path_role, "green");
     if (file.is_high_risk) addBadge(badges, "diffuse ownership", "red");
     if (file.build_failures) addBadge(badges, `${file.build_failures} build failures`, "red");
     if (file.bugfix_commits) addBadge(badges, `${file.bugfix_commits} bug-fix revisions`, "amber");
     if (file.xray_failed) addBadge(badges, "X-Ray failed", "red");
-    if (!badges.childElementCount) addBadge(badges, "no elevated secondary signal", "green");
 
     const metrics = document.getElementById("selected-metrics");
     clear(metrics);
@@ -105,7 +135,9 @@
 
     const pairList = document.getElementById("selected-couplings");
     clear(pairList);
-    const pairIds = couplingIdsByFile.get(path) || [];
+    const pairIds = (couplingIdsByFile.get(path) || []).filter(index =>
+      pairIsInScope(couplings[index])
+    );
     pairIds.slice(0, 8).forEach(index => {
       const pair = couplings[index];
       const partner = pair.file_a === path ? pair.file_b : pair.file_a;
@@ -143,7 +175,7 @@
   function updateChartSelection(path) {
     if (riskChart) {
       riskChart.dispatchAction({type: "downplay", seriesIndex: 0});
-      const index = files.findIndex(file => file.path === path);
+      const index = chartFiles.findIndex(file => file.path === path);
       if (index >= 0) riskChart.dispatchAction({type: "highlight", seriesIndex: 0, dataIndex: index});
     }
     if (mapChart) mapChart.dispatchAction({type: "highlight", seriesId: "repository", name: basename(path)});
@@ -155,24 +187,28 @@
     document.getElementById("side-window").textContent = `${formatInteger(analysis.analyzed_days)} day window`;
     document.getElementById("report-provenance").textContent =
       `${analysis.repo} · ${formatInteger(analysis.analyzed_days)} days · generated ${new Date(analysis.generated_at).toLocaleString("en-GB", {dateStyle: "medium", timeStyle: "short", timeZone: "UTC"})} UTC`;
-    const summary = analysis.summary;
-    document.getElementById("stat-files").textContent = formatInteger(summary.total_files);
-    document.getElementById("stat-ownership").textContent = formatInteger(summary.high_risk_ownership);
-    document.getElementById("stat-couplings").textContent = formatInteger(summary.coupled_pairs);
-    document.getElementById("stat-xray").textContent = formatInteger(summary.xrayed_files);
   }
 
   function strongestConfidence(path) {
-    const ids = couplingIdsByFile.get(path) || [];
-    return ids.length ? couplings[ids[0]].confidence_lower_bound : 0;
+    const pair = activeCouplings.find(item => item.file_a === path || item.file_b === path);
+    return pair ? pair.confidence_lower_bound : 0;
+  }
+
+  function scopedFileRows() {
+    const couplingCountByPath = new Map();
+    activeCouplings.forEach(pair => {
+      couplingCountByPath.set(pair.file_a, (couplingCountByPath.get(pair.file_a) || 0) + 1);
+      couplingCountByPath.set(pair.file_b, (couplingCountByPath.get(pair.file_b) || 0) + 1);
+    });
+    return activeFiles.map(file => ({
+      ...file,
+      coupling_count: couplingCountByPath.get(file.path) || 0,
+      strongest_confidence: strongestConfidence(file.path),
+    }));
   }
 
   function initializeFileGrid() {
-    const rows = files.map(file => ({
-      ...file,
-      coupling_count: (couplingIdsByFile.get(file.path) || []).length,
-      strongest_confidence: strongestConfidence(file.path),
-    }));
+    const rows = scopedFileRows();
     const pathFormatter = cell => text("span", cell.getValue(), "path-cell");
     const inspectFormatter = cell => {
       const button = text("button", "Inspect", "inspect-button");
@@ -187,19 +223,19 @@
     fileTable = new Tabulator("#file-grid", {
       data: rows,
       index: "path",
-      height: "420px",
+      height: "390px",
       layout: "fitDataStretch",
       selectableRows: 1,
-      initialSort: [{column: "hotspot_score", dir: "desc"}, {column: "path", dir: "asc"}],
+      initialSort: fileEvidenceSort,
       columns: [
         {title: "File", field: "path", width: 310, minWidth: 220, formatter: pathFormatter},
-        {title: "Hotspot", field: "hotspot_score", sorter: "number", hozAlign: "right", formatter: cell => formatInteger(Math.round(cell.getValue()))},
-        {title: "Revisions", field: "commits", sorter: "number", hozAlign: "right"},
-        {title: "Complexity", field: "complexity", sorter: "number", hozAlign: "right", formatter: cell => Number(cell.getValue()).toFixed(1)},
-        {title: "Authors", field: "author_count", sorter: "number", hozAlign: "right"},
-        {title: "Bug fixes", field: "bugfix_commits", sorter: "number", hozAlign: "right"},
-        {title: "CI", field: "build_failures", sorter: "number", hozAlign: "right"},
-        {title: "Best confidence", field: "strongest_confidence", sorter: "number", hozAlign: "right", formatter: cell => formatPercent(cell.getValue())},
+        {title: "Hotspot", field: "hotspot_score", sorter: "number", headerSortStartingDir: "desc", hozAlign: "right", formatter: cell => formatInteger(Math.round(cell.getValue()))},
+        {title: "Revisions", field: "commits", sorter: "number", headerSortStartingDir: "desc", hozAlign: "right"},
+        {title: "Complexity", field: "complexity", sorter: "number", headerSortStartingDir: "desc", hozAlign: "right", formatter: cell => Number(cell.getValue()).toFixed(1)},
+        {title: "Authors", field: "author_count", sorter: "number", headerSortStartingDir: "desc", hozAlign: "right"},
+        {title: "Bug fixes", field: "bugfix_commits", sorter: "number", headerSortStartingDir: "desc", hozAlign: "right"},
+        {title: "CI", field: "build_failures", sorter: "number", headerSortStartingDir: "desc", hozAlign: "right"},
+        {title: "Best confidence", field: "strongest_confidence", sorter: "number", headerSortStartingDir: "desc", hozAlign: "right", formatter: cell => formatPercent(cell.getValue())},
         {title: "", field: "path", width: 72, headerSort: false, formatter: inspectFormatter},
       ],
     });
@@ -210,14 +246,7 @@
     document.getElementById("file-count").textContent = formatInteger(rows.length);
 
     const search = document.getElementById("file-search");
-    search.addEventListener("input", () => {
-      const query = search.value.trim().toLocaleLowerCase();
-      if (!query) fileTable.clearFilter();
-      else fileTable.setFilter(file =>
-        file.path.toLocaleLowerCase().includes(query) ||
-        file.authors.some(author => author.toLocaleLowerCase().includes(query))
-      );
-    });
+    search.addEventListener("input", applyFileSearch);
     search.addEventListener("keydown", event => {
       if (event.key === "Escape") {
         search.value = "";
@@ -229,24 +258,20 @@
   function initializeCouplingGrid() {
     const pathFormatter = cell => text("span", cell.getValue(), "path-cell");
     couplingTable = new Tabulator("#coupling-grid", {
-      data: couplings,
+      data: activeCouplings,
       index: "key",
       height: "100%",
       layout: "fitDataStretch",
-      initialSort: [
-        {column: "confidence_lower_bound", dir: "desc"},
-        {column: "shared_revisions", dir: "desc"},
-        {column: "raw_ratio", dir: "desc"},
-      ],
+      initialSort: couplingEvidenceSort,
       columns: [
         {title: "File A", field: "file_a", width: 300, minWidth: 210, formatter: pathFormatter},
         {title: "File B", field: "file_b", width: 300, minWidth: 210, formatter: pathFormatter},
-        {title: "95% lower bound", field: "confidence_lower_bound", sorter: "number", hozAlign: "right", formatter: cell => formatPercent(cell.getValue())},
-        {title: "Shared", field: "shared_revisions", sorter: "number", hozAlign: "right"},
-        {title: "Revisions A", field: "revisions_a", sorter: "number", hozAlign: "right"},
-        {title: "Revisions B", field: "revisions_b", sorter: "number", hozAlign: "right"},
-        {title: "Denominator", field: "denominator", sorter: "number", hozAlign: "right"},
-        {title: "Raw ratio", field: "raw_ratio", sorter: "number", hozAlign: "right", formatter: cell => formatPercent(cell.getValue())},
+        {title: "95% lower bound", field: "confidence_lower_bound", sorter: "number", headerSortStartingDir: "desc", hozAlign: "right", formatter: cell => formatPercent(cell.getValue())},
+        {title: "Shared", field: "shared_revisions", sorter: "number", headerSortStartingDir: "desc", hozAlign: "right"},
+        {title: "Revisions A", field: "revisions_a", sorter: "number", headerSortStartingDir: "desc", hozAlign: "right"},
+        {title: "Revisions B", field: "revisions_b", sorter: "number", headerSortStartingDir: "desc", hozAlign: "right"},
+        {title: "Denominator", field: "denominator", sorter: "number", headerSortStartingDir: "desc", hozAlign: "right"},
+        {title: "Raw ratio", field: "raw_ratio", sorter: "number", headerSortStartingDir: "desc", hozAlign: "right", formatter: cell => formatPercent(cell.getValue())},
       ],
     });
     couplingTable.on("rowClick", (_event, row) => {
@@ -254,14 +279,63 @@
       activatePanel("investigation");
     });
     const search = document.getElementById("coupling-search");
-    search.addEventListener("input", () => {
-      const query = search.value.trim().toLocaleLowerCase();
-      if (!query) couplingTable.clearFilter();
-      else couplingTable.setFilter(pair =>
+    search.addEventListener("input", applyCouplingSearch);
+  }
+
+  function applyFileSearch() {
+    const query = document.getElementById("file-search").value.trim().toLocaleLowerCase();
+    if (!query) fileTable.clearFilter();
+    else {
+      fileTable.setFilter(file =>
+        file.path.toLocaleLowerCase().includes(query) ||
+        file.authors.some(author => author.toLocaleLowerCase().includes(query))
+      );
+    }
+  }
+
+  function applyCouplingSearch() {
+    const query = document.getElementById("coupling-search").value.trim().toLocaleLowerCase();
+    if (!query) couplingTable.clearFilter();
+    else {
+      couplingTable.setFilter(pair =>
         pair.file_a.toLocaleLowerCase().includes(query) ||
         pair.file_b.toLocaleLowerCase().includes(query)
       );
-    });
+    }
+  }
+
+  function updateScopedSummary() {
+    document.getElementById("stat-files").textContent = formatInteger(activeFiles.length);
+    document.getElementById("stat-ownership").textContent = formatInteger(
+      activeFiles.filter(file => file.is_high_risk).length
+    );
+    document.getElementById("stat-couplings").textContent = formatInteger(activeCouplings.length);
+    document.getElementById("stat-xray").textContent = formatInteger(
+      activeFiles.filter(file => file.xray_failed || (file.functions || []).length).length
+    );
+  }
+
+  async function applyScope() {
+    const roles = activeRoleSet();
+    activeFiles = files.filter(file => roles.has(file.path_role));
+    activeCouplings = couplings.filter(pair => roles.has(pair.role_a) && roles.has(pair.role_b));
+    chartFiles = activeFiles;
+
+    const rows = scopedFileRows();
+    await Promise.all([
+      fileTable.setData(rows),
+      couplingTable.setData(activeCouplings),
+    ]);
+    fileTable.setSort(fileEvidenceSort);
+    couplingTable.setSort(couplingEvidenceSort);
+    applyFileSearch();
+    applyCouplingSearch();
+    updateScopedSummary();
+    updateRiskMatrix(activeFiles);
+    updateRepositoryMap(activeFiles);
+
+    const selectedIsVisible = activeFiles.some(file => file.path === selectedPath);
+    if (activeFiles.length) selectFile(selectedIsVisible ? selectedPath : activeFiles[0].path);
   }
 
   function riskColour(hotspot, maxHotspot) {
@@ -272,9 +346,13 @@
   }
 
   function initializeRiskMatrix() {
-    const maxLines = Math.max(1, ...files.map(file => file.lines_changed || 0));
-    const maxHotspot = Math.max(1, ...files.map(file => file.hotspot_score || 0));
     riskChart = echarts.init(document.getElementById("risk-matrix"), null, {renderer: "canvas"});
+    riskChart.on("click", params => selectFile(params.data[3], {focusPanel: true}));
+  }
+
+  function updateRiskMatrix(scopedFiles) {
+    const maxLines = Math.max(1, ...scopedFiles.map(file => file.lines_changed || 0));
+    const maxHotspot = Math.max(1, ...scopedFiles.map(file => file.hotspot_score || 0));
     riskChart.setOption({
       animation: false,
       aria: {enabled: true, decal: {show: true}},
@@ -291,18 +369,17 @@
       series: [{
         id: "risk",
         type: "scatter",
-        data: files.map(file => [file.commits, file.complexity, file.lines_changed, file.path, file.hotspot_score]),
+        data: scopedFiles.map(file => [file.commits, file.complexity, file.lines_changed, file.path, file.hotspot_score]),
         symbolSize: value => 7 + 20 * Math.sqrt((value[2] || 0) / maxLines),
         itemStyle: {color: params => riskColour(params.data[4], maxHotspot), opacity: .82, borderColor: "#fff", borderWidth: 1},
         emphasis: {scale: 1.3, itemStyle: {borderColor: "#172328", borderWidth: 2}},
       }],
-    });
-    riskChart.on("click", params => selectFile(params.data[3], {focusPanel: true}));
+    }, {notMerge: true});
   }
 
-  function repositoryTree(maxHotspot) {
+  function repositoryTree(scopedFiles, maxHotspot) {
     const root = {name: analysis.repo, id: "root", children: [], directories: new Map()};
-    files.forEach(file => {
+    scopedFiles.forEach(file => {
       const parts = file.path.split("/").filter(Boolean);
       let node = root;
       let accumulated = "";
@@ -333,8 +410,12 @@
   }
 
   function initializeRepositoryMap() {
-    const maxHotspot = Math.max(1, ...files.map(file => file.hotspot_score || 0));
     mapChart = echarts.init(document.getElementById("repository-map"), null, {renderer: "canvas"});
+    mapChart.on("click", params => params.data.path && selectFile(params.data.path, {focusPanel: true}));
+  }
+
+  function updateRepositoryMap(scopedFiles) {
+    const maxHotspot = Math.max(1, ...scopedFiles.map(file => file.hotspot_score || 0));
     mapChart.setOption({
       animation: false,
       aria: {enabled: true, decal: {show: true}},
@@ -348,7 +429,7 @@
       series: [{
         id: "repository",
         type: "treemap",
-        data: repositoryTree(maxHotspot).children,
+        data: repositoryTree(scopedFiles, maxHotspot).children,
         roam: false,
         nodeClick: "zoomToNode",
         breadcrumb: {show: true, bottom: 4},
@@ -361,8 +442,7 @@
           {colorSaturation: [.25, .75]},
         ],
       }],
-    });
-    mapChart.on("click", params => params.data.path && selectFile(params.data.path, {focusPanel: true}));
+    }, {notMerge: true});
   }
 
   function definitionList(entries) {
@@ -478,6 +558,12 @@
   initializeRiskMatrix();
   initializeRepositoryMap();
   initializeSignals();
-  if (files.length) selectFile(files[0].path);
+  updateScopedSummary();
+  updateRiskMatrix(activeFiles);
+  updateRepositoryMap(activeFiles);
+  if (activeFiles.length) selectFile(activeFiles[0].path);
+  document.getElementById("scope-select").addEventListener("change", () => {
+    void applyScope();
+  });
   document.documentElement.dataset.reportReady = "true";
 })();

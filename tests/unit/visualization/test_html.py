@@ -62,6 +62,7 @@ def test_generates_one_complete_investigation_workspace() -> None:
     assert document.endswith("</html>\n")
     assert 'data-testid="file-grid"' in document
     assert 'data-testid="coupling-grid"' in document
+    assert 'data-testid="scope-select"' in document
     assert 'id="selected-file-heading"' in document
     assert 'id="risk-matrix"' in document
     assert 'id="repository-map"' in document
@@ -118,3 +119,39 @@ def test_report_has_keyboard_and_non_canvas_evidence_paths() -> None:
     assert "Use Tab then Enter on Inspect." in document
     assert "Sort with column headers." in document
     assert "Both revision counts remain visible." in document
+
+
+def test_tabulator_cells_remain_inline_rows() -> None:
+    document = generate_html_report(_result())
+
+    assert ".tabulator-row .tabulator-cell { display: inline-flex;" in document
+    assert ".tabulator-row .tabulator-cell { display: flex;" not in document
+
+
+def test_default_scope_and_sort_prioritize_actionable_evidence() -> None:
+    document = generate_html_report(_result())
+
+    assert '<option value="code">Code only</option>' in document
+    assert 'code: new Set(["source", "migration"])' in document
+    assert "roles.has(pair.role_a) && roles.has(pair.role_b)" in document
+    assert 'const fileEvidenceSort = [\n    {column: "hotspot_score", dir: "desc"}' in document
+    assert "fileTable.setSort(fileEvidenceSort);" in document
+    assert "couplingTable.setSort(couplingEvidenceSort);" in document
+
+
+def test_default_scope_is_present_when_tables_are_constructed() -> None:
+    document = generate_html_report(_result())
+
+    assert "const rows = scopedFileRows();" in document
+    assert "data: rows," in document
+    assert "data: activeCouplings," in document
+    assert "await applyScope();" not in document
+
+
+def test_report_uses_compact_desktop_density() -> None:
+    document = generate_html_report(_result())
+
+    assert "font-size: 14px;" in document
+    assert 'height: "390px"' in document
+    assert ".tabulator-row { min-height: 36px;" in document
+    assert "padding: 6px 8px;" in document

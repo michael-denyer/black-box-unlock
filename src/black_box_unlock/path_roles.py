@@ -104,7 +104,10 @@ _SOURCE_SUFFIXES = frozenset(
         ".cc",
         ".cpp",
         ".cs",
+        ".css",
         ".go",
+        ".htm",
+        ".html",
         ".java",
         ".js",
         ".jsx",
@@ -114,9 +117,13 @@ _SOURCE_SUFFIXES = frozenset(
         ".rb",
         ".rs",
         ".scala",
+        ".scss",
+        ".sh",
+        ".sql",
         ".swift",
         ".ts",
         ".tsx",
+        ".vue",
     }
 )
 

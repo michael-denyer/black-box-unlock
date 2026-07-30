@@ -194,4 +194,19 @@ def test_change_landscape_keeps_small_files_legible() -> None:
     assert "Tile area compresses lines changed to keep smaller files visible." in document
     assert "value: Math.max(Math.sqrt(actualLinesChanged), 4)" in document
     assert "squareRatio: 1" in document
-    assert "#repository-map { height: 480px;" in document
+    assert "#repository-map { height: 400px;" in document
+    assert "left: 12," in document
+    assert "right: 12," in document
+    assert "top: 12," in document
+    assert "bottom: 12," in document
+
+
+def test_workspace_cards_fit_their_content_and_use_compact_grid_actions() -> None:
+    document = generate_html_report(_result())
+
+    assert ".workspace {" in document
+    assert ".chart-grid {" in document
+    assert document.count("align-items: start;") >= 2
+    assert document.count('class="icon-button" data-focus-grid') == 2
+    assert document.count('aria-label="View these files in the grid"') == 2
+    assert "View the same files in the grid" not in document

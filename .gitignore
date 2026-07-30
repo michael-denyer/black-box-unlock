@@ -62,8 +62,7 @@ htmlcov/
 .DS_Store
 Thumbs.db
 
-# Local-only working files (agent instructions, planning artifacts, issue tracker)
+# Local-only working files (agent instructions and planning artifacts)
 /CLAUDE.md
 /.planning/
-/.beads/
 /docs/plans/

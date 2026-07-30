@@ -99,7 +99,7 @@ p { margin: 0; }
 .keyboard-hint { padding: 7px 15px; border-bottom: 1px solid #e7e6df; color: var(--muted); font-size: .68rem; }
 #file-grid { min-height: 570px; flex: 1; }
 #coupling-grid { height: min(640px, calc(100vh - 315px)); min-height: 390px; }
-.evidence-panel { grid-area: evidence; min-height: 520px; padding: 18px; }
+.evidence-panel { grid-area: evidence; align-self: stretch; min-height: 520px; padding: 18px; }
 .evidence-panel > h2 { margin: 5px 0 2px; font-family: Georgia, "Times New Roman", serif; font-size: 1.35rem; font-weight: 500; }
 #selected-path { margin-bottom: 12px; font-size: .72rem; overflow-wrap: anywhere; }
 .badges { display: flex; flex-wrap: wrap; gap: 6px; min-height: 26px; }

@@ -247,8 +247,8 @@ def test_workspace_cards_fit_their_content_and_use_compact_grid_actions() -> Non
     assert ".workspace {" in document
     assert 'grid-template-areas: "files evidence" "landscape risk";' in document
     assert ".workspace-column { display: contents; }" in document
-    assert ".files-panel { grid-area: files; display: flex;" in document
-    assert ".evidence-panel { grid-area: evidence;" in document
+    assert ".files-panel { grid-area: files; display: flex; align-self: stretch;" in document
+    assert ".evidence-panel { grid-area: evidence; align-self: stretch;" in document
     assert ".landscape-panel { grid-area: landscape; }" in document
     assert ".risk-panel { grid-area: risk; }" in document
     assert "#file-grid { min-height: 570px; flex: 1; }" in document

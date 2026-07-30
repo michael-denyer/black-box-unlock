@@ -1,7 +1,11 @@
 """Tests for the pure change-review decision."""
 
 from datetime import datetime, timezone
+from unittest.mock import patch
 
+import pytest
+
+from black_box_unlock.core.exceptions import ConfigurationError
 from black_box_unlock.core.models import (
     AnalysisResult,
     AnalysisSummary,
@@ -18,7 +22,14 @@ from black_box_unlock.git.changes import (
     WorkingTreeProvenance,
 )
 from black_box_unlock.path_roles import PathRole, PathRoleRule
-from black_box_unlock.review import ChangeReview, NoChanges, ReviewParameters, project_change_review
+from black_box_unlock.review import (
+    ChangeReview,
+    ChangeReviewRequest,
+    NoChanges,
+    ReviewParameters,
+    project_change_review,
+    run_change_review,
+)
 
 
 def _change_set(*paths: str) -> ChangeSet:
@@ -78,6 +89,69 @@ def test_no_selected_paths_has_an_explicit_result():
     assert result.ci_status.state.value == "disabled"
 
 
+@patch("black_box_unlock.review.collect_change_set")
+def test_change_review_request_resolves_public_defaults(mock_collect, tmp_path):
+    mock_collect.return_value = _change_set()
+
+    result = run_change_review(
+        tmp_path,
+        ChangeReviewRequest(selector=WorkingTreeChange()),
+    )
+
+    assert isinstance(result, NoChanges)
+    assert result.parameters.model_dump() == {
+        "days": 90,
+        "min_coupling": 0.3,
+        "min_shared_revisions": 2,
+        "include_ci": False,
+        "max_actions": 3,
+        "profile": "default",
+        "config_path": None,
+    }
+
+
+@patch("black_box_unlock.review.collect_change_set")
+def test_request_overrides_win_over_the_named_profile(mock_collect, tmp_path):
+    (tmp_path / ".bbu.toml").write_text(
+        """
+[profiles.release]
+days = 180
+include_ci = true
+""".strip()
+        + "\n"
+    )
+    mock_collect.return_value = _change_set()
+
+    result = run_change_review(
+        tmp_path,
+        ChangeReviewRequest(
+            selector=WorkingTreeChange(),
+            profile="release",
+            days=30,
+            include_ci=False,
+        ),
+    )
+
+    assert isinstance(result, NoChanges)
+    assert result.parameters.days == 30
+    assert result.parameters.include_ci is False
+    assert result.parameters.profile == "release"
+    assert result.parameters.config_path == ".bbu.toml"
+
+
+def test_unknown_request_profile_lists_available_names(tmp_path):
+    (tmp_path / ".bbu.toml").write_text("[profiles.release]\ndays = 180\n")
+
+    with pytest.raises(ConfigurationError, match="available profiles: release"):
+        run_change_review(
+            tmp_path,
+            ChangeReviewRequest(
+                selector=WorkingTreeChange(),
+                profile="missing",
+            ),
+        )
+
+
 def test_missing_repeated_companion_is_the_first_action():
     result = project_change_review(_change_set("src/a.py"), _analysis(), ReviewParameters())
 
@@ -99,6 +173,48 @@ def test_changed_companion_is_covered_not_recommended():
     assert isinstance(result, ChangeReview)
     assert all(action.kind != "check_coupled_paths" for action in result.actions)
     assert result.couplings[0].coupled_path_is_changed is True
+
+
+def test_copy_starts_a_new_identity_without_source_coupling():
+    change_set = ChangeSet(
+        selector=WorkingTreeChange(),
+        provenance=WorkingTreeProvenance(
+            head_oid="abc123",
+            observed_at=datetime(2026, 7, 30, tzinfo=timezone.utc),
+        ),
+        paths=[
+            ChangedPath(
+                path="src/copied.py",
+                previous_path="src/a.py",
+                kind=ChangeKind.copied,
+            )
+        ],
+    )
+    analysis = _analysis()
+    analysis.failed_ci_runs = [
+        FailedWorkflowRun(
+            run_id=42,
+            workflow_name="CI",
+            run_url="https://github.com/example/demo/actions/runs/42",
+            commit_sha="deadbeef",
+            conclusion="failure",
+            created_at=datetime(2026, 7, 29, tzinfo=timezone.utc),
+            implicated_paths=["src/a.py"],
+        )
+    ]
+
+    result = project_change_review(
+        change_set,
+        analysis,
+        ReviewParameters(include_ci=True),
+    )
+
+    assert isinstance(result, ChangeReview)
+    assert result.files[0].evidence.commits == 0
+    assert result.files[0].evidence.bugfix_commits == 0
+    assert result.files[0].evidence.author_count == 0
+    assert result.couplings == []
+    assert all(action.kind != "inspect_ci_failures" for action in result.actions)
 
 
 def test_action_list_is_bounded_to_three():

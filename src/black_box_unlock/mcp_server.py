@@ -13,11 +13,11 @@ from typing import Literal
 from mcp.server.fastmcp import FastMCP
 
 from .analysis import run_analysis
-from .config import ReviewOverrides, resolve_review_settings
 from .core.exceptions import BlackBoxUnlockError
 from .core.models import AnalysisResult, FileForensics
 from .git.changes import BaseChange, StagedChange, WorkingTreeChange
 from .git.xray import xray_file as _xray_file
+from .review import ChangeReviewRequest
 from .review import run_change_review as _run_change_review
 
 mcp = FastMCP("black-box-unlock")
@@ -212,21 +212,16 @@ def review_change(
         "working_tree": WorkingTreeChange(),
     }
     try:
-        settings = resolve_review_settings(
+        result = _run_change_review(
             Path(repo_path),
-            profile_name=profile,
-            overrides=ReviewOverrides(
+            ChangeReviewRequest(
+                selector=selectors[mode],
+                profile=profile,
                 days=days,
                 min_coupling=min_coupling,
                 min_shared_revisions=min_shared_revisions,
                 include_ci=include_ci,
             ),
-        )
-        result = _run_change_review(
-            Path(repo_path),
-            selectors[mode],
-            settings.parameters,
-            path_role_rules=settings.path_roles,
         )
     except BlackBoxUnlockError as error:
         raise ValueError(str(error)) from error

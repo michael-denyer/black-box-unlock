@@ -211,7 +211,7 @@ class TestReviewChangeTool:
 
         assert mock_review.call_count == 2
 
-    def test_named_profile_and_project_roles_reach_the_review_core(self, tmp_path):
+    def test_profile_and_overrides_reach_the_review_core(self, tmp_path):
         (tmp_path / ".bbu.toml").write_text(
             """
 [[path_roles]]
@@ -233,11 +233,10 @@ include_ci = true
                 days=30,
             )
 
-        parameters = mock_review.call_args.args[2]
-        assert parameters.profile == "release"
-        assert parameters.days == 30
-        assert parameters.include_ci is True
-        assert mock_review.call_args.kwargs["path_role_rules"][0].pattern == "app/**/*.vue"
+        request = mock_review.call_args.args[1]
+        assert request.profile == "release"
+        assert request.days == 30
+        assert request.include_ci is None
 
 
 class TestXrayFileTool:

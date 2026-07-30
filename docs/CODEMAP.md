@@ -297,8 +297,8 @@ src/black_box_unlock/
 ├── complexity.py            # Indentation-depth complexity proxy
 ├── analysis.py              # [2a] Orchestration
 ├── mcp_server.py            # bbu-mcp cached signals plus fresh review tool
-├── review.py                # Changed-path evidence and bounded action selection
-├── config.py                # .bbu.toml and named review profile resolution
+├── review.py                # Request resolution, changed-path identity, and action selection
+├── config.py                # .bbu.toml parsing
 ├── path_roles.py            # Project and built-in path-role classification
 ├── guard.py                 # Typed coupling-only cache + warnings (edit hook)
 ├── core/

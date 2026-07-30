@@ -7,6 +7,8 @@ from black_box_unlock.core.models import (
     AnalysisResult,
     AnalysisSummary,
     FileForensics,
+    SignalState,
+    SignalStatus,
     TemporalCoupling,
 )
 from black_box_unlock.visualization.html import generate_html_report
@@ -60,6 +62,9 @@ def test_generates_one_complete_investigation_workspace() -> None:
 
     assert document.startswith("<!doctype html>")
     assert document.endswith("</html>\n")
+    assert "Code forensics report" in document
+    assert "Repository evidence overview" in document
+    assert "Where should attention go first?" not in document
     assert 'data-testid="file-grid"' in document
     assert 'data-testid="coupling-grid"' in document
     assert 'data-testid="scope-select"' in document
@@ -121,6 +126,26 @@ def test_report_has_keyboard_and_non_canvas_evidence_paths() -> None:
     assert "Both revision counts remain visible." in document
 
 
+def test_disabled_ci_collapses_unavailable_observation_panels() -> None:
+    disabled_document = generate_html_report(_result())
+
+    assert 'id="ci-observation-panels" class="ci-observation-cards" hidden' in disabled_document
+    assert "CI evidence was not collected for this report." in disabled_document
+    assert "bbu analyze-repo --output html > report.html" in disabled_document
+    assert ".signal-card { padding: 18px; }" in disabled_document
+    assert ".signal-card { min-height:" not in disabled_document
+
+    available_result = _result()
+    available_result.ci_status = SignalStatus(state=SignalState.available)
+    available_result.parameters.include_ci = True
+    available_document = generate_html_report(available_result)
+
+    assert 'id="ci-observation-panels" class="ci-observation-cards">' in available_document
+    assert (
+        'id="ci-observation-panels" class="ci-observation-cards" hidden' not in available_document
+    )
+
+
 def test_tabulator_cells_remain_inline_rows() -> None:
     document = generate_html_report(_result())
 
@@ -152,7 +177,7 @@ def test_report_uses_compact_desktop_density() -> None:
     document = generate_html_report(_result())
 
     assert "font-size: 14px;" in document
-    assert 'height: "390px"' in document
+    assert 'height: "100%"' in document
     assert ".tabulator-row { min-height: 36px;" in document
     assert "padding: 6px 8px;" in document
 
@@ -165,6 +190,21 @@ def test_numeric_evidence_uses_visible_scope_heat_meters() -> None:
     assert 'fileMeter("complexity", "#ad6a1f"' in document
     assert 'couplingMeter("confidence_lower_bound", "#6754a6"' in document
     assert ".evidence-meter {" in document
+    assert "color-mix(in srgb, var(--meter-color) 7%, transparent) var(--meter) 100%" in document
+    assert "transparent var(--meter) 100%" not in document
+
+
+def test_report_translates_ranked_evidence_into_next_actions() -> None:
+    document = generate_html_report(_result())
+
+    assert 'id="investigation-leads"' in document
+    assert "Investigation leads" in document
+    assert "function updateInvestigationLeads()" in document
+    assert "Do this next:" in document
+    assert "Inspect file" in document
+    assert "Open coupling evidence" in document
+    assert "Review top files" in document
+    assert document.count("updateInvestigationLeads();") >= 2
 
 
 def test_change_landscape_flattens_noise_without_losing_files() -> None:
@@ -176,3 +216,60 @@ def test_change_landscape_flattens_noise_without_losing_files() -> None:
     assert "breadcrumb: {show: false}" in document
     assert "nodeClick: false" in document
     assert "decal: {show: true}" not in document
+
+
+def test_change_landscape_labels_and_highlights_only_file_tiles() -> None:
+    document = generate_html_report(_result())
+
+    assert 'if (!item.path) return item.name ? escapeHtml(item.name) : "";' in document
+    assert 'if (!item.path) return "";' in document
+    assert "label: {show: false}" in document
+    assert 'focus: "self"' not in document
+    assert 'mapChart.dispatchAction({type: "highlight"' not in document
+
+
+def test_change_landscape_keeps_small_files_legible() -> None:
+    document = generate_html_report(_result())
+
+    assert "Tile area compresses lines changed to keep smaller files visible." in document
+    assert "value: Math.max(Math.sqrt(actualLinesChanged), 4)" in document
+    assert "squareRatio: 1" in document
+    assert "#repository-map { height: 400px;" in document
+    assert "left: 12," in document
+    assert "right: 12," in document
+    assert "top: 12," in document
+    assert "bottom: 12," in document
+
+
+def test_workspace_cards_fit_their_content_and_use_compact_grid_actions() -> None:
+    document = generate_html_report(_result())
+
+    assert ".workspace {" in document
+    assert 'grid-template-areas: "files evidence" "landscape risk";' in document
+    assert ".workspace-column { display: contents; }" in document
+    assert ".files-panel { grid-area: files; display: flex;" in document
+    assert ".evidence-panel { grid-area: evidence;" in document
+    assert ".landscape-panel { grid-area: landscape; }" in document
+    assert ".risk-panel { grid-area: risk; }" in document
+    assert "#file-grid { min-height: 570px; flex: 1; }" in document
+    assert "height: min(570px, calc(100vh - 300px))" not in document
+    assert document.count('height: "100%"') == 2
+    assert ".chart { height: 400px;" in document
+    assert document.count('class="workspace-column ') == 2
+    assert 'class="workspace-column workspace-primary"' in document
+    assert 'class="workspace-column workspace-secondary"' in document
+    assert 'class="panel chart-panel risk-panel"' in document
+    assert 'class="panel chart-panel landscape-panel"' in document
+    assert ".workspace-column {" in document
+    assert ".chart-grid {" not in document
+    assert document.count('class="icon-button" data-focus-grid') == 2
+    assert document.count('aria-label="View these files in the grid"') == 2
+    assert "View the same files in the grid" not in document
+    assert document.index('class="panel files-panel"') < document.index(
+        'class="panel chart-panel landscape-panel"'
+    )
+    assert document.index('class="panel evidence-panel"') < document.index(
+        'class="panel chart-panel risk-panel"'
+    )
+    assert ".landscape-panel { order: 3; }" in document
+    assert ".risk-panel { order: 4; }" in document

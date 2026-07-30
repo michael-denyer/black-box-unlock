@@ -1,6 +1,8 @@
 """Black Box Unlock CLI - Code forensics commands."""
 
 import json
+import shutil
+import sys
 from enum import Enum
 from pathlib import Path
 
@@ -11,6 +13,8 @@ from rich.console import Console
 from black_box_unlock.analysis import export_to_json, run_analysis
 from black_box_unlock.core.exceptions import BlackBoxUnlockError
 from black_box_unlock.core.logging import configure_logging
+from black_box_unlock.git.changes import BaseChange, StagedChange, WorkingTreeChange
+from black_box_unlock.review import ReviewParameters, run_change_review
 from black_box_unlock.visualization.html import generate_html_report
 
 
@@ -45,6 +49,21 @@ console = Console()
 class OutputFormat(str, Enum):
     json = "json"
     html = "html"
+
+
+def _review_selector(
+    base: str | None,
+    staged: bool,
+    working_tree: bool,
+) -> BaseChange | StagedChange | WorkingTreeChange:
+    selected = sum((base is not None, staged, working_tree))
+    if selected > 1:
+        raise typer.BadParameter("--base, --staged, and --working-tree are mutually exclusive")
+    if base is not None:
+        return BaseChange(base_ref=base)
+    if staged:
+        return StagedChange()
+    return WorkingTreeChange()
 
 
 @app.command()
@@ -118,6 +137,108 @@ def coupling_guard(
                 }
             )
         )
+
+
+@app.command("coupling-guard-hook", hidden=True)
+def coupling_guard_hook(
+    repo: Path = typer.Option(Path("."), "--repo", help="Repository root"),
+) -> None:
+    """Parse a Claude PostToolUse payload and emit a quiet coupling warning."""
+    from black_box_unlock.guard import coupling_warnings
+
+    try:
+        payload = json.loads(sys.stdin.read())
+        raw_path = payload.get("tool_input", {}).get("file_path")
+        if not isinstance(raw_path, str) or not raw_path:
+            return
+        repo_root = repo.resolve()
+        candidate = Path(raw_path)
+        absolute_path = (
+            candidate.resolve() if candidate.is_absolute() else (repo_root / candidate).resolve()
+        )
+        file_path = absolute_path.relative_to(repo_root).as_posix()
+        warnings = coupling_warnings(file_path, repo_root)
+    except Exception as error:
+        logger.warning("coupling guard hook skipped: {}", error)
+        return
+    if warnings:
+        print(
+            json.dumps(
+                {
+                    "hookSpecificOutput": {
+                        "hookEventName": "PostToolUse",
+                        "additionalContext": " ".join(warnings),
+                    }
+                }
+            )
+        )
+
+
+@app.command("review-change")
+def review_change_command(
+    base: str | None = typer.Option(
+        None,
+        "--base",
+        help="Review branch and local work from this ref's merge base",
+    ),
+    staged: bool = typer.Option(False, "--staged", help="Review only the index"),
+    working_tree: bool = typer.Option(
+        False,
+        "--working-tree",
+        help="Review unstaged and untracked files (the default)",
+    ),
+    repo: Path = typer.Option(Path("."), "--repo", help="Repository root"),
+    days: int = typer.Option(90, "--days", help="Days of history used as evidence"),
+    min_coupling: float = typer.Option(
+        0.3,
+        "--min-coupling",
+        help="Minimum observed coupling ratio",
+    ),
+    min_shared_revisions: int = typer.Option(
+        2,
+        "--min-shared-revisions",
+        help="Minimum shared revisions needed for an action",
+    ),
+    include_ci: bool = typer.Option(
+        False,
+        "--include-ci",
+        help="Include slower GitHub Actions evidence",
+    ),
+) -> None:
+    """Review the selected change and emit at most three evidence-backed actions."""
+    selector = _review_selector(base, staged, working_tree)
+    try:
+        result = run_change_review(
+            repo,
+            selector,
+            ReviewParameters(
+                days=days,
+                min_coupling=min_coupling,
+                min_shared_revisions=min_shared_revisions,
+                include_ci=include_ci,
+            ),
+        )
+    except BlackBoxUnlockError as error:
+        console.print(f"[red]Error:[/red] {error}")
+        raise typer.Exit(code=1) from error
+    print(json.dumps(result.model_dump(mode="json"), indent=2))
+
+
+@app.command()
+def doctor(
+    repo: Path = typer.Option(Path("."), "--repo", help="Repository root"),
+) -> None:
+    """Report whether local review dependencies are available."""
+    resolved = repo.resolve()
+    checks = {
+        "git": shutil.which("git") is not None,
+        "repository": (resolved / ".git").exists(),
+        "bbu": shutil.which("bbu") is not None,
+        "bbu_mcp": shutil.which("bbu-mcp") is not None,
+        "gh_optional": shutil.which("gh") is not None,
+        "jq_required": False,
+    }
+    print(json.dumps({"ok": checks["git"] and checks["repository"], "checks": checks}, indent=2))
 
 
 @app.command()

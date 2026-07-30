@@ -4,7 +4,45 @@ from datetime import datetime
 
 import pytest
 
-from black_box_unlock.core.models import FileChurn, FileForensics
+from black_box_unlock.core.models import (
+    FileChurn,
+    FileForensics,
+    TemporalCoupling,
+    coupling_info_for,
+    wilson_lower_bound,
+)
+
+
+class TestCouplingEvidence:
+    def test_repeated_evidence_has_a_stronger_lower_bound_than_one_off(self):
+        assert wilson_lower_bound(11, 13) > wilson_lower_bound(1, 1)
+
+    def test_display_projection_preserves_oriented_raw_counts(self):
+        coupling = TemporalCoupling(
+            file_a="src/a.py",
+            file_b="tests/test_a.py",
+            co_change_count=11,
+            commits_a=13,
+            commits_b=12,
+        )
+
+        info = coupling_info_for(coupling, "tests/test_a.py")
+
+        assert info.file == "src/a.py"
+        assert info.shared_revisions == 11
+        assert info.file_revisions == 12
+        assert info.coupled_file_revisions == 13
+        assert info.confidence_lower_bound == coupling.confidence_lower_bound
+
+    def test_rejects_impossible_coupling_counts(self):
+        with pytest.raises(ValueError, match="co-change count exceeds"):
+            TemporalCoupling(
+                file_a="a.py",
+                file_b="b.py",
+                co_change_count=3,
+                commits_a=2,
+                commits_b=4,
+            )
 
 
 class TestFileChurn:

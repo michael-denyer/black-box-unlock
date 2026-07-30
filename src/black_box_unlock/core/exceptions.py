@@ -15,3 +15,11 @@ class GitToolNotFoundError(BlackBoxUnlockError):
 
 class InsufficientHistoryError(BlackBoxUnlockError):
     """Raised when a validation window contains no commits."""
+
+
+class ChangeSelectionError(BlackBoxUnlockError):
+    """Raised when a requested Git change cannot be selected coherently."""
+
+
+class InvalidRevisionError(ChangeSelectionError):
+    """Raised when a requested Git revision cannot be resolved."""

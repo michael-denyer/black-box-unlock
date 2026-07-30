@@ -311,6 +311,68 @@ class TestCouplingGuardCommand:
         assert any("src/a.py" in m for m in messages)
 
 
+class TestReviewChangeCommand:
+    def test_base_mode_outputs_typed_json(self):
+        with patch("black_box_unlock.cli.run_change_review") as mock_review:
+            mock_review.return_value.model_dump.return_value = {
+                "kind": "no_changes",
+                "repo": "demo",
+            }
+            result = runner.invoke(app, ["review-change", "--base", "origin/main"])
+
+        assert result.exit_code == 0
+        assert json.loads(result.stdout)["kind"] == "no_changes"
+        selector = mock_review.call_args.args[1]
+        assert selector.kind == "base"
+        assert selector.base_ref == "origin/main"
+
+    def test_source_flags_are_mutually_exclusive(self):
+        result = runner.invoke(
+            app,
+            ["review-change", "--base", "origin/main", "--staged"],
+        )
+
+        assert result.exit_code == 2
+
+
+class TestCouplingGuardHookCommand:
+    def test_reads_claude_payload_without_jq(self, tmp_path):
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        edited = repo / "src" / "a.py"
+        edited.parent.mkdir()
+        edited.write_text("x = 1\n")
+        payload = json.dumps({"tool_input": {"file_path": str(edited)}})
+
+        with patch("black_box_unlock.guard.coupling_warnings") as mock_warnings:
+            mock_warnings.return_value = ["check the companion"]
+            result = runner.invoke(
+                app,
+                ["coupling-guard-hook", "--repo", str(repo)],
+                input=payload,
+            )
+
+        assert result.exit_code == 0
+        assert json.loads(result.stdout)["hookSpecificOutput"]["additionalContext"]
+        mock_warnings.assert_called_once_with("src/a.py", repo.resolve())
+
+    def test_hooks_declaration_has_no_jq_dependency(self, repo_root):
+        hooks = (repo_root / "hooks" / "hooks.json").read_text()
+
+        assert "jq" not in hooks
+        assert "coupling-guard-hook" in hooks
+
+
+class TestDoctorCommand:
+    def test_reports_that_jq_is_not_required(self, tmp_path):
+        (tmp_path / ".git").mkdir()
+
+        result = runner.invoke(app, ["doctor", "--repo", str(tmp_path)])
+
+        assert result.exit_code == 0
+        assert json.loads(result.stdout)["checks"]["jq_required"] is False
+
+
 class TestXrayMinCoupling:
     def test_min_coupling_forwarded(self):
         with patch("black_box_unlock.git.xray.xray_file") as mock_xray:

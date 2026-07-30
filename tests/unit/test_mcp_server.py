@@ -30,7 +30,16 @@ def _result() -> AnalysisResult:
                 lines_changed=500,
                 complexity=40.0,
                 authors=["a@x.com"],
-                coupled_with=[CouplingInfo(file="src/token.py", ratio=0.8)],
+                coupled_with=[
+                    CouplingInfo(
+                        file="src/token.py",
+                        ratio=0.8,
+                        shared_revisions=8,
+                        file_revisions=10,
+                        coupled_file_revisions=10,
+                        confidence_lower_bound=0.49,
+                    )
+                ],
                 build_failures=2,
                 bugfix_commits=3,
             ),
@@ -79,7 +88,16 @@ class TestMcpTools:
 
         coupled = mcp_server.get_coupled_files("src/auth.py", repo_path=".", days=30)
 
-        assert coupled == [{"file": "src/token.py", "ratio": 0.8}]
+        assert coupled == [
+            {
+                "file": "src/token.py",
+                "ratio": 0.8,
+                "shared_revisions": 8,
+                "file_revisions": 10,
+                "coupled_file_revisions": 10,
+                "confidence_lower_bound": 0.49,
+            }
+        ]
 
     def test_get_ci_failures_only_nonzero(self, mock_analysis):
         mock_analysis.return_value = _result()
@@ -139,7 +157,7 @@ class TestAnalysisCache:
 
 
 class TestToolRegistration:
-    def test_all_seven_tools_registered(self):
+    def test_all_eight_tools_registered(self):
         names = {t.name for t in asyncio.run(mcp_server.mcp.list_tools())}
         assert names == {
             "get_hotspots",
@@ -149,7 +167,19 @@ class TestToolRegistration:
             "get_ci_failures",
             "get_flaky_steps",
             "xray_file",
+            "review_change",
         }
+
+
+class TestReviewChangeTool:
+    def test_review_is_fresh_and_bypasses_analysis_cache(self):
+        with patch("black_box_unlock.mcp_server._run_change_review") as mock_review:
+            mock_review.return_value.model_dump.return_value = {"kind": "no_changes"}
+
+            mcp_server.review_change(repo_path=".", mode="working_tree")
+            mcp_server.review_change(repo_path=".", mode="working_tree")
+
+        assert mock_review.call_count == 2
 
 
 class TestXrayFileTool:

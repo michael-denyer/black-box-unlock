@@ -18,6 +18,8 @@ from .core.models import (
     FileForensics,
     SignalState,
     SignalStatus,
+    coupling_info_for,
+    coupling_info_sort_key,
 )
 from .git.churn import parse_history_entries
 from .git.coupling import analyze_temporal_coupling
@@ -33,6 +35,8 @@ def run_analysis(  # [2a] Main analysis pipeline
     min_coupling: float = 0.3,
     include_ci: bool = True,
     xray_top: int = 5,
+    *,
+    ensure_paths: frozenset[str] = frozenset(),
 ) -> AnalysisResult:
     """Run complete forensic analysis on a repository.
 
@@ -45,6 +49,7 @@ def run_analysis(  # [2a] Main analysis pipeline
         min_coupling: Minimum coupling ratio to include.
         include_ci: Whether to include CI/CD build failure data.
         xray_top: Auto X-Ray the top N hotspot files (0 disables).
+        ensure_paths: Current paths to include even when they have no history.
 
     Returns:
         AnalysisResult with file forensics and summary.
@@ -73,18 +78,17 @@ def run_analysis(  # [2a] Main analysis pipeline
     # Build coupling lookup: for each file, which files is it coupled with?
     coupling_by_file: dict[str, list[CouplingInfo]] = defaultdict(list)
     for coupling in coupling_list:
-        coupling_by_file[coupling.file_a].append(
-            CouplingInfo(file=coupling.file_b, ratio=coupling.coupling_ratio)
-        )
-        coupling_by_file[coupling.file_b].append(
-            CouplingInfo(file=coupling.file_a, ratio=coupling.coupling_ratio)
-        )
+        coupling_by_file[coupling.file_a].append(coupling_info_for(coupling, coupling.file_a))
+        coupling_by_file[coupling.file_b].append(coupling_info_for(coupling, coupling.file_b))
+    for coupled_files in coupling_by_file.values():
+        coupled_files.sort(key=coupling_info_sort_key)
 
     # All unique paths
     all_paths = (
         set(churn_by_path.keys())
         | set(ownership_by_path.keys())
         | set(ci_analysis.file_failures.keys())
+        | set(ensure_paths)
     )
 
     # Build FileForensics for each file
@@ -135,6 +139,7 @@ def run_analysis(  # [2a] Main analysis pipeline
         analyzed_days=days,
         generated_at=datetime.now(timezone.utc),
         files=files,
+        couplings=coupling_list,
         parameters=AnalysisParameters(
             min_coupling=min_coupling,
             include_ci=include_ci,

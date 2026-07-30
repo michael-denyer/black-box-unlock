@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-07-30
+
+### Added
+
+- `bbu review-change` and the uncached MCP `review_change` tool review branch,
+  staged, or working-tree changes and return at most three typed,
+  evidence-backed actions
+- `/review-change` plugin command and `bbu doctor` activation diagnostics
+- Fixed, explainable path roles for source, tests, docs, config, migrations,
+  generated files, and other paths
+- Change provenance with resolved revisions, selected Git layers, observation
+  time, parameters, and explicit cache status
+
+### Changed
+
+- Temporal coupling exposes shared and per-file revision counts plus the 95%
+  Wilson lower bound; repeated evidence now ranks ahead of perfect ratios from
+  tiny samples
+- Review and ambient hook actions require at least two shared revisions by
+  default
+- The coupling cache is keyed to `HEAD` as well as its TTL
+- The plugin hook parses its JSON payload in Python and no longer requires
+  `jq`
+- MCP is capped to the compatible major range `>=1.27,<2`
+
 ## [1.2.0] - 2026-07-07
 
 ### Added

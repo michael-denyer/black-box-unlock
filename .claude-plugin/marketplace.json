@@ -9,8 +9,8 @@
     {
       "name": "black-box-unlock",
       "source": "./",
-      "description": "Code forensics for AI agents - hotspot, coupling, defect-density, and flaky-CI signals via /analyze, /hotspots, a git-forensics agent, an ambient coupling guard, and the bbu-mcp server",
-      "version": "1.2.0"
+      "description": "Evidence-backed change review and code forensics for AI agents via /review-change, /analyze, /hotspots, a quiet coupling guard, and bbu-mcp",
+      "version": "1.3.0"
     }
   ]
 }

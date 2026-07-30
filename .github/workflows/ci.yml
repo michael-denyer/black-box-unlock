@@ -8,7 +8,10 @@ on:
 
 jobs:
   quality:
-    runs-on: ubuntu-latest
+    # mmdc needs Chromium's process sandbox. Ubuntu 24.04 blocks the required
+    # user namespaces, so use 22.04 instead of weakening Chromium with
+    # --no-sandbox.
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6
 

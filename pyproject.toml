@@ -1,6 +1,6 @@
 [project]
 name = "black-box-unlock"
-version = "1.2.0"
+version = "1.3.0"
 description = "Code forensics tool - investigate your codebase like a crime scene"
 readme = "README.md"
 license = { text = "MIT" }
@@ -28,7 +28,7 @@ dependencies = [
     "rich>=13.0.0",
     "pydantic>=2.0.0",
     "loguru>=0.7.0",
-    "mcp>=1.2.0",
+    "mcp>=1.27.0,<2",
 ]
 
 [project.optional-dependencies]

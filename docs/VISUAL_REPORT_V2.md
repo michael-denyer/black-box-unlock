@@ -13,7 +13,7 @@ the file is now a self-contained investigation workspace:
   evidence in one place;
 - temporal coupling is ordered by the 95% Wilson lower bound and always shows
   the numerator and both revision counts behind the ratio;
-- the risk matrix and repository map are alternate routes into the same
+- the risk matrix and change landscape are alternate routes into the same
   selected-file evidence, not separate sources of truth.
 
 The public boundary stays `generate_html_report(AnalysisResult) -> str`. The
@@ -42,7 +42,7 @@ classification from `path_roles.py`. The default `Code only` scope admits
 source files and migrations. A coupling pair is visible only when both
 endpoints are admitted. Tests, configuration, documentation, generated files,
 and other repository metadata are retained in the document and can be opted
-into. Summary counts, searches, the risk matrix, and the repository map all
+into. Summary counts, searches, the risk matrix, and the change landscape all
 derive from the current scope.
 
 ## Modules
@@ -65,7 +65,7 @@ visualization/
 
 `treemap.py` and `coupling_graph.py` are deleted. Their APIs encode Plotly and
 Cytoscape payloads, duplicate presentation policy, and lose raw evidence.
-ECharts renders the risk matrix and repository map from the canonical
+ECharts renders the risk matrix and change landscape from the canonical
 envelope. Tabulator provides the virtualized grids.
 
 ## Interaction contract
@@ -75,7 +75,11 @@ searchable evidence on the left, one selected-file panel on the right, and
 spatial views below. On narrower screens the panel follows the grid. Every
 chart selection calls the same `selectFile(path)` transition as the grid.
 Evidence tables open with the strongest signal first; numeric evidence columns
-also sort descending on their first click.
+also sort descending on their first click. Proportional heat bars expose the
+relative magnitude of each numeric value without replacing its exact number.
+The change landscape removes constant path prefixes, groups files by their
+first meaningful code area, and keeps full paths and supporting values in its
+tooltips.
 
 Charts are supplementary. Decision-relevant values remain available in
 keyboard-operable grids and the semantic evidence panel. Repository strings

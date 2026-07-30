@@ -99,6 +99,7 @@ p { margin: 0; }
 .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 14px; }
 .chart-panel figcaption { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 13px 15px; border-bottom: 1px solid var(--line); }
 .chart { height: 350px; background: radial-gradient(circle at 50% 45%, rgb(255 255 255 / 72%), transparent 68%); }
+#repository-map { height: 480px; }
 .text-button { padding: 4px 0; border: 0; border-bottom: 1px solid currentColor; background: transparent; color: var(--green); cursor: pointer; font-size: .7rem; }
 .explanation { padding: 11px 15px; border-bottom: 1px solid var(--line); background: #f2f5f2; color: var(--muted); font-size: .75rem; line-height: 1.5; }
 .explanation strong { color: var(--ink); }
@@ -169,6 +170,7 @@ footer { padding: 14px 28px 17px 238px; border-top: 1px solid var(--line); color
   .panel-heading, .chart-panel figcaption { align-items: stretch; flex-direction: column; }
   .search-label input { width: 100%; }
   .chart { height: 320px; }
+  #repository-map { height: 420px; }
   .signals-grid { grid-template-columns: 1fr; }
   footer { padding: 14px; }
 }

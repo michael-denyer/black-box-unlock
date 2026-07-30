@@ -205,8 +205,13 @@ def test_workspace_cards_fit_their_content_and_use_compact_grid_actions() -> Non
     document = generate_html_report(_result())
 
     assert ".workspace {" in document
-    assert ".chart-grid {" in document
-    assert document.count("align-items: start;") >= 2
+    assert document.count('class="workspace-column ') == 2
+    assert 'class="workspace-column workspace-primary"' in document
+    assert 'class="workspace-column workspace-secondary"' in document
+    assert 'class="panel chart-panel risk-panel"' in document
+    assert 'class="panel chart-panel landscape-panel"' in document
+    assert ".workspace-column {" in document
+    assert ".chart-grid {" not in document
     assert document.count('class="icon-button" data-focus-grid') == 2
     assert document.count('aria-label="View these files in the grid"') == 2
     assert "View the same files in the grid" not in document

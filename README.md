@@ -162,15 +162,23 @@ src/black_box_unlock/
 ## Development
 
 ```bash
+# Install development dependencies and the Git hook
+uv sync --all-extras --dev
+uv run prek install
+
+# Run the same quality and security checks as CI
+uv run prek run --all-files
+
 # Run tests
 uv run pytest -v
-
-# Lint and format
-uv run ruff check . && uv run ruff format .
 
 # Verbose output for debugging
 bbu --verbose analyze-repo
 ```
+
+The `prek` gate covers repository hygiene, Ruff, Pyrefly, GitHub Actions
+linting, Markdown and link checks, Mermaid rendering, workflow security, and
+locked-dependency auditing. Link and dependency checks need network access.
 
 ## License
 

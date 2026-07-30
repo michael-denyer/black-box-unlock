@@ -16,12 +16,12 @@ jobs:
     # --no-sandbox.
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v6
         with:
           persist-credentials: false
 
       - name: Install uv
-        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39  # v8.2.0
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9  # v9.0.0
 
       - name: Set up Python
         run: uv python install 3.12
@@ -30,21 +30,21 @@ jobs:
         run: uv sync --all-extras --dev
 
       - name: Run prek checks
-        # Lychee's Linux binary targets Ubuntu 24.04's glibc. It runs in the
-        # links job below; mmdc stays here for Ubuntu 22.04's Chromium sandbox.
+        # Lychee runs in the Ubuntu 24.04 links job below. The branch guard is
+        # local-only; CI must also validate the post-merge commit on main.
         env:
-          SKIP: lychee
+          SKIP: lychee,no-commit-to-branch
         run: uv run prek run --all-files
 
   links:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v6
         with:
           persist-credentials: false
 
       - name: Install uv
-        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39  # v8.2.0
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9  # v9.0.0
 
       - name: Set up Python
         run: uv python install 3.12
@@ -63,12 +63,12 @@ jobs:
         python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
 
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v6
         with:
           persist-credentials: false
 
       - name: Install uv
-        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39  # v8.2.0
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9  # v9.0.0
 
       - name: Set up Python ${{ matrix.python-version }}
         run: uv python install ${{ matrix.python-version }}
@@ -84,13 +84,13 @@ jobs:
     # pipeline (git extraction, hotspots, auto X-Ray, JSON integrity).
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v6
         with:
           fetch-depth: 0  # bbu reads git history; a shallow clone sees one commit
           persist-credentials: false
 
       - name: Install uv
-        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39  # v8.2.0
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9  # v9.0.0
 
       - name: Set up Python
         run: uv python install 3.12

@@ -87,9 +87,15 @@ Eligible pairs are ordered by:
 This makes repeated evidence outrank a perfect ratio from one observation
 without replacing evidence with an opaque risk score.
 
-Fixed, ordered path-role rules classify source, test, docs, config, generated,
-and other paths. The matched rule is returned with the role. Roles affect only
+Ordered path-role rules classify source, test, docs, config, generated, and
+other paths. Project rules from `.bbu.toml` run first; fixed built-ins handle
+the rest. The matched rule is returned with the role. Roles affect only
 documented action policies and never change historical counts.
+
+Named `.bbu.toml` profiles set the history window, coupling threshold, support
+floor, CI choice, and action cap. CLI and MCP values override the selected
+profile. The result records the profile name and config path with the effective
+parameters.
 
 ## Actions
 
@@ -98,6 +104,10 @@ The result contains at most one action of each kind:
 - `check_coupled_paths` when a supported historical companion is absent from
   the selected change.
 - `add_or_update_tests` when source code changed but no test path changed.
+- `inspect_ci_failures` when a selected path appears in a failed workflow run.
+  Its evidence retains the workflow, run ID and URL, commit, timestamp, and
+  matching paths. The action states that this is implication, not proof of
+  causality.
 - `focus_review` when changed code has defect history or diffuse ownership.
 
 Each action embeds the typed evidence that caused it. Empty action lists are
@@ -119,12 +129,18 @@ adapter parses Claude hook JSON in Python, so the plugin no longer depends on
 `jq`. The complete change review remains an explicit command instead of a slow
 analysis after every edit.
 
-## Rejected for v1.3
+## Added in v1.4
+
+- Project path-role rules and named review profiles in `.bbu.toml`.
+- Actionable failed-run evidence for opt-in CI review.
+- Strict config parsing at the CLI and MCP boundary. Invalid configuration
+  cannot reach review policy.
+
+## Rejected for v1.3 and v1.4
 
 - A composite change-risk score.
 - A full change review on every edit.
 - A new repository-facts cache or dirty-content fingerprint cache.
-- Project path-role configuration before fixed rules have real-world evidence.
 - Dashboards, HTML additions, PR-process telemetry, and wider language parsing.
 - Complexity-growth advice without a validated threshold. Current complexity
   remains visible in file evidence; historical coupling and defect evidence

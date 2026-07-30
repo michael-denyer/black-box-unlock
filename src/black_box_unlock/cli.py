@@ -11,10 +11,15 @@ from loguru import logger
 from rich.console import Console
 
 from black_box_unlock.analysis import export_to_json, run_analysis
+from black_box_unlock.config import (
+    ReviewOverrides,
+    load_project_config,
+    resolve_review_settings,
+)
 from black_box_unlock.core.exceptions import BlackBoxUnlockError
 from black_box_unlock.core.logging import configure_logging
 from black_box_unlock.git.changes import BaseChange, StagedChange, WorkingTreeChange
-from black_box_unlock.review import ReviewParameters, run_change_review
+from black_box_unlock.review import run_change_review
 from black_box_unlock.visualization.html import generate_html_report
 
 
@@ -188,35 +193,50 @@ def review_change_command(
         help="Review unstaged and untracked files (the default)",
     ),
     repo: Path = typer.Option(Path("."), "--repo", help="Repository root"),
-    days: int = typer.Option(90, "--days", help="Days of history used as evidence"),
-    min_coupling: float = typer.Option(
-        0.3,
+    profile: str | None = typer.Option(
+        None,
+        "--profile",
+        help="Named review profile from .bbu.toml",
+    ),
+    days: int | None = typer.Option(
+        None,
+        "--days",
+        help="Override the profile's history window",
+    ),
+    min_coupling: float | None = typer.Option(
+        None,
         "--min-coupling",
-        help="Minimum observed coupling ratio",
+        help="Override the profile's minimum observed coupling ratio",
     ),
-    min_shared_revisions: int = typer.Option(
-        2,
+    min_shared_revisions: int | None = typer.Option(
+        None,
         "--min-shared-revisions",
-        help="Minimum shared revisions needed for an action",
+        help="Override the profile's support floor",
     ),
-    include_ci: bool = typer.Option(
-        False,
-        "--include-ci",
-        help="Include slower GitHub Actions evidence",
+    include_ci: bool | None = typer.Option(
+        None,
+        "--include-ci/--no-include-ci",
+        help="Override whether the profile includes GitHub Actions evidence",
     ),
 ) -> None:
     """Review the selected change and emit at most three evidence-backed actions."""
     selector = _review_selector(base, staged, working_tree)
     try:
-        result = run_change_review(
+        settings = resolve_review_settings(
             repo,
-            selector,
-            ReviewParameters(
+            profile_name=profile,
+            overrides=ReviewOverrides(
                 days=days,
                 min_coupling=min_coupling,
                 min_shared_revisions=min_shared_revisions,
                 include_ci=include_ci,
             ),
+        )
+        result = run_change_review(
+            repo,
+            selector,
+            settings.parameters,
+            path_role_rules=settings.path_roles,
         )
     except BlackBoxUnlockError as error:
         console.print(f"[red]Error:[/red] {error}")
@@ -230,6 +250,12 @@ def doctor(
 ) -> None:
     """Report whether local review dependencies are available."""
     resolved = repo.resolve()
+    config_error: str | None = None
+    try:
+        config = load_project_config(resolved)
+    except BlackBoxUnlockError as error:
+        config = None
+        config_error = str(error)
     checks = {
         "git": shutil.which("git") is not None,
         "repository": (resolved / ".git").exists(),
@@ -237,8 +263,22 @@ def doctor(
         "bbu_mcp": shutil.which("bbu-mcp") is not None,
         "gh_optional": shutil.which("gh") is not None,
         "jq_required": False,
+        "config": config is not None,
     }
-    print(json.dumps({"ok": checks["git"] and checks["repository"], "checks": checks}, indent=2))
+    print(
+        json.dumps(
+            {
+                "ok": checks["git"] and checks["repository"] and checks["config"],
+                "checks": checks,
+                "config": {
+                    "profiles": sorted(config.profiles) if config is not None else [],
+                    "path_role_rules": len(config.path_roles) if config is not None else 0,
+                    "error": config_error,
+                },
+            },
+            indent=2,
+        )
+    )
 
 
 @app.command()

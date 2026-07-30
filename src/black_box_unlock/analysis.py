@@ -146,6 +146,7 @@ def run_analysis(  # [2a] Main analysis pipeline
             xray_top=xray_top,
         ),
         ci_status=ci_analysis.status,
+        failed_ci_runs=ci_analysis.failed_runs,
         flaky_steps=ci_analysis.flaky_steps,
         summary=AnalysisSummary(
             total_files=len(files),

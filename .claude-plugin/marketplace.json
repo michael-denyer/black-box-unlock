@@ -10,7 +10,7 @@
       "name": "black-box-unlock",
       "source": "./",
       "description": "Evidence-backed change review and code forensics for AI agents via /review-change, /analyze, /hotspots, a quiet coupling guard, and bbu-mcp",
-      "version": "1.3.0"
+      "version": "1.4.0"
     }
   ]
 }

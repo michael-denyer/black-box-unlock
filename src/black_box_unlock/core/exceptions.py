@@ -23,3 +23,7 @@ class ChangeSelectionError(BlackBoxUnlockError):
 
 class InvalidRevisionError(ChangeSelectionError):
     """Raised when a requested Git revision cannot be resolved."""
+
+
+class ConfigurationError(BlackBoxUnlockError):
+    """Raised when project configuration cannot be parsed or resolved."""

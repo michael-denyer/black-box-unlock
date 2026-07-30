@@ -103,6 +103,8 @@ def test_coupling_projection_keeps_support_and_both_revision_counts() -> None:
         "key": "src/strong.py\0src/partner.py",
         "file_a": "src/strong.py",
         "file_b": "src/partner.py",
+        "role_a": "source",
+        "role_b": "source",
         "shared_revisions": 8,
         "revisions_a": 10,
         "revisions_b": 12,
@@ -121,3 +123,45 @@ def test_complete_analysis_shape_is_retained_and_files_are_stable() -> None:
     assert payload["analysis"]["files"][0]["path"] == "src/strong.py"
     assert payload["analysis"]["files"][0]["bugfix_commits"] == 3
     assert payload["analysis"]["files"][0]["build_failures"] == 2
+    assert payload["analysis"]["files"][0]["path_role"] == "source"
+    assert payload["analysis"]["files"][0]["path_role_rule"] == "source-extension"
+
+
+def test_report_roles_separate_code_from_repository_support_files() -> None:
+    result = _result()
+
+    def support_file(
+        path: str, *, commits: int, lines_changed: int, complexity: int
+    ) -> FileForensics:
+        return FileForensics(
+            path=path,
+            commits=commits,
+            lines_changed=lines_changed,
+            complexity=complexity,
+            authors=[],
+            coupled_with=[],
+        )
+
+    result.files.extend(
+        [
+            support_file("README.md", commits=5, lines_changed=20, complexity=12),
+            support_file("uv.lock", commits=4, lines_changed=100, complexity=0),
+            support_file(".claude-plugin/plugin.json", commits=2, lines_changed=8, complexity=0),
+            support_file(".gitignore", commits=2, lines_changed=4, complexity=0),
+            support_file("migrations/001_create.py", commits=3, lines_changed=30, complexity=3),
+        ]
+    )
+
+    payload = build_report_payload(result)
+    roles = {file["path"]: file["path_role"] for file in payload["analysis"]["files"]}
+
+    assert roles == {
+        ".claude-plugin/plugin.json": "config",
+        ".gitignore": "other",
+        "README.md": "docs",
+        "migrations/001_create.py": "migration",
+        "src/partner.py": "source",
+        "src/strong.py": "source",
+        "src/tiny.py": "source",
+        "uv.lock": "generated",
+    }

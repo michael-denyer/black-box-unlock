@@ -7,6 +7,8 @@ the file is now a self-contained investigation workspace:
 
 - it makes no requests while loading or being explored;
 - files are searchable and sortable at repository scale;
+- it opens with source files and migrations in scope, while broader repository
+  roles remain one selection away;
 - selecting a file reveals its ownership, defect, CI, X-Ray, and coupling
   evidence in one place;
 - temporal coupling is ordered by the 95% Wilson lower bound and always shows
@@ -34,6 +36,14 @@ min(revisions A, revisions B), raw Tornhill ratio, 95% Wilson lower bound
 Pairs have a stable, evidence-first order: Wilson lower bound, shared
 revisions, raw ratio, then paths. `FileForensics.coupled_with` is not used to
 reconstruct raw pairs.
+
+Every file and coupling endpoint also carries the shared path-role
+classification from `path_roles.py`. The default `Code only` scope admits
+source files and migrations. A coupling pair is visible only when both
+endpoints are admitted. Tests, configuration, documentation, generated files,
+and other repository metadata are retained in the document and can be opted
+into. Summary counts, searches, the risk matrix, and the repository map all
+derive from the current scope.
 
 ## Modules
 
@@ -64,6 +74,8 @@ The desktop layout uses the chosen “investigation workspace” direction:
 searchable evidence on the left, one selected-file panel on the right, and
 spatial views below. On narrower screens the panel follows the grid. Every
 chart selection calls the same `selectFile(path)` transition as the grid.
+Evidence tables open with the strongest signal first; numeric evidence columns
+also sort descending on their first click.
 
 Charts are supplementary. Decision-relevant values remain available in
 keyboard-operable grids and the semantic evidence panel. Repository strings

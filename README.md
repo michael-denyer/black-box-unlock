@@ -170,6 +170,11 @@ The HTML output is a self-contained investigation workspace:
 - **Coupling evidence** - confidence-first pairs with support and denominators
 - **CI and signals** - collection status, failed runs, flaky steps, and policy
 
+The report opens in **Code only** scope: source files and migrations, with
+coupling limited to pairs whose two endpoints are in that scope. Tests,
+configuration, documentation, generated files, and repository metadata remain
+available through the scope selector.
+
 Pinned ECharts and Tabulator assets are embedded in the document, so opening a
 saved report makes no CDN requests. Charts are supplementary: the evidence
 needed to interpret them remains in keyboard-operable grids and text panels.

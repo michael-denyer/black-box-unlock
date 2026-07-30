@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Local Git hooks now run through `prek`; repository hygiene, Ruff, Pyrefly,
+  GitHub Actions lint and security checks, Markdown links, Mermaid rendering,
+  and locked-dependency auditing run through the same gate in CI
+- Dependabot now updates both GitHub Actions and the `uv` lockfile, with grouped
+  weekly updates and a seven-day cooldown
+- CodeQL scans Python source on pull requests, pushes to `main`, and weekly
+
+### Fixed
+
+- Updated locked Click and MCP releases after dependency auditing found three
+  published vulnerabilities
+
 ## [1.3.0] - 2026-07-30
 
 ### Added

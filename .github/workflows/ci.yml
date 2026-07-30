@@ -6,7 +6,55 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
+  quality:
+    # mmdc needs Chromium's process sandbox. Ubuntu 24.04 blocks the required
+    # user namespaces, so use 22.04 instead of weakening Chromium with
+    # --no-sandbox.
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6
+        with:
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39  # v8.2.0
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install dependencies
+        run: uv sync --all-extras --dev
+
+      - name: Run prek checks
+        # Lychee's Linux binary targets Ubuntu 24.04's glibc. It runs in the
+        # links job below; mmdc stays here for Ubuntu 22.04's Chromium sandbox.
+        env:
+          SKIP: lychee
+        run: uv run prek run --all-files
+
+  links:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6
+        with:
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39  # v8.2.0
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install hook dependencies
+        run: uv sync --only-group dev
+
+      - name: Check Markdown links
+        run: uv run prek run lychee --all-files
+
   test:
     runs-on: ubuntu-latest
     strategy:
@@ -16,6 +64,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6
+        with:
+          persist-credentials: false
 
       - name: Install uv
         uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39  # v8.2.0
@@ -25,12 +75,6 @@ jobs:
 
       - name: Install dependencies
         run: uv sync --all-extras --dev
-
-      - name: Run linting
-        run: uv run ruff check .
-
-      - name: Run formatting check
-        run: uv run ruff format --check .
 
       - name: Run tests
         run: uv run pytest -v
@@ -43,6 +87,7 @@ jobs:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6
         with:
           fetch-depth: 0  # bbu reads git history; a shallow clone sees one commit
+          persist-credentials: false
 
       - name: Install uv
         uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39  # v8.2.0

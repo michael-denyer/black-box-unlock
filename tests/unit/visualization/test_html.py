@@ -176,3 +176,22 @@ def test_change_landscape_flattens_noise_without_losing_files() -> None:
     assert "breadcrumb: {show: false}" in document
     assert "nodeClick: false" in document
     assert "decal: {show: true}" not in document
+
+
+def test_change_landscape_labels_and_highlights_only_file_tiles() -> None:
+    document = generate_html_report(_result())
+
+    assert 'if (!item.path) return item.name ? escapeHtml(item.name) : "";' in document
+    assert 'if (!item.path) return "";' in document
+    assert "label: {show: false}" in document
+    assert 'focus: "self"' not in document
+    assert 'mapChart.dispatchAction({type: "highlight"' not in document
+
+
+def test_change_landscape_keeps_small_files_legible() -> None:
+    document = generate_html_report(_result())
+
+    assert "Tile area compresses lines changed to keep smaller files visible." in document
+    assert "value: Math.max(Math.sqrt(actualLinesChanged), 4)" in document
+    assert "squareRatio: 1" in document
+    assert "#repository-map { height: 480px;" in document

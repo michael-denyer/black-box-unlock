@@ -197,7 +197,6 @@
       const index = chartFiles.findIndex(file => file.path === path);
       if (index >= 0) riskChart.dispatchAction({type: "highlight", seriesIndex: 0, dataIndex: index});
     }
-    if (mapChart) mapChart.dispatchAction({type: "highlight", seriesId: "repository", name: basename(path)});
   }
 
   function initializeHeader() {
@@ -456,14 +455,21 @@
     scopedFiles.forEach(file => {
       const groupName = repositoryGroup(file);
       if (!groups.has(groupName)) {
-        groups.set(groupName, {name: groupName, id: `group:${groupName}`, children: []});
+        groups.set(groupName, {
+          name: groupName,
+          id: `group:${groupName}`,
+          tooltip: {show: false},
+          emphasis: {disabled: true},
+          children: [],
+        });
       }
+      const actualLinesChanged = file.lines_changed || 0;
       groups.get(groupName).children.push({
         name: basename(file.path),
         id: `file:${file.path}`,
         path: file.path,
-        value: Math.max(file.lines_changed || 0, 1),
-        actualLinesChanged: file.lines_changed || 0,
+        value: Math.max(Math.sqrt(actualLinesChanged), 4),
+        actualLinesChanged,
         hotspot: file.hotspot_score || 0,
         revisions: file.commits || 0,
         complexity: file.complexity || 0,
@@ -486,8 +492,8 @@
       tooltip: {
         confine: true,
         formatter: params => {
-          const item = params.data;
-          if (!item.path) return escapeHtml(item.name);
+          const item = params.data || {};
+          if (!item.path) return item.name ? escapeHtml(item.name) : "";
           return `<strong>${escapeHtml(item.path)}</strong><br>${formatInteger(item.actualLinesChanged)} lines changed · ${formatInteger(item.revisions)} revisions<br>complexity ${Number(item.complexity).toFixed(1)} · hotspot ${formatInteger(Math.round(item.hotspot))}`;
         },
       },
@@ -499,6 +505,7 @@
         nodeClick: false,
         breadcrumb: {show: false},
         sort: "desc",
+        squareRatio: 1,
         label: {
           show: true,
           color: "#fff",
@@ -506,14 +513,25 @@
           fontWeight: 700,
           lineHeight: 16,
           overflow: "truncate",
-          formatter: params => `${params.data.name}\n${formatInteger(Math.round(params.data.hotspot || 0))} hotspot`,
+          formatter: params => {
+            const item = params.data || {};
+            if (!item.path) return "";
+            return `${item.name}\n${formatInteger(Math.round(item.hotspot || 0))} hotspot`;
+          },
         },
-        upperLabel: {show: true, height: 25, color: "#244851", fontSize: 11, fontWeight: 750},
+        upperLabel: {
+          show: true,
+          height: 25,
+          color: "#244851",
+          fontSize: 11,
+          fontWeight: 750,
+          formatter: params => (params.data && params.data.name) || params.name || "",
+        },
         itemStyle: {borderColor: "#fffefa", borderWidth: 2, gapWidth: 2, borderRadius: 5},
-        emphasis: {focus: "self", itemStyle: {borderColor: "#172328", borderWidth: 2}},
+        emphasis: {disabled: true},
         levels: [
-          {itemStyle: {borderWidth: 0, gapWidth: 5}},
-          {upperLabel: {show: true}, itemStyle: {borderColor: "#e7ece9", borderWidth: 25, gapWidth: 3, borderRadius: 8}},
+          {label: {show: false}, upperLabel: {show: false}, itemStyle: {borderWidth: 0, gapWidth: 5}},
+          {label: {show: false}, upperLabel: {show: true}, itemStyle: {borderColor: "#e7ece9", borderWidth: 25, gapWidth: 3, borderRadius: 8}},
           {itemStyle: {borderColor: "#fffefa", borderWidth: 2, gapWidth: 2, borderRadius: 5}},
         ],
       }],

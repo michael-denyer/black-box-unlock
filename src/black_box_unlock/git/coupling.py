@@ -19,6 +19,7 @@ class CouplingAnalysis:
 def analyze_temporal_coupling(
     commits: list[Commit],
     min_ratio: float = 0.3,
+    min_shared_revisions: int = 1,
     max_changeset_size: int = DEFAULT_MAX_COUPLED_FILES_PER_COMMIT,
 ) -> CouplingAnalysis:
     """Detect files that change together frequently.
@@ -30,6 +31,7 @@ def analyze_temporal_coupling(
     Args:
         commits: Commit history from fetch_git_history.
         min_ratio: Minimum coupling ratio to include (default 0.3 = 30%).
+        min_shared_revisions: Minimum co-changing revisions needed to include a pair.
         max_changeset_size: Largest commit that contributes co-change pairs.
 
     Returns:
@@ -38,6 +40,8 @@ def analyze_temporal_coupling(
     """
     if max_changeset_size < 2:
         raise ValueError("max_changeset_size must be at least 2")
+    if min_shared_revisions < 1:
+        raise ValueError("min_shared_revisions must be at least 1")
 
     commit_counts: dict[str, int] = defaultdict(int)
     co_change_counts: dict[tuple[str, str], int] = defaultdict(int)
@@ -66,8 +70,20 @@ def analyze_temporal_coupling(
         )
         for (file_a, file_b), co_changes in co_change_counts.items()
     ]
-    included = [c for c in couplings if c.coupling_ratio >= min_ratio]
-    included.sort(key=lambda c: (-c.coupling_ratio, c.file_a, c.file_b))
+    included = [
+        coupling
+        for coupling in couplings
+        if coupling.coupling_ratio >= min_ratio and coupling.co_change_count >= min_shared_revisions
+    ]
+    included.sort(
+        key=lambda coupling: (
+            -coupling.confidence_lower_bound,
+            -coupling.co_change_count,
+            -coupling.coupling_ratio,
+            coupling.file_a,
+            coupling.file_b,
+        )
+    )
     return CouplingAnalysis(
         couplings=included,
         ignored_large_changesets=ignored_large_changesets,
@@ -77,11 +93,13 @@ def analyze_temporal_coupling(
 def detect_temporal_coupling(  # [3b] Find co-changing files
     commits: list[Commit],
     min_ratio: float = 0.3,
+    min_shared_revisions: int = 1,
     max_changeset_size: int = DEFAULT_MAX_COUPLED_FILES_PER_COMMIT,
 ) -> list[TemporalCoupling]:
     """Compatibility interface returning only the detected coupling pairs."""
     return analyze_temporal_coupling(
         commits,
         min_ratio=min_ratio,
+        min_shared_revisions=min_shared_revisions,
         max_changeset_size=max_changeset_size,
     ).couplings

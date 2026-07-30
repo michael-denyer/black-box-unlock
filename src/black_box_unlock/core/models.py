@@ -2,6 +2,7 @@
 
 from datetime import datetime, timezone
 from enum import Enum
+from math import sqrt
 
 from pydantic import BaseModel, Field, computed_field, field_validator, model_validator
 
@@ -30,6 +31,25 @@ def tornhill_ratio(shared: int, count_a: int, count_b: int) -> float:
     """Co-change coupling ratio (Tornhill): shared / min(count_a, count_b), 0 if either is 0."""
     lo = min(count_a, count_b)
     return shared / lo if lo else 0.0
+
+
+def wilson_lower_bound(successes: int, trials: int, z: float = 1.96) -> float:
+    """Lower bound of a Wilson score interval for a binomial proportion.
+
+    Coupling uses the smaller file-revision count as the number of trials.
+    The explicit 95% bound prevents perfect ratios from tiny samples from
+    outranking repeated evidence.
+    """
+    if trials < 0 or successes < 0 or successes > trials:
+        raise ValueError("Wilson counts must satisfy 0 <= successes <= trials")
+    if trials == 0:
+        return 0.0
+    proportion = successes / trials
+    z_squared = z * z
+    denominator = 1 + z_squared / trials
+    centre = proportion + z_squared / (2 * trials)
+    margin = z * sqrt((proportion * (1 - proportion) + z_squared / (4 * trials)) / trials)
+    return max(0.0, (centre - margin) / denominator)
 
 
 class FileChurn(BaseModel):  # [4a] Churn metrics per file
@@ -66,14 +86,28 @@ class TemporalCoupling(BaseModel):  # [4a.1] File pair co-change
 
     file_a: str
     file_b: str
-    co_change_count: int
-    commits_a: int
-    commits_b: int
+    co_change_count: int = Field(ge=0)
+    commits_a: int = Field(ge=0)
+    commits_b: int = Field(ge=0)
+
+    @model_validator(mode="after")
+    def co_changes_fit_revision_counts(self) -> "TemporalCoupling":
+        if self.co_change_count > min(self.commits_a, self.commits_b):
+            raise ValueError("co-change count exceeds the smaller file revision count")
+        return self
 
     @property
     def coupling_ratio(self) -> float:
         """Ratio of co-changes to minimum commit count (Tornhill's formula)."""
         return tornhill_ratio(self.co_change_count, self.commits_a, self.commits_b)
+
+    @property
+    def confidence_lower_bound(self) -> float:
+        """95% Wilson lower bound for the coupling ratio."""
+        return wilson_lower_bound(
+            self.co_change_count,
+            min(self.commits_a, self.commits_b),
+        )
 
 
 class FileOwnership(BaseModel):  # [4a.2] Authors per file
@@ -113,6 +147,42 @@ class CouplingInfo(BaseModel):
 
     file: str
     ratio: float = Field(ge=0.0, le=1.0)
+    shared_revisions: int = Field(default=0, ge=0)
+    file_revisions: int = Field(default=0, ge=0)
+    coupled_file_revisions: int = Field(default=0, ge=0)
+    confidence_lower_bound: float = Field(default=0.0, ge=0.0, le=1.0)
+
+
+def coupling_info_for(coupling: TemporalCoupling, file_path: str) -> CouplingInfo:
+    """Orient one raw pair as display evidence for ``file_path``."""
+    if file_path == coupling.file_a:
+        partner = coupling.file_b
+        file_revisions = coupling.commits_a
+        partner_revisions = coupling.commits_b
+    elif file_path == coupling.file_b:
+        partner = coupling.file_a
+        file_revisions = coupling.commits_b
+        partner_revisions = coupling.commits_a
+    else:
+        raise ValueError(f"{file_path} is not part of the coupling pair")
+    return CouplingInfo(
+        file=partner,
+        ratio=coupling.coupling_ratio,
+        shared_revisions=coupling.co_change_count,
+        file_revisions=file_revisions,
+        coupled_file_revisions=partner_revisions,
+        confidence_lower_bound=coupling.confidence_lower_bound,
+    )
+
+
+def coupling_info_sort_key(info: CouplingInfo) -> tuple[float, int, float, str]:
+    """Stable strongest-evidence-first ordering for display projections."""
+    return (
+        -info.confidence_lower_bound,
+        -info.shared_revisions,
+        -info.ratio,
+        info.file,
+    )
 
 
 class FunctionChurn(BaseModel):
@@ -290,6 +360,7 @@ class AnalysisResult(BaseModel):  # [4a.4] Complete analysis output
     analyzed_days: int
     generated_at: datetime
     files: list[FileForensics]
+    couplings: list[TemporalCoupling] = Field(default_factory=list)
     summary: AnalysisSummary
     parameters: AnalysisParameters = Field(default_factory=AnalysisParameters)
     ci_status: SignalStatus = Field(default_factory=SignalStatus)

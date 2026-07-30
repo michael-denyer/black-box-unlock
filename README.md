@@ -35,13 +35,15 @@ Register the MCP server in Claude Code (`.mcp.json`):
 ```
 
 Tools: `get_hotspots`, `get_file_forensics`, `get_coupled_files`,
-`get_ownership`, `get_ci_failures`, `get_flaky_steps`, `xray_file`.
+`get_ownership`, `get_ci_failures`, `get_flaky_steps`, `xray_file`,
+`review_change`.
 The two CI tools return `status` and `errors` alongside their data, so an
 unavailable or partial GitHub response is distinguishable from a clean result.
 
-The Claude Code plugin in this repo adds `/analyze`, `/hotspots`, a
+The Claude Code plugin in this repo adds `/review-change`, `/analyze`, `/hotspots`, a
 `git-forensics` agent, and an ambient coupling guard that warns when you
-edit one half of a temporally coupled file pair. Install it via the
+edit one half of a repeatedly coupled file pair. The hook parses Claude's JSON
+directly and does not require `jq`. Install it via the
 self-hosted marketplace:
 
 ```text
@@ -82,6 +84,16 @@ bbu analyze-repo --repo /path/to/repo --output=html > report.html
 
 # Per-function churn for one file (Tornhill's X-Ray)
 bbu xray src/hot_file.py --days 365
+
+# Review branch commits and local work from the upstream merge base
+bbu review-change --base origin/main
+
+# Review only staged work, or only unstaged and untracked work
+bbu review-change --staged
+bbu review-change --working-tree
+
+# Diagnose local activation (CI and gh remain optional)
+bbu doctor
 ```
 
 ### Features
@@ -89,7 +101,8 @@ bbu xray src/hot_file.py --days 365
 | Signal | Description |
 |--------|-------------|
 | **Hotspot Score** | commits × indentation complexity - identifies unstable complex code |
-| **Temporal Coupling** | Files changing together above the configured threshold reveal hidden dependencies; bulk commits touching >50 files are excluded from pair generation |
+| **Temporal Coupling** | Files changing together above the configured threshold reveal hidden dependencies; repeated evidence ranks by a 95% Wilson lower bound and bulk commits touching >50 files are excluded |
+| **Change Review** | A fresh branch, staged, or working-tree review returns at most three typed actions with raw evidence |
 | **Ownership Risk** | >3 authors + high churn = coordination problems |
 | **Build Failures** | Files appearing in CI failures = fragile code |
 | **Bug-fix Density** | Count of defect-repair commits per file |

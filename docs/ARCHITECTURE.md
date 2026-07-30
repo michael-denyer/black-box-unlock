@@ -2,8 +2,8 @@
 
 Code forensics tool based on Adam Tornhill's "Your Code as a Crime Scene".
 Signals are extracted from git history and GitHub Actions, joined per file,
-and served as JSON, an HTML report (frozen), MCP tools (`bbu-mcp`), and an
-ambient coupling-guard hook for Claude Code.
+and served as JSON, an HTML report (frozen), MCP tools (`bbu-mcp`), a fresh
+change-review decision, and an ambient coupling-guard hook for Claude Code.
 
 ## Module layout
 
@@ -12,7 +12,8 @@ src/black_box_unlock/
 ├── cli.py                  # Typer CLI: bbu analyze-repo / version
 ├── complexity.py           # Indentation-depth complexity proxy
 ├── analysis.py             # Pipeline: fetch -> parse -> join -> AnalysisResult
-├── mcp_server.py           # FastMCP server: bbu-mcp (seven read tools, cached)
+├── mcp_server.py           # FastMCP server: cached signals + fresh review
+├── review.py               # Pure review projection and bounded action policy
 ├── guard.py                # Coupling guard: small typed cache for the edit hook
 ├── core/
 │   ├── models.py           # Pydantic models (FileForensics, AnalysisResult, ...)
@@ -22,6 +23,7 @@ src/black_box_unlock/
 │   ├── log.py              # Native git log --numstat extraction
 │   ├── churn.py            # FileChurn aggregation
 │   ├── coupling.py         # Temporal coupling (Tornhill ratio, bulk-commit cap)
+│   ├── changes.py          # Base, staged, and working-tree selection
 │   ├── ownership.py        # Authors per file
 │   └── defects.py          # Bug-fix commit detection
 ├── cicd/
@@ -38,7 +40,7 @@ src/black_box_unlock/
 | Signal | Source | Formula |
 |--------|--------|---------|
 | Hotspot score | git + file contents | commits x indentation complexity (serialized-data/lockfile/generated-asset files and generator-marked files score 0; notebooks scored over code cells) |
-| Temporal coupling | git | co_changes / min(commits_a, commits_b), threshold 0.3; commits touching >50 files are excluded from pair generation |
+| Temporal coupling | git | co_changes / min(commits_a, commits_b), ordered by 95% Wilson lower bound; commits touching >50 files are excluded from pair generation |
 | Ownership risk | git | > 3 authors |
 | Bug-fix commits | git messages | fix(ing)/bug/hotfix/defect/regression/revert + repair verbs (correct/broke/crash/repair/fault/malfunction/stuck/hang) markers, excluding docs/style/test/chore/ci/build/refactor/feat-prefixed commits |
 | Build failures | gh CLI | files changed in failing workflow runs |
@@ -56,6 +58,10 @@ flowchart LR
     Join --> HTML[HTML report - frozen]
     Join --> MCP[bbu-mcp tools]
     Join --> Guard[coupling guard hook]
+    Git --> Change[typed change selection]
+    Change --> Review[fresh change review]
+    Join --> Review
+    Review --> MCP
 ```
 
 ## Degraded modes
@@ -64,6 +70,8 @@ flowchart LR
 - git missing -> `GitToolNotFoundError`, same handling
 - gh missing/unauthenticated -> `ci_status.state` is `unavailable`, errors are reported, analysis continues
 - one failed CI detail request -> `ci_status.state` is `partial`; successful run data is preserved
+- missing review base -> `InvalidRevisionError`, CLI prints a clean error
+- unresolved merge conflict -> `ChangeSelectionError`; no misleading actions are returned
 
 ## Roadmap
 

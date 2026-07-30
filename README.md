@@ -166,7 +166,7 @@ bbu validate --repo /path/to/repo --days 730
 The HTML output is a self-contained investigation workspace:
 
 - **Files** - searchable, sortable metrics with a persistent evidence panel
-- **Risk matrix and repository map** - two routes into the same selected file
+- **Risk matrix and change landscape** - two routes into the same selected file
 - **Coupling evidence** - confidence-first pairs with support and denominators
 - **CI and signals** - collection status, failed runs, flaky steps, and policy
 
@@ -174,6 +174,10 @@ The report opens in **Code only** scope: source files and migrations, with
 coupling limited to pairs whose two endpoints are in that scope. Tests,
 configuration, documentation, generated files, and repository metadata remain
 available through the scope selector.
+
+Numeric evidence columns use proportional heat bars scaled to the current
+scope. The change landscape groups files by code area without repeating
+low-information repository path levels.
 
 Pinned ECharts and Tabulator assets are embedded in the document, so opening a
 saved report makes no CDN requests. Charts are supplementary: the evidence

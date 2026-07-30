@@ -34,6 +34,25 @@
     {column: "shared_revisions", dir: "desc"},
     {column: "raw_ratio", dir: "desc"},
   ];
+  const fileEvidenceFields = [
+    "hotspot_score",
+    "commits",
+    "complexity",
+    "author_count",
+    "bugfix_commits",
+    "build_failures",
+    "strongest_confidence",
+  ];
+  const couplingEvidenceFields = [
+    "confidence_lower_bound",
+    "shared_revisions",
+    "revisions_a",
+    "revisions_b",
+    "denominator",
+    "raw_ratio",
+  ];
+  let fileEvidenceMax = {};
+  let couplingEvidenceMax = {};
 
   couplings.forEach((pair, index) => {
     [pair.file_a, pair.file_b].forEach(path => {
@@ -207,8 +226,41 @@
     }));
   }
 
+  function fieldMaxima(items, fields) {
+    return Object.fromEntries(fields.map(field => [
+      field,
+      items.reduce((maximum, item) => Math.max(maximum, Number(item[field]) || 0), 0),
+    ]));
+  }
+
+  function updateEvidenceScales(rows = scopedFileRows()) {
+    fileEvidenceMax = fieldMaxima(rows, fileEvidenceFields);
+    couplingEvidenceMax = fieldMaxima(activeCouplings, couplingEvidenceFields);
+  }
+
+  function meterNode(value, maximum, colour, formatter) {
+    const numericValue = Number(value) || 0;
+    const ratio = maximum > 0 ? Math.sqrt(Math.max(0, numericValue / maximum)) : 0;
+    const meter = text("span", formatter(numericValue), "evidence-meter");
+    meter.style.setProperty("--meter", `${Math.round(ratio * 100)}%`);
+    meter.style.setProperty("--meter-color", colour);
+    meter.title = maximum > 0
+      ? `${formatter(numericValue)} · ${Math.round(numericValue / maximum * 100)}% of the scope maximum`
+      : formatter(numericValue);
+    return meter;
+  }
+
+  function fileMeter(field, colour, formatter = formatInteger) {
+    return cell => meterNode(cell.getValue(), fileEvidenceMax[field], colour, formatter);
+  }
+
+  function couplingMeter(field, colour, formatter = formatInteger) {
+    return cell => meterNode(cell.getValue(), couplingEvidenceMax[field], colour, formatter);
+  }
+
   function initializeFileGrid() {
     const rows = scopedFileRows();
+    updateEvidenceScales(rows);
     const pathFormatter = cell => text("span", cell.getValue(), "path-cell");
     const inspectFormatter = cell => {
       const button = text("button", "Inspect", "inspect-button");
@@ -229,13 +281,13 @@
       initialSort: fileEvidenceSort,
       columns: [
         {title: "File", field: "path", width: 310, minWidth: 220, formatter: pathFormatter},
-        {title: "Hotspot", field: "hotspot_score", sorter: "number", headerSortStartingDir: "desc", hozAlign: "right", formatter: cell => formatInteger(Math.round(cell.getValue()))},
-        {title: "Revisions", field: "commits", sorter: "number", headerSortStartingDir: "desc", hozAlign: "right"},
-        {title: "Complexity", field: "complexity", sorter: "number", headerSortStartingDir: "desc", hozAlign: "right", formatter: cell => Number(cell.getValue()).toFixed(1)},
-        {title: "Authors", field: "author_count", sorter: "number", headerSortStartingDir: "desc", hozAlign: "right"},
-        {title: "Bug fixes", field: "bugfix_commits", sorter: "number", headerSortStartingDir: "desc", hozAlign: "right"},
-        {title: "CI", field: "build_failures", sorter: "number", headerSortStartingDir: "desc", hozAlign: "right"},
-        {title: "Best confidence", field: "strongest_confidence", sorter: "number", headerSortStartingDir: "desc", hozAlign: "right", formatter: cell => formatPercent(cell.getValue())},
+        {title: "Hotspot", field: "hotspot_score", sorter: "number", headerSortStartingDir: "desc", formatter: fileMeter("hotspot_score", "#b63a30", value => formatInteger(Math.round(value)))},
+        {title: "Revisions", field: "commits", sorter: "number", headerSortStartingDir: "desc", formatter: fileMeter("commits", "#2c6480")},
+        {title: "Complexity", field: "complexity", sorter: "number", headerSortStartingDir: "desc", formatter: fileMeter("complexity", "#ad6a1f", value => value.toFixed(1))},
+        {title: "Authors", field: "author_count", sorter: "number", headerSortStartingDir: "desc", formatter: fileMeter("author_count", "#28735c")},
+        {title: "Bug fixes", field: "bugfix_commits", sorter: "number", headerSortStartingDir: "desc", formatter: fileMeter("bugfix_commits", "#b63a30")},
+        {title: "CI", field: "build_failures", sorter: "number", headerSortStartingDir: "desc", formatter: fileMeter("build_failures", "#b63a30")},
+        {title: "Best confidence", field: "strongest_confidence", sorter: "number", headerSortStartingDir: "desc", formatter: fileMeter("strongest_confidence", "#6754a6", formatPercent)},
         {title: "", field: "path", width: 72, headerSort: false, formatter: inspectFormatter},
       ],
     });
@@ -266,12 +318,12 @@
       columns: [
         {title: "File A", field: "file_a", width: 300, minWidth: 210, formatter: pathFormatter},
         {title: "File B", field: "file_b", width: 300, minWidth: 210, formatter: pathFormatter},
-        {title: "95% lower bound", field: "confidence_lower_bound", sorter: "number", headerSortStartingDir: "desc", hozAlign: "right", formatter: cell => formatPercent(cell.getValue())},
-        {title: "Shared", field: "shared_revisions", sorter: "number", headerSortStartingDir: "desc", hozAlign: "right"},
-        {title: "Revisions A", field: "revisions_a", sorter: "number", headerSortStartingDir: "desc", hozAlign: "right"},
-        {title: "Revisions B", field: "revisions_b", sorter: "number", headerSortStartingDir: "desc", hozAlign: "right"},
-        {title: "Denominator", field: "denominator", sorter: "number", headerSortStartingDir: "desc", hozAlign: "right"},
-        {title: "Raw ratio", field: "raw_ratio", sorter: "number", headerSortStartingDir: "desc", hozAlign: "right", formatter: cell => formatPercent(cell.getValue())},
+        {title: "95% lower bound", field: "confidence_lower_bound", sorter: "number", headerSortStartingDir: "desc", formatter: couplingMeter("confidence_lower_bound", "#6754a6", formatPercent)},
+        {title: "Shared", field: "shared_revisions", sorter: "number", headerSortStartingDir: "desc", formatter: couplingMeter("shared_revisions", "#2c6480")},
+        {title: "Revisions A", field: "revisions_a", sorter: "number", headerSortStartingDir: "desc", formatter: couplingMeter("revisions_a", "#2c6480")},
+        {title: "Revisions B", field: "revisions_b", sorter: "number", headerSortStartingDir: "desc", formatter: couplingMeter("revisions_b", "#2c6480")},
+        {title: "Denominator", field: "denominator", sorter: "number", headerSortStartingDir: "desc", formatter: couplingMeter("denominator", "#2c6480")},
+        {title: "Raw ratio", field: "raw_ratio", sorter: "number", headerSortStartingDir: "desc", formatter: couplingMeter("raw_ratio", "#28735c", formatPercent)},
       ],
     });
     couplingTable.on("rowClick", (_event, row) => {
@@ -322,6 +374,7 @@
     chartFiles = activeFiles;
 
     const rows = scopedFileRows();
+    updateEvidenceScales(rows);
     await Promise.all([
       fileTable.setData(rows),
       couplingTable.setData(activeCouplings),
@@ -355,7 +408,7 @@
     const maxHotspot = Math.max(1, ...scopedFiles.map(file => file.hotspot_score || 0));
     riskChart.setOption({
       animation: false,
-      aria: {enabled: true, decal: {show: true}},
+      aria: {enabled: true},
       grid: {left: 58, right: 28, top: 28, bottom: 52},
       xAxis: {name: "Revisions", nameLocation: "middle", nameGap: 32, splitLine: {lineStyle: {color: "#e0e0d8"}}},
       yAxis: {name: "Complexity", nameLocation: "middle", nameGap: 42, splitLine: {lineStyle: {color: "#e0e0d8"}}},
@@ -371,42 +424,53 @@
         type: "scatter",
         data: scopedFiles.map(file => [file.commits, file.complexity, file.lines_changed, file.path, file.hotspot_score]),
         symbolSize: value => 7 + 20 * Math.sqrt((value[2] || 0) / maxLines),
-        itemStyle: {color: params => riskColour(params.data[4], maxHotspot), opacity: .82, borderColor: "#fff", borderWidth: 1},
+        itemStyle: {color: params => riskColour(params.data[4], maxHotspot), opacity: .84, borderColor: "#fff", borderWidth: 1, shadowBlur: 8, shadowColor: "rgba(23, 35, 40, .18)"},
         emphasis: {scale: 1.3, itemStyle: {borderColor: "#172328", borderWidth: 2}},
       }],
     }, {notMerge: true});
   }
 
-  function repositoryTree(scopedFiles, maxHotspot) {
-    const root = {name: analysis.repo, id: "root", children: [], directories: new Map()};
+  function repositoryGroup(file) {
+    const roleGroups = {
+      test: "tests",
+      config: "configuration",
+      docs: "documentation",
+      migration: "migrations",
+      generated: "generated",
+      other: "repository support",
+    };
+    if (file.path_role !== "source") return roleGroups[file.path_role] || file.path_role;
+
+    const parts = file.path.split("/").filter(Boolean);
+    const srcIndex = parts.indexOf("src");
+    if (srcIndex >= 0) {
+      const belowSrc = parts.slice(srcIndex + 1);
+      if (belowSrc.length >= 3) return belowSrc[1];
+      return "package root";
+    }
+    return parts.length > 1 ? parts[0] : "root";
+  }
+
+  function repositoryGroups(scopedFiles, maxHotspot) {
+    const groups = new Map();
     scopedFiles.forEach(file => {
-      const parts = file.path.split("/").filter(Boolean);
-      let node = root;
-      let accumulated = "";
-      parts.slice(0, -1).forEach(part => {
-        accumulated = accumulated ? `${accumulated}/${part}` : part;
-        if (!node.directories.has(part)) {
-          const directory = {name: part, id: `dir:${accumulated}`, children: [], directories: new Map()};
-          node.directories.set(part, directory);
-          node.children.push(directory);
-        }
-        node = node.directories.get(part);
-      });
-      node.children.push({
-        name: parts.at(-1) || file.path,
+      const groupName = repositoryGroup(file);
+      if (!groups.has(groupName)) {
+        groups.set(groupName, {name: groupName, id: `group:${groupName}`, children: []});
+      }
+      groups.get(groupName).children.push({
+        name: basename(file.path),
         id: `file:${file.path}`,
         path: file.path,
         value: Math.max(file.lines_changed || 0, 1),
         actualLinesChanged: file.lines_changed || 0,
         hotspot: file.hotspot_score || 0,
+        revisions: file.commits || 0,
+        complexity: file.complexity || 0,
         itemStyle: {color: riskColour(file.hotspot_score || 0, maxHotspot)},
       });
     });
-    const stripMaps = node => ({
-      ...Object.fromEntries(Object.entries(node).filter(([key]) => key !== "directories")),
-      children: (node.children || []).map(stripMaps),
-    });
-    return stripMaps(root);
+    return Array.from(groups.values());
   }
 
   function initializeRepositoryMap() {
@@ -418,28 +482,39 @@
     const maxHotspot = Math.max(1, ...scopedFiles.map(file => file.hotspot_score || 0));
     mapChart.setOption({
       animation: false,
-      aria: {enabled: true, decal: {show: true}},
+      aria: {enabled: true},
       tooltip: {
+        confine: true,
         formatter: params => {
           const item = params.data;
           if (!item.path) return escapeHtml(item.name);
-          return `<strong>${escapeHtml(item.path)}</strong><br>${formatInteger(item.actualLinesChanged)} lines changed<br>hotspot ${formatInteger(Math.round(item.hotspot))}`;
+          return `<strong>${escapeHtml(item.path)}</strong><br>${formatInteger(item.actualLinesChanged)} lines changed · ${formatInteger(item.revisions)} revisions<br>complexity ${Number(item.complexity).toFixed(1)} · hotspot ${formatInteger(Math.round(item.hotspot))}`;
         },
       },
       series: [{
         id: "repository",
         type: "treemap",
-        data: repositoryTree(scopedFiles, maxHotspot).children,
+        data: repositoryGroups(scopedFiles, maxHotspot),
         roam: false,
-        nodeClick: "zoomToNode",
-        breadcrumb: {show: true, bottom: 4},
-        label: {show: true, formatter: "{b}"},
-        upperLabel: {show: true, height: 24},
-        itemStyle: {borderColor: "#fffefa", borderWidth: 2, gapWidth: 1},
+        nodeClick: false,
+        breadcrumb: {show: false},
+        sort: "desc",
+        label: {
+          show: true,
+          color: "#fff",
+          fontSize: 11,
+          fontWeight: 700,
+          lineHeight: 16,
+          overflow: "truncate",
+          formatter: params => `${params.data.name}\n${formatInteger(Math.round(params.data.hotspot || 0))} hotspot`,
+        },
+        upperLabel: {show: true, height: 25, color: "#244851", fontSize: 11, fontWeight: 750},
+        itemStyle: {borderColor: "#fffefa", borderWidth: 2, gapWidth: 2, borderRadius: 5},
+        emphasis: {focus: "self", itemStyle: {borderColor: "#172328", borderWidth: 2}},
         levels: [
-          {itemStyle: {borderWidth: 0, gapWidth: 3}},
-          {color: ["#315973", "#386f6b", "#7d8860", "#bd752f", "#7a3b39"]},
-          {colorSaturation: [.25, .75]},
+          {itemStyle: {borderWidth: 0, gapWidth: 5}},
+          {upperLabel: {show: true}, itemStyle: {borderColor: "#e7ece9", borderWidth: 25, gapWidth: 3, borderRadius: 8}},
+          {itemStyle: {borderColor: "#fffefa", borderWidth: 2, gapWidth: 2, borderRadius: 5}},
         ],
       }],
     }, {notMerge: true});

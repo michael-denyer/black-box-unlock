@@ -155,3 +155,24 @@ def test_report_uses_compact_desktop_density() -> None:
     assert 'height: "390px"' in document
     assert ".tabulator-row { min-height: 36px;" in document
     assert "padding: 6px 8px;" in document
+
+
+def test_numeric_evidence_uses_visible_scope_heat_meters() -> None:
+    document = generate_html_report(_result())
+
+    assert "function updateEvidenceScales(rows = scopedFileRows())" in document
+    assert 'fileMeter("hotspot_score", "#b63a30"' in document
+    assert 'fileMeter("complexity", "#ad6a1f"' in document
+    assert 'couplingMeter("confidence_lower_bound", "#6754a6"' in document
+    assert ".evidence-meter {" in document
+
+
+def test_change_landscape_flattens_noise_without_losing_files() -> None:
+    document = generate_html_report(_result())
+
+    assert "Change landscape" in document
+    assert "function repositoryGroups(scopedFiles, maxHotspot)" in document
+    assert "data: repositoryGroups(scopedFiles, maxHotspot)" in document
+    assert "breadcrumb: {show: false}" in document
+    assert "nodeClick: false" in document
+    assert "decal: {show: true}" not in document

@@ -30,7 +30,30 @@ jobs:
         run: uv sync --all-extras --dev
 
       - name: Run prek checks
+        # Lychee's Linux binary targets Ubuntu 24.04's glibc. It runs in the
+        # links job below; mmdc stays here for Ubuntu 22.04's Chromium sandbox.
+        env:
+          SKIP: lychee
         run: uv run prek run --all-files
+
+  links:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6
+        with:
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39  # v8.2.0
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install hook dependencies
+        run: uv sync --only-group dev
+
+      - name: Check Markdown links
+        run: uv run prek run lychee --all-files
 
   test:
     runs-on: ubuntu-latest

@@ -17,7 +17,9 @@
 
 Code forensics tool based on Adam Tornhill's ["Your Code as a Crime Scene"](https://pragprog.com/titles/atcrime2/your-code-as-a-crime-scene-second-edition/).
 
-Key insight: **2-8% of files cause 60-90% of defects**. Built for AI coding agents: forensic signals as MCP tools and a Claude Code plugin, so reviews and refactors are prioritized by evidence.
+The useful bit from code-forensics research is concentration: **2-8% of files
+cause 60-90% of defects**. Black Box Unlock gives AI coding agents those
+signals through MCP tools and a Claude Code plugin.
 </td>
 </tr>
 </table>
@@ -37,8 +39,10 @@ Register the MCP server in Claude Code (`.mcp.json`):
 Tools: `get_hotspots`, `get_file_forensics`, `get_coupled_files`,
 `get_ownership`, `get_ci_failures`, `get_flaky_steps`, `xray_file`,
 `review_change`.
-The two CI tools return `status` and `errors` alongside their data, so an
-unavailable or partial GitHub response is distinguishable from a clean result.
+The CI tools return `status` and `errors`, so a missing or partial GitHub
+response cannot look like a clean result. Failed-run data includes the workflow,
+run URL, commit, time, and paths changed in that commit. Those paths are
+implicated by the failed run, not proven to have caused it.
 
 The Claude Code plugin in this repo adds `/review-change`, `/analyze`, `/hotspots`, a
 `git-forensics` agent, and an ambient coupling guard that warns when you
@@ -62,7 +66,9 @@ to work.
 uv pip install -e .
 ```
 
-CI failure analysis additionally uses the [gh](https://cli.github.com/) CLI when available (skip with `--no-ci`).
+`analyze-repo` uses the [gh](https://cli.github.com/) CLI for CI data by
+default; pass `--no-ci` to skip it. `review-change` queries GitHub only when a
+profile or `--include-ci` turns that signal on.
 
 ### Usage
 
@@ -92,9 +98,42 @@ bbu review-change --base origin/main
 bbu review-change --staged
 bbu review-change --working-tree
 
+# Use a named .bbu.toml profile and retain failed workflow details
+bbu review-change --profile release
+
 # Diagnose local activation (CI and gh remain optional)
 bbu doctor
 ```
+
+### Project configuration
+
+Add `.bbu.toml` when the built-in path roles or review defaults do not fit the
+repository:
+
+```toml
+default_profile = "release"
+
+[[path_roles]]
+pattern = "app/**/*.vue"
+role = "source"
+
+[[path_roles]]
+pattern = "snapshots/**"
+role = "generated"
+
+[profiles.release]
+days = 180
+min_coupling = 0.4
+min_shared_revisions = 3
+include_ci = true
+max_actions = 3
+```
+
+Project path rules run in file order before the built-in rules. Named profiles
+set review defaults; command-line and MCP arguments override the selected
+profile. Invalid configuration stops the review with a clear error. The full
+format and glob rules are in
+[docs/CONFIGURATION.md](docs/CONFIGURATION.md).
 
 ### Features
 
@@ -103,8 +142,8 @@ bbu doctor
 | **Hotspot Score** | commits × indentation complexity - identifies unstable complex code |
 | **Temporal Coupling** | Files changing together above the configured threshold reveal hidden dependencies; repeated evidence ranks by a 95% Wilson lower bound and bulk commits touching >50 files are excluded |
 | **Change Review** | A fresh branch, staged, or working-tree review returns at most three typed actions with raw evidence |
-| **Ownership Risk** | >3 authors + high churn = coordination problems |
-| **Build Failures** | Files appearing in CI failures = fragile code |
+| **Ownership Risk** | More than three authors marks a coordination risk |
+| **Build Failures** | Failed workflow links and files changed in each failed commit, reported as implication rather than causation |
 | **Bug-fix Density** | Count of defect-repair commits per file |
 | **Flaky Steps** | CI steps that failed then passed on re-run |
 | **Function X-Ray** | Per-function churn × complexity for hot files ([docs/XRAY.md](docs/XRAY.md)) |
@@ -114,7 +153,7 @@ bbu doctor
 Measured with `bbu validate` (split-history: rank hotspots on the older half,
 count bug-fix commits in the newer half): median Spearman rho **0.46** across
 six real repos (click, flask, pydantic, rich, fastapi, httpx); the top 10% of
-ranked files attracted a median **46%** of subsequent bug-fix touches — uniform
+ranked files attracted a median **46%** of subsequent bug-fix touches; uniform
 would be 10%. Method, per-repo numbers, and limitations:
 [docs/VALIDATION.md](docs/VALIDATION.md).
 

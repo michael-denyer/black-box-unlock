@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
-from ..core.models import FlakyStepSummary, SignalState, SignalStatus
+from ..core.models import FailedWorkflowRun, FlakyStepSummary, SignalState, SignalStatus
 from .models import CIAnalysis, FlakyStep, WorkflowJob, WorkflowRun
 
 
@@ -17,6 +17,7 @@ def parse_workflow_runs(gh_json: list[dict]) -> list[WorkflowRun]:
         WorkflowRun(
             run_id=item["id"],
             workflow_name=item["name"],
+            run_url=item["html_url"],
             commit_sha=item["head_sha"],
             conclusion=item["conclusion"] or "unknown",
             created_at=item["created_at"],
@@ -167,14 +168,29 @@ def collect_ci_signals(repo_path: Path = Path("."), limit: int = 100) -> CIAnaly
         )
 
     file_failures: Counter[str] = Counter()
+    failed_runs: list[FailedWorkflowRun] = []
     flaky_observations: list[FlakyStep] = []
     errors: list[str] = []
     for run in runs:
-        if run.is_failure:
+        failure_conclusion = run.failure_conclusion
+        if failure_conclusion is not None:
+            implicated_paths: list[str] = []
             try:
-                file_failures.update(get_files_changed(run.commit_sha, repo_path=repo_path))
+                implicated_paths = get_files_changed(run.commit_sha, repo_path=repo_path)
+                file_failures.update(implicated_paths)
             except Exception as error:
                 errors.append(_error_message(f"files for run {run.run_id}", error))
+            failed_runs.append(
+                FailedWorkflowRun(
+                    run_id=run.run_id,
+                    workflow_name=run.workflow_name,
+                    run_url=run.run_url,
+                    commit_sha=run.commit_sha,
+                    conclusion=failure_conclusion,
+                    created_at=run.created_at,
+                    implicated_paths=implicated_paths,
+                )
+            )
         if run.run_attempt > 1:
             try:
                 jobs = fetch_jobs_for_run(run.run_id, repo_path=repo_path)
@@ -187,5 +203,6 @@ def collect_ci_signals(repo_path: Path = Path("."), limit: int = 100) -> CIAnaly
     return CIAnalysis(
         status=SignalStatus(state=state, errors=errors),
         file_failures=dict(file_failures),
+        failed_runs=failed_runs,
         flaky_steps=summarize_flaky_steps(flaky_observations),
     )

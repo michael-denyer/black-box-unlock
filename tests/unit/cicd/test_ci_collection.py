@@ -19,6 +19,7 @@ def _run(
     return WorkflowRun(
         run_id=run_id,
         workflow_name="CI",
+        run_url=f"https://github.com/example/repo/actions/runs/{run_id}",
         commit_sha=f"sha-{run_id}",
         conclusion=conclusion,
         created_at=datetime(2026, 6, run_id, tzinfo=timezone.utc),
@@ -48,6 +49,8 @@ class TestCollectCISignals:
         mock_jobs.assert_called_once_with(1, repo_path=tmp_path)
         assert result.status.state is SignalState.available
         assert result.file_failures == {"src/a.py": 1}
+        assert result.failed_runs[0].run_url.endswith("/1")
+        assert result.failed_runs[0].implicated_paths == ["src/a.py"]
 
     @patch("black_box_unlock.cicd.github_actions.get_files_changed")
     @patch("black_box_unlock.cicd.github_actions.fetch_workflow_runs")
@@ -64,6 +67,10 @@ class TestCollectCISignals:
         assert result.file_failures == {"src/a.py": 1}
         assert len(result.status.errors) == 1
         assert "run 2" in result.status.errors[0]
+        assert [run.implicated_paths for run in result.failed_runs] == [
+            ["src/a.py"],
+            [],
+        ]
 
     @patch("black_box_unlock.cicd.github_actions.fetch_workflow_runs")
     def test_run_fetch_failure_is_explicitly_unavailable(self, mock_runs, tmp_path):
@@ -73,6 +80,7 @@ class TestCollectCISignals:
 
         assert result.status.state is SignalState.unavailable
         assert result.file_failures == {}
+        assert result.failed_runs == []
         assert result.flaky_steps == []
         assert result.status.errors == ["gh not found"]
 

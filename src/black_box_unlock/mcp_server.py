@@ -13,11 +13,11 @@ from typing import Literal
 from mcp.server.fastmcp import FastMCP
 
 from .analysis import run_analysis
+from .config import ReviewOverrides, resolve_review_settings
 from .core.exceptions import BlackBoxUnlockError
 from .core.models import AnalysisResult, FileForensics
 from .git.changes import BaseChange, StagedChange, WorkingTreeChange
 from .git.xray import xray_file as _xray_file
-from .review import ReviewParameters
 from .review import run_change_review as _run_change_review
 
 mcp = FastMCP("black-box-unlock")
@@ -127,9 +127,10 @@ def get_ownership(
 
 @mcp.tool()
 def get_ci_failures(repo_path: str = ".") -> dict:
-    """Files implicated in failing CI runs, most-failing first.
+    """Failed CI runs and implicated files, with most-failing files first.
 
     Scans the repository's last 100 workflow runs (not limited by a day window).
+    Changed paths are correlated with the failed run, not proven causal.
     """
     # days=30: canonical window for cache reuse; CI signals are run-count-based, not day-based
     result = _safe_analysis(repo_path, 30, include_ci=True)
@@ -139,6 +140,7 @@ def get_ci_failures(repo_path: str = ".") -> dict:
         "status": result.ci_status.state.value,
         "errors": result.ci_status.errors,
         "files": [{"path": f.path, "build_failures": f.build_failures} for f in failing],
+        "runs": [run.model_dump(mode="json") for run in result.failed_ci_runs],
     }
 
 
@@ -191,16 +193,18 @@ def review_change(
     repo_path: str = ".",
     mode: Literal["base", "staged", "working_tree"] = "working_tree",
     base_ref: str = "origin/main",
-    days: int = 90,
-    min_coupling: float = 0.3,
-    min_shared_revisions: int = 2,
-    include_ci: bool = False,
+    profile: str | None = None,
+    days: int | None = None,
+    min_coupling: float | None = None,
+    min_shared_revisions: int | None = None,
+    include_ci: bool | None = None,
 ) -> dict:
     """Review a current change and return at most three evidence-backed actions.
 
     ``base`` includes branch commits and all local layers from the merge base.
     ``staged`` reads only the index. ``working_tree`` reads unstaged and
-    untracked files. Review always runs fresh; CI is opt-in.
+    untracked files. Review always runs fresh. CI stays off unless a selected
+    profile or ``include_ci`` turns it on.
     """
     selectors = {
         "base": BaseChange(base_ref=base_ref),
@@ -208,15 +212,21 @@ def review_change(
         "working_tree": WorkingTreeChange(),
     }
     try:
-        result = _run_change_review(
+        settings = resolve_review_settings(
             Path(repo_path),
-            selectors[mode],
-            ReviewParameters(
+            profile_name=profile,
+            overrides=ReviewOverrides(
                 days=days,
                 min_coupling=min_coupling,
                 min_shared_revisions=min_shared_revisions,
                 include_ci=include_ci,
             ),
+        )
+        result = _run_change_review(
+            Path(repo_path),
+            selectors[mode],
+            settings.parameters,
+            path_role_rules=settings.path_roles,
         )
     except BlackBoxUnlockError as error:
         raise ValueError(str(error)) from error

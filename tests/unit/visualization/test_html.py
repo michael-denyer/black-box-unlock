@@ -60,6 +60,9 @@ def test_generates_one_complete_investigation_workspace() -> None:
 
     assert document.startswith("<!doctype html>")
     assert document.endswith("</html>\n")
+    assert "Code forensics report" in document
+    assert "Repository evidence overview" in document
+    assert "Where should attention go first?" not in document
     assert 'data-testid="file-grid"' in document
     assert 'data-testid="coupling-grid"' in document
     assert 'data-testid="scope-select"' in document
@@ -167,6 +170,19 @@ def test_numeric_evidence_uses_visible_scope_heat_meters() -> None:
     assert ".evidence-meter {" in document
 
 
+def test_report_translates_ranked_evidence_into_next_actions() -> None:
+    document = generate_html_report(_result())
+
+    assert 'id="investigation-leads"' in document
+    assert "Investigation leads" in document
+    assert "function updateInvestigationLeads()" in document
+    assert "Do this next:" in document
+    assert "Inspect file" in document
+    assert "Open coupling evidence" in document
+    assert "Review top files" in document
+    assert document.count("updateInvestigationLeads();") >= 2
+
+
 def test_change_landscape_flattens_noise_without_losing_files() -> None:
     document = generate_html_report(_result())
 
@@ -205,6 +221,7 @@ def test_workspace_cards_fit_their_content_and_use_compact_grid_actions() -> Non
     document = generate_html_report(_result())
 
     assert ".workspace {" in document
+    assert "#file-grid { height: min(570px, calc(100vh - 300px)); min-height: 390px; }" in document
     assert document.count('class="workspace-column ') == 2
     assert 'class="workspace-column workspace-primary"' in document
     assert 'class="workspace-column workspace-secondary"' in document
@@ -215,3 +232,11 @@ def test_workspace_cards_fit_their_content_and_use_compact_grid_actions() -> Non
     assert document.count('class="icon-button" data-focus-grid') == 2
     assert document.count('aria-label="View these files in the grid"') == 2
     assert "View the same files in the grid" not in document
+    assert document.index('class="panel files-panel"') < document.index(
+        'class="panel chart-panel landscape-panel"'
+    )
+    assert document.index('class="panel evidence-panel"') < document.index(
+        'class="panel chart-panel risk-panel"'
+    )
+    assert ".landscape-panel { order: 3; }" in document
+    assert ".risk-panel { order: 4; }" in document

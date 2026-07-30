@@ -190,6 +190,8 @@ def test_numeric_evidence_uses_visible_scope_heat_meters() -> None:
     assert 'fileMeter("complexity", "#ad6a1f"' in document
     assert 'couplingMeter("confidence_lower_bound", "#6754a6"' in document
     assert ".evidence-meter {" in document
+    assert "color-mix(in srgb, var(--meter-color) 7%, transparent) var(--meter) 100%" in document
+    assert "transparent var(--meter) 100%" not in document
 
 
 def test_report_translates_ranked_evidence_into_next_actions() -> None:

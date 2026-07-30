@@ -163,7 +163,7 @@ footer { padding: 14px 28px 17px 238px; border-top: 1px solid var(--line); color
   background: linear-gradient(
     90deg,
     color-mix(in srgb, var(--meter-color) 22%, transparent) 0 var(--meter),
-    transparent var(--meter) 100%
+    color-mix(in srgb, var(--meter-color) 7%, transparent) var(--meter) 100%
   );
   color: var(--ink);
   font-variant-numeric: tabular-nums;

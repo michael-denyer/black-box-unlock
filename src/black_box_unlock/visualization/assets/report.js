@@ -661,17 +661,28 @@
     return list;
   }
 
-  function signalRows(items, render) {
+  function signalRows(items, render, emptyMessage) {
     const fragment = document.createDocumentFragment();
-    if (!items.length) fragment.append(text("p", "No observations collected.", "empty-state"));
+    if (!items.length) fragment.append(text("p", emptyMessage, "empty-state"));
     items.forEach(item => fragment.append(render(item)));
     return fragment;
   }
 
   function initializeSignals() {
     const ci = document.getElementById("ci-status");
+    const ciState = analysis.ci_status.state;
+    const ciSummary = {
+      disabled: "CI evidence was not collected for this report.",
+      unavailable: "CI evidence was requested but could not be collected.",
+      partial: "Some CI evidence was collected; diagnostics explain what is missing.",
+      available: "CI evidence was collected for this report.",
+    }[ciState];
+    ci.append(text("p", ciSummary, "signal-summary"));
+    if (ciState === "disabled") {
+      ci.append(text("code", "bbu analyze-repo --output html > report.html", "signal-command"));
+    }
     ci.append(definitionList([
-      ["State", analysis.ci_status.state],
+      ["State", ciState[0].toUpperCase() + ciState.slice(1)],
       ["Diagnostics", analysis.ci_status.errors.length ? analysis.ci_status.errors.join("; ") : "None"],
     ]));
 
@@ -684,7 +695,7 @@
         text("span", run.run_url, "mono muted"),
       );
       return node;
-    }));
+    }, "No failed workflow runs were observed."));
 
     const flaky = document.getElementById("flaky-steps");
     flaky.append(signalRows(analysis.flaky_steps || [], step => {
@@ -695,7 +706,7 @@
         text("span", `${new Date(step.first_seen).toLocaleDateString("en-GB")} – ${new Date(step.last_seen).toLocaleDateString("en-GB")}`, "muted"),
       );
       return node;
-    }));
+    }, "No recovered retry patterns were observed."));
 
     const policy = analysis.parameters;
     document.getElementById("analysis-policy").append(definitionList([

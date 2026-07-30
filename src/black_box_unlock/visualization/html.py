@@ -70,6 +70,9 @@ def generate_html_report(result: AnalysisResult) -> str:
         "/*__ECHARTS_JS__*/": assets.echarts_js,
         "/*__TABULATOR_JS__*/": assets.tabulator_js,
         "/*__REPORT_JS__*/": assets.report_js,
+        "__CI_OBSERVATION_VISIBILITY__": (
+            " hidden" if result.ci_status.state.value in {"disabled", "unavailable"} else ""
+        ),
         "__REPORT_DATA__": _json_for_script(build_report_payload(result)),
     }
     for sentinel, value in replacements.items():

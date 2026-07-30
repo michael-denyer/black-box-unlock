@@ -173,10 +173,12 @@
         <div class="signals-grid">
           <section class="panel signal-card"><div class="eyebrow">Collection state</div>
             <h2>CI evidence</h2><div id="ci-status"></div></section>
-          <section class="panel signal-card"><div class="eyebrow">Observed failures</div>
-            <h2>Failed workflow runs</h2><div id="failed-runs"></div></section>
-          <section class="panel signal-card"><div class="eyebrow">Recovered retries</div>
-            <h2>Flaky steps</h2><div id="flaky-steps"></div></section>
+          <div id="ci-observation-panels" class="ci-observation-cards"__CI_OBSERVATION_VISIBILITY__>
+            <section class="panel signal-card"><div class="eyebrow">Observed failures</div>
+              <h2>Failed workflow runs</h2><div id="failed-runs"></div></section>
+            <section class="panel signal-card"><div class="eyebrow">Recovered retries</div>
+              <h2>Flaky steps</h2><div id="flaky-steps"></div></section>
+          </div>
           <section class="panel signal-card"><div class="eyebrow">Interpretation</div>
             <h2>Analysis policy</h2><div id="analysis-policy"></div></section>
         </div>

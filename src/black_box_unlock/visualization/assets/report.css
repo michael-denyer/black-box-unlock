@@ -128,11 +128,15 @@ p { margin: 0; }
 .explanation { padding: 11px 15px; border-bottom: 1px solid var(--line); background: #f2f5f2; color: var(--muted); font-size: .75rem; line-height: 1.5; }
 .explanation strong { color: var(--ink); }
 .signals-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
-.signal-card { min-height: 240px; padding: 18px; }
+.ci-observation-cards { display: contents; }
+.ci-observation-cards[hidden] { display: none; }
+.signal-card { padding: 18px; }
 .signal-card h2 { margin: 5px 0 16px; font-family: Georgia, "Times New Roman", serif; font-size: 1.25rem; font-weight: 500; }
 .signal-card dl { display: grid; grid-template-columns: max-content 1fr; gap: 7px 14px; margin: 0; font-size: .76rem; }
 .signal-card dt { color: var(--muted); }
 .signal-card dd { margin: 0; overflow-wrap: anywhere; }
+.signal-summary { max-width: 58ch; margin: 0 0 12px; color: var(--muted); font-size: .76rem; line-height: 1.5; }
+.signal-command { display: block; width: fit-content; max-width: 100%; margin: -3px 0 16px; padding: 6px 8px; border-radius: 5px; background: #f1f3f0; font-size: .7rem; overflow-wrap: anywhere; }
 .signal-row { padding: 10px 0; border-top: 1px solid var(--line); font-size: .74rem; line-height: 1.5; }
 .signal-row strong { display: block; }
 footer { padding: 14px 28px 17px 238px; border-top: 1px solid var(--line); color: var(--muted); font-size: .65rem; }

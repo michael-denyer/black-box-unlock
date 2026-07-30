@@ -7,6 +7,8 @@ from black_box_unlock.core.models import (
     AnalysisResult,
     AnalysisSummary,
     FileForensics,
+    SignalState,
+    SignalStatus,
     TemporalCoupling,
 )
 from black_box_unlock.visualization.html import generate_html_report
@@ -122,6 +124,26 @@ def test_report_has_keyboard_and_non_canvas_evidence_paths() -> None:
     assert "Use Tab then Enter on Inspect." in document
     assert "Sort with column headers." in document
     assert "Both revision counts remain visible." in document
+
+
+def test_disabled_ci_collapses_unavailable_observation_panels() -> None:
+    disabled_document = generate_html_report(_result())
+
+    assert 'id="ci-observation-panels" class="ci-observation-cards" hidden' in disabled_document
+    assert "CI evidence was not collected for this report." in disabled_document
+    assert "bbu analyze-repo --output html > report.html" in disabled_document
+    assert ".signal-card { padding: 18px; }" in disabled_document
+    assert ".signal-card { min-height:" not in disabled_document
+
+    available_result = _result()
+    available_result.ci_status = SignalStatus(state=SignalState.available)
+    available_result.parameters.include_ci = True
+    available_document = generate_html_report(available_result)
+
+    assert 'id="ci-observation-panels" class="ci-observation-cards">' in available_document
+    assert (
+        'id="ci-observation-panels" class="ci-observation-cards" hidden' not in available_document
+    )
 
 
 def test_tabulator_cells_remain_inline_rows() -> None:

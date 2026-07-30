@@ -334,6 +334,54 @@ class TestReviewChangeCommand:
 
         assert result.exit_code == 2
 
+    def test_named_profile_and_project_roles_reach_the_review_core(self, tmp_path):
+        (tmp_path / ".bbu.toml").write_text(
+            """
+[[path_roles]]
+pattern = "app/**/*.vue"
+role = "source"
+
+[profiles.release]
+days = 180
+include_ci = true
+""".strip()
+            + "\n"
+        )
+        with patch("black_box_unlock.cli.run_change_review") as mock_review:
+            mock_review.return_value.model_dump.return_value = {"kind": "no_changes"}
+            result = runner.invoke(
+                app,
+                [
+                    "review-change",
+                    "--repo",
+                    str(tmp_path),
+                    "--profile",
+                    "release",
+                    "--days",
+                    "30",
+                ],
+            )
+
+        assert result.exit_code == 0
+        parameters = mock_review.call_args.args[2]
+        assert parameters.profile == "release"
+        assert parameters.days == 30
+        assert parameters.include_ci is True
+        assert parameters.config_path == ".bbu.toml"
+        assert mock_review.call_args.kwargs["path_role_rules"][0].pattern == "app/**/*.vue"
+
+    def test_invalid_config_is_a_clean_cli_error(self, tmp_path):
+        (tmp_path / ".bbu.toml").write_text("[profiles.release\n")
+
+        result = runner.invoke(
+            app,
+            ["review-change", "--repo", str(tmp_path)],
+        )
+
+        assert result.exit_code == 1
+        assert "Invalid .bbu.toml" in result.stdout
+        assert "Traceback" not in result.stdout
+
 
 class TestCouplingGuardHookCommand:
     def test_reads_claude_payload_without_jq(self, tmp_path):
@@ -371,6 +419,17 @@ class TestDoctorCommand:
 
         assert result.exit_code == 0
         assert json.loads(result.stdout)["checks"]["jq_required"] is False
+
+    def test_invalid_config_makes_doctor_fail_honestly(self, tmp_path):
+        (tmp_path / ".git").mkdir()
+        (tmp_path / ".bbu.toml").write_text("surprise = true\n")
+
+        result = runner.invoke(app, ["doctor", "--repo", str(tmp_path)])
+
+        parsed = json.loads(result.stdout)
+        assert parsed["ok"] is False
+        assert parsed["checks"]["config"] is False
+        assert "surprise" in parsed["config"]["error"]
 
 
 class TestXrayMinCoupling:

@@ -1,18 +1,20 @@
 """Typed GitHub Actions input and CI analysis models."""
 
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from ..core.models import FlakyStepStats, FlakyStepSummary, SignalStatus
+from ..core.models import FailedWorkflowRun, FlakyStepStats, FlakyStepSummary, SignalStatus
 
 
 class WorkflowRun(BaseModel):
     """A GitHub Actions workflow run parsed at the external seam."""
 
-    run_id: int
-    workflow_name: str
-    commit_sha: str
+    run_id: int = Field(ge=1)
+    workflow_name: str = Field(min_length=1)
+    run_url: str = Field(min_length=1)
+    commit_sha: str = Field(min_length=1)
     conclusion: str
     created_at: datetime
     run_attempt: int = Field(default=1, ge=1)
@@ -20,7 +22,16 @@ class WorkflowRun(BaseModel):
     @property
     def is_failure(self) -> bool:
         """Whether the run contributes build-failure attribution."""
-        return self.conclusion in ("failure", "timed_out")
+        return self.failure_conclusion is not None
+
+    @property
+    def failure_conclusion(self) -> Literal["failure", "timed_out"] | None:
+        """Narrow a raw GitHub conclusion to the two failure variants."""
+        if self.conclusion == "failure":
+            return "failure"
+        if self.conclusion == "timed_out":
+            return "timed_out"
+        return None
 
 
 class WorkflowStep(BaseModel):
@@ -48,4 +59,5 @@ class CIAnalysis(BaseModel):
 
     status: SignalStatus
     file_failures: dict[str, int] = Field(default_factory=dict)
+    failed_runs: list[FailedWorkflowRun] = Field(default_factory=list)
     flaky_steps: list[FlakyStepSummary] = Field(default_factory=list)

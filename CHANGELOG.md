@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-07-30
+
+### Added
+
+- `.bbu.toml` project configuration with ordered path-role rules, named review
+  profiles, a selectable default profile, and CLI/MCP overrides
+- Opt-in `inspect_ci_failures` review actions with the failed workflow name,
+  run ID and URL, commit, timestamp, and implicated changed paths
+- `bbu doctor` validation for project configuration
+- Pyrefly, Markdown link checks, GitHub Actions lint and security checks,
+  locked-dependency auditing, and CodeQL
+
 ### Changed
 
 - Local Git hooks now run through `prek`; repository hygiene, Ruff, Pyrefly,
@@ -15,11 +27,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Dependabot now updates both GitHub Actions and the `uv` lockfile, with grouped
   weekly updates and a seven-day cooldown
 - CodeQL scans Python source on pull requests, pushes to `main`, and weekly
+- CI failure output now preserves failed-run details and states that changed
+  paths are implicated rather than proven causal
 
 ### Fixed
 
 - Updated locked Click and MCP releases after dependency auditing found three
   published vulnerabilities
+- Removed the last stale documentation reference to the retired local issue
+  tracker
 
 ## [1.3.0] - 2026-07-30
 

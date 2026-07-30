@@ -14,6 +14,7 @@ class TestWorkflowRun:
         common = {
             "run_id": 123,
             "workflow_name": "CI",
+            "run_url": "https://github.com/example/repo/actions/runs/123",
             "commit_sha": "abc123",
             "created_at": datetime(2026, 1, 26, tzinfo=timezone.utc),
         }

@@ -3,6 +3,7 @@
 from datetime import datetime, timezone
 from enum import Enum
 from math import sqrt
+from typing import Literal
 
 from pydantic import BaseModel, Field, computed_field, field_validator, model_validator
 
@@ -341,6 +342,19 @@ class SignalStatus(BaseModel):
     errors: list[str] = Field(default_factory=list)
 
 
+class FailedWorkflowRun(BaseModel):
+    """One failed workflow run and the commit paths it implicates."""
+
+    run_id: int = Field(ge=1)
+    workflow_name: str = Field(min_length=1)
+    run_url: str = Field(min_length=1)
+    commit_sha: str = Field(min_length=1)
+    conclusion: Literal["failure", "timed_out"]
+    created_at: datetime
+    implicated_paths: list[str] = Field(default_factory=list)
+    attribution: Literal["changed_in_failed_commit"] = "changed_in_failed_commit"
+
+
 class AnalysisParameters(BaseModel):
     """Inputs and policies needed to interpret an analysis result."""
 
@@ -364,4 +378,5 @@ class AnalysisResult(BaseModel):  # [4a.4] Complete analysis output
     summary: AnalysisSummary
     parameters: AnalysisParameters = Field(default_factory=AnalysisParameters)
     ci_status: SignalStatus = Field(default_factory=SignalStatus)
+    failed_ci_runs: list[FailedWorkflowRun] = Field(default_factory=list)
     flaky_steps: list[FlakyStepSummary] = Field(default_factory=list)

@@ -1,7 +1,6 @@
 """Fresh, evidence-backed review of a selected Git change."""
 
 from datetime import datetime, timezone
-from enum import Enum
 from pathlib import Path
 from typing import Annotated, Literal
 
@@ -17,27 +16,14 @@ from .git.changes import (
     ChangeSet,
     collect_change_set,
 )
+from .path_roles import (
+    PathRole,
+    PathRoleClassification,
+    PathRoleRule,
+    classify_path_role,
+)
 
 MAX_REVIEW_COUPLINGS = 20
-
-
-class PathRole(str, Enum):
-    """Stable, coarse role of a repository path."""
-
-    source = "source"
-    test = "test"
-    docs = "docs"
-    config = "config"
-    migration = "migration"
-    generated = "generated"
-    other = "other"
-
-
-class PathRoleClassification(BaseModel):
-    """A role plus the fixed rule that selected it."""
-
-    role: PathRole
-    rule: str
 
 
 class ReviewParameters(BaseModel):
@@ -48,6 +34,8 @@ class ReviewParameters(BaseModel):
     min_shared_revisions: int = Field(default=2, ge=1)
     include_ci: bool = False
     max_actions: int = Field(default=3, ge=1, le=3)
+    profile: str = Field(default="default", min_length=1)
+    config_path: Literal[".bbu.toml"] | None = None
 
 
 class FileEvidence(BaseModel):
@@ -89,7 +77,7 @@ class TestGapEvidence(BaseModel):
 
     source_paths: list[str] = Field(min_length=1)
     changed_test_paths: list[str]
-    role_classifier_version: Literal[1] = 1
+    role_classifier_version: Literal[2] = 2
 
 
 class FocusFileEvidence(BaseModel):
@@ -100,6 +88,19 @@ class FocusFileEvidence(BaseModel):
     author_count: int = Field(ge=0)
     commits: int = Field(ge=0)
     complexity: float = Field(ge=0)
+
+
+class CIFailureEvidence(BaseModel):
+    """One failed run that includes at least one selected path."""
+
+    run_id: int = Field(ge=1)
+    workflow_name: str = Field(min_length=1)
+    run_url: str = Field(min_length=1)
+    commit_sha: str = Field(min_length=1)
+    conclusion: Literal["failure", "timed_out"]
+    created_at: datetime
+    implicated_changed_paths: list[str] = Field(min_length=1)
+    attribution: Literal["changed_in_failed_commit"] = "changed_in_failed_commit"
 
 
 class CheckCoupledPathsAction(BaseModel):
@@ -120,8 +121,14 @@ class FocusReviewAction(BaseModel):
     evidence: list[FocusFileEvidence] = Field(min_length=1, max_length=3)
 
 
+class InspectCIFailuresAction(BaseModel):
+    kind: Literal["inspect_ci_failures"] = "inspect_ci_failures"
+    message: str
+    evidence: list[CIFailureEvidence] = Field(min_length=1, max_length=3)
+
+
 ReviewAction = Annotated[
-    CheckCoupledPathsAction | AddOrUpdateTestsAction | FocusReviewAction,
+    CheckCoupledPathsAction | AddOrUpdateTestsAction | InspectCIFailuresAction | FocusReviewAction,
     Field(discriminator="kind"),
 ]
 
@@ -156,65 +163,7 @@ ChangeReviewResult = Annotated[
     Field(discriminator="kind"),
 ]
 
-_TEST_SEGMENTS = frozenset({"test", "tests", "spec", "specs", "__tests__"})
-_DOC_SEGMENTS = frozenset({"doc", "docs", "documentation"})
-_MIGRATION_SEGMENTS = frozenset({"migration", "migrations"})
-_GENERATED_SEGMENTS = frozenset({"generated", "vendor", "node_modules"})
-_CONFIG_SEGMENTS = frozenset({"config", "hooks", ".claude-plugin", ".github"})
-_DOC_SUFFIXES = frozenset({".md", ".mdx", ".rst", ".adoc"})
-_CONFIG_SUFFIXES = frozenset({".toml", ".yaml", ".yml", ".ini", ".cfg"})
-_SOURCE_SUFFIXES = frozenset(
-    {
-        ".c",
-        ".cc",
-        ".cpp",
-        ".cs",
-        ".go",
-        ".java",
-        ".js",
-        ".jsx",
-        ".kt",
-        ".php",
-        ".py",
-        ".rb",
-        ".rs",
-        ".scala",
-        ".swift",
-        ".ts",
-        ".tsx",
-    }
-)
 _ACTIONABLE_ROLES = frozenset({PathRole.source, PathRole.migration, PathRole.config})
-
-
-def classify_path_role(path: str) -> PathRoleClassification:
-    """Classify a path with fixed, ordered, explainable rules."""
-    candidate = Path(path)
-    lowered_parts = {part.lower() for part in candidate.parts}
-    name = candidate.name.lower()
-    suffix = candidate.suffix.lower()
-
-    if lowered_parts & _TEST_SEGMENTS or name.startswith(("test_", "test.", "spec_")):
-        return PathRoleClassification(role=PathRole.test, rule="test-path")
-    if lowered_parts & _DOC_SEGMENTS or suffix in _DOC_SUFFIXES:
-        return PathRoleClassification(role=PathRole.docs, rule="docs-path")
-    if lowered_parts & _MIGRATION_SEGMENTS:
-        return PathRoleClassification(role=PathRole.migration, rule="migration-path")
-    if (
-        lowered_parts & _GENERATED_SEGMENTS
-        or suffix in {".lock", ".map"}
-        or name.endswith((".min.js", ".min.css"))
-    ):
-        return PathRoleClassification(role=PathRole.generated, rule="generated-path")
-    if (
-        lowered_parts & _CONFIG_SEGMENTS
-        or suffix in _CONFIG_SUFFIXES
-        or name in {"dockerfile", "makefile", "pyproject.toml", "package.json"}
-    ):
-        return PathRoleClassification(role=PathRole.config, rule="config-path")
-    if suffix in _SOURCE_SUFFIXES:
-        return PathRoleClassification(role=PathRole.source, rule="source-extension")
-    return PathRoleClassification(role=PathRole.other, rule="fallback")
 
 
 def _empty_forensics(path: str) -> FileForensics:
@@ -227,10 +176,14 @@ def _empty_forensics(path: str) -> FileForensics:
     )
 
 
-def _file_evidence(path: str, forensics: FileForensics) -> FileEvidence:
+def _file_evidence(
+    path: str,
+    forensics: FileForensics,
+    path_role_rules: tuple[PathRoleRule, ...],
+) -> FileEvidence:
     return FileEvidence(
         path=path,
-        role=classify_path_role(path),
+        role=classify_path_role(path, path_role_rules),
         commits=forensics.commits,
         complexity=forensics.complexity,
         bugfix_commits=forensics.bugfix_commits,
@@ -243,6 +196,7 @@ def _coupling_evidence(
     change_set: ChangeSet,
     analysis: AnalysisResult,
     parameters: ReviewParameters,
+    path_role_rules: tuple[PathRoleRule, ...],
 ) -> list[CouplingEvidence]:
     aliases: dict[str, str] = {}
     selected_paths = {change.path for change in change_set.paths}
@@ -273,9 +227,9 @@ def _coupling_evidence(
             continue
         item = CouplingEvidence(
             changed_path=changed_path,
-            changed_path_role=classify_path_role(changed_path),
+            changed_path_role=classify_path_role(changed_path, path_role_rules),
             coupled_path=coupled_path,
-            coupled_path_role=classify_path_role(coupled_path),
+            coupled_path_role=classify_path_role(coupled_path, path_role_rules),
             shared_revisions=coupling.co_change_count,
             changed_path_revisions=changed_revisions,
             coupled_path_revisions=coupled_revisions,
@@ -300,10 +254,40 @@ def _coupling_evidence(
     )
 
 
+def _ci_failure_evidence(
+    change_set: ChangeSet,
+    analysis: AnalysisResult,
+) -> list[CIFailureEvidence]:
+    aliases: dict[str, str] = {}
+    for change in change_set.paths:
+        aliases[change.path] = change.path
+        if change.previous_path is not None:
+            aliases[change.previous_path] = change.path
+
+    evidence: list[CIFailureEvidence] = []
+    for run in analysis.failed_ci_runs:
+        matched_paths = sorted({aliases[path] for path in run.implicated_paths if path in aliases})
+        if not matched_paths:
+            continue
+        evidence.append(
+            CIFailureEvidence(
+                run_id=run.run_id,
+                workflow_name=run.workflow_name,
+                run_url=run.run_url,
+                commit_sha=run.commit_sha,
+                conclusion=run.conclusion,
+                created_at=run.created_at,
+                implicated_changed_paths=matched_paths,
+            )
+        )
+    return sorted(evidence, key=lambda item: (-item.created_at.timestamp(), -item.run_id))
+
+
 def project_change_review(
     change_set: ChangeSet,
     analysis: AnalysisResult,
     parameters: ReviewParameters,
+    path_role_rules: tuple[PathRoleRule, ...] = (),
 ) -> ChangeReviewResult:
     """Purely join selected paths, repository facts, and bounded action policy."""
     if not change_set.paths:
@@ -322,11 +306,12 @@ def project_change_review(
             evidence=_file_evidence(
                 change.path,
                 by_path.get(change.path, _empty_forensics(change.path)),
+                path_role_rules,
             ),
         )
         for change in change_set.paths
     ]
-    couplings = _coupling_evidence(change_set, analysis, parameters)
+    couplings = _coupling_evidence(change_set, analysis, parameters, path_role_rules)
     actions: list[ReviewAction] = []
 
     missing = [
@@ -361,6 +346,18 @@ def project_change_review(
                     source_paths=source_paths,
                     changed_test_paths=test_paths,
                 ),
+            )
+        )
+
+    ci_failures = _ci_failure_evidence(change_set, analysis) if parameters.include_ci else []
+    if ci_failures:
+        actions.append(
+            InspectCIFailuresAction(
+                message=(
+                    "Inspect failed workflow runs containing changed paths. "
+                    "The paths are implicated by the failed commit, not proven causal."
+                ),
+                evidence=ci_failures[:3],
             )
         )
 
@@ -409,6 +406,8 @@ def run_change_review(
     repo_path: Path,
     selector: ChangeSelector,
     parameters: ReviewParameters | None = None,
+    *,
+    path_role_rules: tuple[PathRoleRule, ...] = (),
 ) -> ChangeReviewResult:
     """Collect the selected change and analyze it afresh."""
     policy = parameters or ReviewParameters()
@@ -432,4 +431,9 @@ def run_change_review(
         xray_top=0,
         ensure_paths=current_paths,
     )
-    return project_change_review(change_set, analysis, policy)
+    return project_change_review(
+        change_set,
+        analysis,
+        policy,
+        path_role_rules=path_role_rules,
+    )

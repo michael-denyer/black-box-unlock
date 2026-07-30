@@ -12,6 +12,7 @@ from black_box_unlock.core.models import (
     AnalysisResult,
     AnalysisSummary,
     CouplingInfo,
+    FailedWorkflowRun,
     FileForensics,
     SignalState,
     SignalStatus,
@@ -108,6 +109,35 @@ class TestMcpTools:
             "status": "available",
             "errors": [],
             "files": [{"path": "src/auth.py", "build_failures": 2}],
+            "runs": [],
+        }
+
+    def test_get_ci_failures_keeps_actionable_run_details(self, mock_analysis):
+        result = _result()
+        result.failed_ci_runs = [
+            FailedWorkflowRun(
+                run_id=42,
+                workflow_name="CI",
+                run_url="https://github.com/example/repo/actions/runs/42",
+                commit_sha="abc123",
+                conclusion="failure",
+                created_at=datetime(2026, 6, 12),
+                implicated_paths=["src/auth.py"],
+            )
+        ]
+        mock_analysis.return_value = result
+
+        failures = mcp_server.get_ci_failures(repo_path=".")
+
+        assert failures["runs"][0] == {
+            "run_id": 42,
+            "workflow_name": "CI",
+            "run_url": "https://github.com/example/repo/actions/runs/42",
+            "commit_sha": "abc123",
+            "conclusion": "failure",
+            "created_at": "2026-06-12T00:00:00",
+            "implicated_paths": ["src/auth.py"],
+            "attribution": "changed_in_failed_commit",
         }
 
     def test_get_flaky_steps_reports_signal_status(self, mock_analysis):
@@ -180,6 +210,34 @@ class TestReviewChangeTool:
             mcp_server.review_change(repo_path=".", mode="working_tree")
 
         assert mock_review.call_count == 2
+
+    def test_named_profile_and_project_roles_reach_the_review_core(self, tmp_path):
+        (tmp_path / ".bbu.toml").write_text(
+            """
+[[path_roles]]
+pattern = "app/**/*.vue"
+role = "source"
+
+[profiles.release]
+days = 180
+include_ci = true
+""".strip()
+            + "\n"
+        )
+        with patch("black_box_unlock.mcp_server._run_change_review") as mock_review:
+            mock_review.return_value.model_dump.return_value = {"kind": "no_changes"}
+
+            mcp_server.review_change(
+                repo_path=str(tmp_path),
+                profile="release",
+                days=30,
+            )
+
+        parameters = mock_review.call_args.args[2]
+        assert parameters.profile == "release"
+        assert parameters.days == 30
+        assert parameters.include_ci is True
+        assert mock_review.call_args.kwargs["path_role_rules"][0].pattern == "app/**/*.vue"
 
 
 class TestXrayFileTool:

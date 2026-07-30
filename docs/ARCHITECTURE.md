@@ -13,8 +13,8 @@ src/black_box_unlock/
 ├── complexity.py           # Indentation-depth complexity proxy
 ├── analysis.py             # Pipeline: fetch -> parse -> join -> AnalysisResult
 ├── mcp_server.py           # FastMCP server: cached signals + fresh review
-├── review.py               # Pure review projection and bounded action policy
-├── config.py               # .bbu.toml parsing and named profile resolution
+├── review.py               # Request resolution, changed-path identity, and bounded action policy
+├── config.py               # .bbu.toml parsing
 ├── path_roles.py           # Project and built-in path-role classifier
 ├── guard.py                # Coupling guard: small typed cache for the edit hook
 ├── core/

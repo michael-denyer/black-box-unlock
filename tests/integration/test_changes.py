@@ -9,7 +9,7 @@ from black_box_unlock.git.changes import (
     WorkingTreeChange,
     collect_change_set,
 )
-from black_box_unlock.review import ChangeReview, run_change_review
+from black_box_unlock.review import ChangeReview, ChangeReviewRequest, run_change_review
 
 
 def _git(repo, *args: str) -> None:
@@ -72,7 +72,7 @@ def test_working_tree_reviews_untracked_files_before_the_first_commit(tmp_path):
     assert result.provenance.head_oid is None
     assert [path.path for path in result.paths] == ["new.py"]
 
-    review = run_change_review(repo, WorkingTreeChange())
+    review = run_change_review(repo, ChangeReviewRequest(selector=WorkingTreeChange()))
 
     assert isinstance(review, ChangeReview)
     assert review.files[0].evidence.path == "new.py"
@@ -83,3 +83,31 @@ def test_working_tree_reviews_untracked_files_before_the_first_commit(tmp_path):
 
     assert staged.provenance.head_oid is None
     assert [path.path for path in staged.paths] == ["new.py"]
+
+
+def test_rename_keeps_one_continuous_changed_path_identity(tmp_path):
+    repo = tmp_path / "renamed"
+    repo.mkdir()
+    _git(repo, "init")
+    old_path = repo / "old.py"
+    old_path.write_text("value = 1\n")
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-m", "add old path")
+    old_path.write_text("if True:\n    value = 2\n")
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-m", "fix: repair old path")
+    _git(repo, "tag", "review-base")
+    _git(repo, "mv", "old.py", "new.py")
+    _git(repo, "commit", "-m", "rename old path")
+
+    result = run_change_review(
+        repo,
+        ChangeReviewRequest(selector=BaseChange(base_ref="review-base")),
+    )
+
+    assert isinstance(result, ChangeReview)
+    assert result.files[0].change.path == "new.py"
+    assert result.files[0].change.previous_path == "old.py"
+    assert result.files[0].evidence.commits == 3
+    assert result.files[0].evidence.bugfix_commits == 1
+    assert result.files[0].evidence.complexity == 1.0

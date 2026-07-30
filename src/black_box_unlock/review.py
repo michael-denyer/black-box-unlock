@@ -1,5 +1,6 @@
 """Fresh, evidence-backed review of a selected Git change."""
 
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Annotated, Literal
@@ -7,6 +8,8 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, Field
 
 from .analysis import run_analysis
+from .config import CONFIG_FILE_NAME, load_project_config
+from .core.exceptions import ConfigurationError
 from .core.models import AnalysisResult, FileForensics, SignalStatus
 from .git.changes import (
     ChangedPath,
@@ -36,6 +39,65 @@ class ReviewParameters(BaseModel):
     max_actions: int = Field(default=3, ge=1, le=3)
     profile: str = Field(default="default", min_length=1)
     config_path: Literal[".bbu.toml"] | None = None
+
+
+class ChangeReviewRequest(BaseModel):
+    """Unresolved change selection and explicit review policy overrides."""
+
+    selector: ChangeSelector
+    profile: str | None = Field(default=None, min_length=1)
+    days: int | None = Field(default=None, ge=1)
+    min_coupling: float | None = Field(default=None, ge=0.0, le=1.0)
+    min_shared_revisions: int | None = Field(default=None, ge=1)
+    include_ci: bool | None = None
+    max_actions: int | None = Field(default=None, ge=1, le=3)
+
+
+@dataclass(frozen=True)
+class _ResolvedReviewSettings:
+    parameters: ReviewParameters
+    path_roles: tuple[PathRoleRule, ...]
+
+
+def _resolve_review_settings(
+    repo_path: Path,
+    request: ChangeReviewRequest,
+) -> _ResolvedReviewSettings:
+    """Resolve project defaults and explicit overrides inside Change Review."""
+    config = load_project_config(repo_path)
+    selected_name = request.profile if request.profile is not None else config.default_profile
+    values = ReviewParameters().model_dump(exclude={"profile", "config_path"})
+
+    if selected_name is not None:
+        profile = config.profiles.get(selected_name)
+        if profile is None:
+            available = ", ".join(sorted(config.profiles)) or "none"
+            raise ConfigurationError(
+                f"Unknown review profile {selected_name!r}; available profiles: {available}"
+            )
+        values.update(profile.model_dump(exclude_none=True))
+
+    values.update(
+        request.model_dump(
+            include={
+                "days",
+                "min_coupling",
+                "min_shared_revisions",
+                "include_ci",
+                "max_actions",
+            },
+            exclude_none=True,
+        )
+    )
+    config_path = CONFIG_FILE_NAME if (repo_path.resolve() / CONFIG_FILE_NAME).exists() else None
+    return _ResolvedReviewSettings(
+        parameters=ReviewParameters(
+            **values,
+            profile=selected_name or "default",
+            config_path=config_path,
+        ),
+        path_roles=config.path_roles,
+    )
 
 
 class FileEvidence(BaseModel):
@@ -166,6 +228,38 @@ ChangeReviewResult = Annotated[
 _ACTIONABLE_ROLES = frozenset({PathRole.source, PathRole.migration, PathRole.config})
 
 
+@dataclass(frozen=True)
+class ChangedPathIdentity:
+    """Current path and every historical path that represents the same rename."""
+
+    current_path: str
+    historical_paths: tuple[str, ...]
+
+    @classmethod
+    def from_change(cls, change: ChangedPath) -> "ChangedPathIdentity":
+        historical_paths = (change.path,)
+        if change.kind is ChangeKind.renamed and change.previous_path is not None:
+            historical_paths = (change.path, change.previous_path)
+        return cls(current_path=change.path, historical_paths=historical_paths)
+
+
+def _changed_path_identities(change_set: ChangeSet) -> dict[str, ChangedPathIdentity]:
+    identities: dict[str, ChangedPathIdentity] = {}
+    for change in change_set.paths:
+        identity = ChangedPathIdentity.from_change(change)
+        for path in identity.historical_paths:
+            identities[path] = identity
+    return identities
+
+
+def _history_aliases(identities: dict[str, ChangedPathIdentity]) -> dict[str, str]:
+    return {
+        path: identity.current_path
+        for path, identity in identities.items()
+        if path != identity.current_path
+    }
+
+
 def _empty_forensics(path: str) -> FileForensics:
     return FileForensics(
         path=path,
@@ -197,30 +291,30 @@ def _coupling_evidence(
     analysis: AnalysisResult,
     parameters: ReviewParameters,
     path_role_rules: tuple[PathRoleRule, ...],
+    identities: dict[str, ChangedPathIdentity],
 ) -> list[CouplingEvidence]:
-    aliases: dict[str, str] = {}
     selected_paths = {change.path for change in change_set.paths}
-    for change in change_set.paths:
-        aliases[change.path] = change.path
-        if change.previous_path is not None:
-            aliases[change.previous_path] = change.path
 
     evidence: dict[tuple[str, str], CouplingEvidence] = {}
     for coupling in analysis.couplings:
         if coupling.co_change_count < parameters.min_shared_revisions:
             continue
-        a_selected = coupling.file_a in aliases
-        b_selected = coupling.file_b in aliases
+        a_identity = identities.get(coupling.file_a)
+        b_identity = identities.get(coupling.file_b)
+        a_selected = a_identity is not None
+        b_selected = b_identity is not None
         if not (a_selected or b_selected):
             continue
         if a_selected:
-            changed_path = aliases[coupling.file_a]
-            coupled_path = aliases.get(coupling.file_b, coupling.file_b)
+            assert a_identity is not None
+            changed_path = a_identity.current_path
+            coupled_path = b_identity.current_path if b_identity is not None else coupling.file_b
             changed_revisions = coupling.commits_a
             coupled_revisions = coupling.commits_b
         else:
-            changed_path = aliases[coupling.file_b]
-            coupled_path = aliases.get(coupling.file_a, coupling.file_a)
+            assert b_identity is not None
+            changed_path = b_identity.current_path
+            coupled_path = a_identity.current_path if a_identity is not None else coupling.file_a
             changed_revisions = coupling.commits_b
             coupled_revisions = coupling.commits_a
         if changed_path == coupled_path:
@@ -257,16 +351,13 @@ def _coupling_evidence(
 def _ci_failure_evidence(
     change_set: ChangeSet,
     analysis: AnalysisResult,
+    identities: dict[str, ChangedPathIdentity],
 ) -> list[CIFailureEvidence]:
-    aliases: dict[str, str] = {}
-    for change in change_set.paths:
-        aliases[change.path] = change.path
-        if change.previous_path is not None:
-            aliases[change.previous_path] = change.path
-
     evidence: list[CIFailureEvidence] = []
     for run in analysis.failed_ci_runs:
-        matched_paths = sorted({aliases[path] for path in run.implicated_paths if path in aliases})
+        matched_paths = sorted(
+            {identities[path].current_path for path in run.implicated_paths if path in identities}
+        )
         if not matched_paths:
             continue
         evidence.append(
@@ -299,19 +390,33 @@ def project_change_review(
             ci_status=analysis.ci_status,
         )
 
+    identities = _changed_path_identities(change_set)
     by_path = {file.path: file for file in analysis.files}
     files = [
         ChangedFileReview(
             change=change,
             evidence=_file_evidence(
                 change.path,
-                by_path.get(change.path, _empty_forensics(change.path)),
+                next(
+                    (
+                        by_path[path]
+                        for path in identities[change.path].historical_paths
+                        if path in by_path
+                    ),
+                    _empty_forensics(change.path),
+                ),
                 path_role_rules,
             ),
         )
         for change in change_set.paths
     ]
-    couplings = _coupling_evidence(change_set, analysis, parameters, path_role_rules)
+    couplings = _coupling_evidence(
+        change_set,
+        analysis,
+        parameters,
+        path_role_rules,
+        identities,
+    )
     actions: list[ReviewAction] = []
 
     missing = [
@@ -349,7 +454,9 @@ def project_change_review(
             )
         )
 
-    ci_failures = _ci_failure_evidence(change_set, analysis) if parameters.include_ci else []
+    ci_failures = (
+        _ci_failure_evidence(change_set, analysis, identities) if parameters.include_ci else []
+    )
     if ci_failures:
         actions.append(
             InspectCIFailuresAction(
@@ -404,14 +511,12 @@ def project_change_review(
 
 def run_change_review(
     repo_path: Path,
-    selector: ChangeSelector,
-    parameters: ReviewParameters | None = None,
-    *,
-    path_role_rules: tuple[PathRoleRule, ...] = (),
+    request: ChangeReviewRequest,
 ) -> ChangeReviewResult:
     """Collect the selected change and analyze it afresh."""
-    policy = parameters or ReviewParameters()
-    change_set = collect_change_set(repo_path, selector)
+    settings = _resolve_review_settings(repo_path, request)
+    policy = settings.parameters
+    change_set = collect_change_set(repo_path, request.selector)
     if not change_set.paths:
         return NoChanges(
             repo=repo_path.resolve().name,
@@ -423,6 +528,7 @@ def run_change_review(
     current_paths = frozenset(
         change.path for change in change_set.paths if change.kind is not ChangeKind.deleted
     )
+    identities = _changed_path_identities(change_set)
     analysis = run_analysis(
         repo_path,
         days=policy.days,
@@ -430,10 +536,11 @@ def run_change_review(
         include_ci=policy.include_ci,
         xray_top=0,
         ensure_paths=current_paths,
+        path_aliases=_history_aliases(identities),
     )
     return project_change_review(
         change_set,
         analysis,
         policy,
-        path_role_rules=path_role_rules,
+        path_role_rules=settings.path_roles,
     )

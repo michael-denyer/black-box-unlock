@@ -11,15 +11,11 @@ from loguru import logger
 from rich.console import Console
 
 from black_box_unlock.analysis import export_to_json, run_analysis
-from black_box_unlock.config import (
-    ReviewOverrides,
-    load_project_config,
-    resolve_review_settings,
-)
+from black_box_unlock.config import load_project_config
 from black_box_unlock.core.exceptions import BlackBoxUnlockError
 from black_box_unlock.core.logging import configure_logging
 from black_box_unlock.git.changes import BaseChange, StagedChange, WorkingTreeChange
-from black_box_unlock.review import run_change_review
+from black_box_unlock.review import ChangeReviewRequest, run_change_review
 from black_box_unlock.visualization.html import generate_html_report
 
 
@@ -222,21 +218,16 @@ def review_change_command(
     """Review the selected change and emit at most three evidence-backed actions."""
     selector = _review_selector(base, staged, working_tree)
     try:
-        settings = resolve_review_settings(
+        result = run_change_review(
             repo,
-            profile_name=profile,
-            overrides=ReviewOverrides(
+            ChangeReviewRequest(
+                selector=selector,
+                profile=profile,
                 days=days,
                 min_coupling=min_coupling,
                 min_shared_revisions=min_shared_revisions,
                 include_ci=include_ci,
             ),
-        )
-        result = run_change_review(
-            repo,
-            selector,
-            settings.parameters,
-            path_role_rules=settings.path_roles,
         )
     except BlackBoxUnlockError as error:
         console.print(f"[red]Error:[/red] {error}")

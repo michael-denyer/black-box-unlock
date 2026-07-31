@@ -74,6 +74,21 @@ def test_generates_one_complete_investigation_workspace() -> None:
     assert "Confidence-first temporal coupling" in document
 
 
+def test_report_uses_readme_brand_artwork_and_visual_section_headers() -> None:
+    document = generate_html_report(_result())
+
+    assert "--brand-cyan: #25d9f0;" in document
+    assert "--brand-magenta: #df45e8;" in document
+    assert '--brand-image: url("data:image/png;base64,' in document
+    assert 'class="brand-lockbox" aria-hidden="true"' in document
+    assert "Mischief. Mayhem. Merge conflicts. Exposed." in document
+    assert document.count('class="nav-icon"') == 3
+    assert document.count('class="section-icon"') >= 5
+    assert 'symbol id="icon-investigation"' in document
+    assert 'symbol id="icon-coupling"' in document
+    assert 'symbol id="icon-ci"' in document
+
+
 def test_report_is_self_contained_and_denies_connections() -> None:
     document = generate_html_report(_result())
 

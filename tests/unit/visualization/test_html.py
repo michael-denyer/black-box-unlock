@@ -1,5 +1,7 @@
 """Tests for the standalone HTML investigation report."""
 
+import base64
+import hashlib
 import re
 from datetime import datetime, timezone
 
@@ -99,10 +101,21 @@ def test_report_is_self_contained_and_denies_connections() -> None:
     )
     assert external_resources == []
     assert "connect-src 'none'" in document
+    assert "script-src 'unsafe-inline'" not in document
     assert '<script src="' not in document
     assert '<link rel="stylesheet"' not in document
     assert "echarts.init" in document
     assert "new Tabulator" in document
+
+    executable_scripts = re.findall(r"<script>(.*?)</script>", document, flags=re.DOTALL)
+    expected_sources = {
+        "'sha256-" + base64.b64encode(hashlib.sha256(script.encode()).digest()).decode() + "'"
+        for script in executable_scripts
+    }
+    csp = re.search(r'http-equiv="Content-Security-Policy"\s+content="([^"]+)"', document)
+    assert csp is not None
+    assert len(executable_scripts) == 3
+    assert expected_sources == set(re.findall(r"'sha256-[A-Za-z0-9+/=]+'", csp.group(1)))
 
 
 def test_embeds_complete_confidence_evidence() -> None:

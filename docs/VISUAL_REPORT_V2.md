@@ -52,6 +52,7 @@ visualization/
   html.py                 small public facade and document composition
   report_data.py          AnalysisResult -> deterministic report envelope
   assets/
+    brand-logo.png        README lockbox artwork, embedded in every report
     report.html           semantic shell
     report.css            responsive investigation-workspace layout
     report.js             browser indexes, selection state, views
@@ -74,6 +75,8 @@ The desktop layout uses the chosen “investigation workspace” direction:
 searchable evidence on the left, one selected-file panel on the right, and
 spatial views below. On narrower screens the panel follows the grid. Every
 chart selection calls the same `selectFile(path)` transition as the grid.
+The report chrome reuses the README lockbox artwork and neon palette, while
+evidence panels retain restrained semantic colours for legibility.
 Evidence tables open with the strongest signal first; numeric evidence columns
 also sort descending on their first click. Proportional heat bars expose the
 relative magnitude of each numeric value without replacing its exact number.
@@ -88,12 +91,12 @@ tooltip text is escaped.
 
 ## Offline and packaging contract
 
-Pinned ECharts and Tabulator releases, their licenses, and a checksum manifest
-ship inside the Python wheel and are inlined into the generated document. The
-document contains a restrictive content-security policy and no external
-scripts, styles, fonts, images, or frames. The report application does not
-invoke network APIs, and `connect-src 'none'` denies connections from bundled
-library code.
+Pinned ECharts and Tabulator releases, their licenses, the README brand
+artwork, and a checksum manifest ship inside the Python wheel and are inlined
+into the generated document. The document contains a restrictive
+content-security policy and no external scripts, styles, fonts, images, or
+frames. The report application does not invoke network APIs. Bundled library
+code cannot connect because the policy sets `connect-src 'none'`.
 
 Verification covers:
 

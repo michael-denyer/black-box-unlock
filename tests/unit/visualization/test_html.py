@@ -1,5 +1,7 @@
 """Tests for the standalone HTML investigation report."""
 
+import base64
+import hashlib
 import re
 from datetime import datetime, timezone
 
@@ -74,6 +76,21 @@ def test_generates_one_complete_investigation_workspace() -> None:
     assert "Confidence-first temporal coupling" in document
 
 
+def test_report_uses_readme_brand_artwork_and_visual_section_headers() -> None:
+    document = generate_html_report(_result())
+
+    assert "--brand-cyan: #25d9f0;" in document
+    assert "--brand-magenta: #df45e8;" in document
+    assert '--brand-image: url("data:image/png;base64,' in document
+    assert 'class="brand-lockbox" aria-hidden="true"' in document
+    assert "Mischief. Mayhem. Merge conflicts. Exposed." in document
+    assert document.count('class="nav-icon"') == 3
+    assert document.count('class="section-icon"') >= 5
+    assert 'symbol id="icon-investigation"' in document
+    assert 'symbol id="icon-coupling"' in document
+    assert 'symbol id="icon-ci"' in document
+
+
 def test_report_is_self_contained_and_denies_connections() -> None:
     document = generate_html_report(_result())
 
@@ -84,10 +101,25 @@ def test_report_is_self_contained_and_denies_connections() -> None:
     )
     assert external_resources == []
     assert "connect-src 'none'" in document
+    assert "script-src 'unsafe-inline'" not in document
     assert '<script src="' not in document
     assert '<link rel="stylesheet"' not in document
     assert "echarts.init" in document
     assert "new Tabulator" in document
+
+    executable_scripts = re.findall(
+        r"<script>(.*?)</script>",
+        document,
+        flags=re.DOTALL | re.IGNORECASE,
+    )
+    expected_sources = {
+        "'sha256-" + base64.b64encode(hashlib.sha256(script.encode()).digest()).decode() + "'"
+        for script in executable_scripts
+    }
+    csp = re.search(r'http-equiv="Content-Security-Policy"\s+content="([^"]+)"', document)
+    assert csp is not None
+    assert len(executable_scripts) == 3
+    assert expected_sources == set(re.findall(r"'sha256-[A-Za-z0-9+/=]+'", csp.group(1)))
 
 
 def test_embeds_complete_confidence_evidence() -> None:

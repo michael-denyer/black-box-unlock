@@ -27,3 +27,9 @@ def test_report_assets_and_licences_ship_as_package_resources() -> None:
         "vendor/TABULATOR-LICENSE.txt",
     ):
         assert assets.joinpath(*filename.split("/")).is_file()
+
+    brand_logo = assets.joinpath("brand-logo.png")
+    assert brand_logo.is_file()
+    assert hashlib.sha256(brand_logo.read_bytes()).hexdigest() == (
+        "690e20170e94ec8e32097110f8a247abf74997cfc2a2245223c42d24fbd99f3d"
+    )

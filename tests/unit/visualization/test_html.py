@@ -107,7 +107,11 @@ def test_report_is_self_contained_and_denies_connections() -> None:
     assert "echarts.init" in document
     assert "new Tabulator" in document
 
-    executable_scripts = re.findall(r"<script>(.*?)</script>", document, flags=re.DOTALL)
+    executable_scripts = re.findall(
+        r"<script>(.*?)</script>",
+        document,
+        flags=re.DOTALL | re.IGNORECASE,
+    )
     expected_sources = {
         "'sha256-" + base64.b64encode(hashlib.sha256(script.encode()).digest()).decode() + "'"
         for script in executable_scripts

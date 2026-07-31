@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import hashlib
 import json
 from dataclasses import dataclass
 from functools import cache
@@ -18,6 +19,7 @@ class ReportAssets:
     report_css: str
     report_js: str
     brand_logo_data_uri: str
+    script_csp_sources: str
     echarts_js: str
     tabulator_css: str
     tabulator_js: str
@@ -35,20 +37,31 @@ def _resource_bytes(path: str) -> bytes:
     return files("black_box_unlock.visualization").joinpath("assets", *path.split("/")).read_bytes()
 
 
+def _sha256_csp_source(content: str) -> str:
+    digest = hashlib.sha256(content.encode()).digest()
+    return f"'sha256-{base64.b64encode(digest).decode()}'"
+
+
 @cache
 def load_report_assets() -> ReportAssets:
     """Load pinned package resources once per process."""
+    echarts_js = _resource_text("vendor/echarts-6.1.0.min.js")
+    tabulator_js = _resource_text("vendor/tabulator-6.5.2.min.js")
+    report_js = _resource_text("report.js")
     return ReportAssets(
         template=_resource_text("report.html"),
         report_css=_resource_text("report.css"),
-        report_js=_resource_text("report.js"),
+        report_js=report_js,
         brand_logo_data_uri=(
             "data:image/png;base64,"
             + base64.b64encode(_resource_bytes("brand-logo.png")).decode("ascii")
         ),
-        echarts_js=_resource_text("vendor/echarts-6.1.0.min.js"),
+        script_csp_sources=" ".join(
+            _sha256_csp_source(script) for script in (echarts_js, tabulator_js, report_js)
+        ),
+        echarts_js=echarts_js,
         tabulator_css=_resource_text("vendor/tabulator-6.5.2.min.css"),
-        tabulator_js=_resource_text("vendor/tabulator-6.5.2.min.js"),
+        tabulator_js=tabulator_js,
     )
 
 
@@ -78,6 +91,7 @@ def generate_html_report(result: AnalysisResult) -> str:
         "/*__TABULATOR_CSS__*/": assets.tabulator_css,
         "/*__REPORT_CSS__*/": assets.report_css,
         "__BRAND_LOGO_DATA_URI__": assets.brand_logo_data_uri,
+        "__SCRIPT_CSP_SOURCES__": assets.script_csp_sources,
         "/*__ECHARTS_JS__*/": assets.echarts_js,
         "/*__TABULATOR_JS__*/": assets.tabulator_js,
         "/*__REPORT_JS__*/": assets.report_js,

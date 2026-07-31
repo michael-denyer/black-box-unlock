@@ -95,8 +95,10 @@ Pinned ECharts and Tabulator releases, their licenses, the README brand
 artwork, and a checksum manifest ship inside the Python wheel and are inlined
 into the generated document. The document contains a restrictive
 content-security policy and no external scripts, styles, fonts, images, or
-frames. The report application does not invoke network APIs. Bundled library
-code cannot connect because the policy sets `connect-src 'none'`.
+frames. Its three executable inline scripts are admitted by exact SHA-256 CSP
+sources rather than `unsafe-inline`. The report application does not invoke
+network APIs. Bundled library code cannot connect because the policy sets
+`connect-src 'none'`.
 
 Verification covers:
 

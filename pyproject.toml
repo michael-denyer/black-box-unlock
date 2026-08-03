@@ -41,7 +41,7 @@ dev = [
     "pytest-xdist>=3.5.0",
     # Pinned: prek rev and CI must run the identical ruff (version drift
     # means local hooks and CI disagree about violations)
-    "ruff==0.15.22",
+    "ruff==0.16.0",
 ]
 
 [project.scripts]

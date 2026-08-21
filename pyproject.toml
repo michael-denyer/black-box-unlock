@@ -28,7 +28,7 @@ dependencies = [
     "rich>=13.0.0",
     "pydantic>=2.0.0",
     "loguru>=0.7.0",
-    "mcp>=1.27.0,<2",
+    "mcp>=1.27.0,<3",
     "tomli>=2.0.0; python_version < '3.11'",
 ]
 
@@ -41,7 +41,7 @@ dev = [
     "pytest-xdist>=3.5.0",
     # Pinned: prek rev and CI must run the identical ruff (version drift
     # means local hooks and CI disagree about violations)
-    "ruff==0.16.0",
+    "ruff==0.16.3",
 ]
 
 [project.scripts]
@@ -55,7 +55,7 @@ Issues = "https://github.com/michael-denyer/black-box-unlock/issues"
 
 [build-system]
 # Exact pin: a compromised build backend executes arbitrary code at install time
-requires = ["hatchling==1.31.0"]
+requires = ["hatchling==1.32.0"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
@@ -86,6 +86,6 @@ dev = [
     "tomli>=2.0.0",
     # Exact pins keep local and CI diagnostics stable. Both tools may add
     # findings in ordinary releases.
-    "pyrefly==1.1.1",
-    "zizmor==1.28.0",
+    "pyrefly==1.2.0",
+    "zizmor==1.29.0",
 ]

@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- Updated locked PyJWT (2.13.0 to 2.15.1), anyio (4.13.0 to 4.15.1), and
+  cryptography (48.0.1 to 50.0.2) to releases that clear their open
+  advisories; typing-extensions moved to 4.16.0 as an anyio requirement
+
 ## [1.4.0] - 2026-07-30
 
 ### Added

@@ -5,6 +5,7 @@ from datetime import datetime
 from unittest.mock import patch
 
 import pytest
+from mcp.server.mcpserver.exceptions import ToolError, UnexpectedToolError
 
 from black_box_unlock import mcp_server
 from black_box_unlock.core.exceptions import NotAGitRepoError
@@ -81,7 +82,7 @@ class TestMcpTools:
     def test_get_file_forensics_unknown_file_raises(self, mock_analysis):
         mock_analysis.return_value = _result()
 
-        with pytest.raises(ValueError, match="No history for nope.py"):
+        with pytest.raises(ToolError, match="No history for nope.py"):
             mcp_server.get_file_forensics("nope.py", repo_path=".", days=30)
 
     def test_get_coupled_files(self, mock_analysis):
@@ -154,13 +155,13 @@ class TestMcpTools:
     def test_get_ownership_unknown_file_raises(self, mock_analysis):
         mock_analysis.return_value = _result()
 
-        with pytest.raises(ValueError, match="No history for nope.py"):
+        with pytest.raises(ToolError, match="No history for nope.py"):
             mcp_server.get_ownership("nope.py", repo_path=".", days=30)
 
-    def test_bad_repo_raises_value_error(self, mock_analysis):
+    def test_bad_repo_raises_tool_error(self, mock_analysis):
         mock_analysis.side_effect = NotAGitRepoError("Not a git repository: /tmp")
 
-        with pytest.raises(ValueError, match="Not a git repository: /tmp"):
+        with pytest.raises(ToolError, match="Not a git repository: /tmp"):
             mcp_server.get_hotspots(repo_path="/tmp", days=1)
 
 
@@ -199,6 +200,20 @@ class TestToolRegistration:
             "xray_file",
             "review_change",
         }
+
+
+class TestErrorsReachTheClient:
+    @patch("black_box_unlock.mcp_server._analysis")
+    def test_tool_error_message_is_returned_to_the_caller(self, mock_analysis):
+        mock_analysis.side_effect = NotAGitRepoError("Not a git repository: /tmp")
+
+        with pytest.raises(ToolError, match="Not a git repository: /tmp") as raised:
+            asyncio.run(
+                mcp_server.mcp.call_tool("get_hotspots", {"repo_path": "/tmp"}, context=None)
+            )
+
+        # UnexpectedToolError is the crash path: the server hides its message from the client.
+        assert not isinstance(raised.value, UnexpectedToolError)
 
 
 class TestReviewChangeTool:
@@ -266,10 +281,10 @@ class TestXrayFileTool:
             out = mcp_server.xray_file("mod.py", repo_path=".", days=365)
         assert out["functions"][0]["hotspot_score"] == 4.0
 
-    def test_bbu_error_becomes_value_error(self):
+    def test_bbu_error_becomes_tool_error(self):
         with patch("black_box_unlock.mcp_server._xray_file") as mock_xray:
             mock_xray.side_effect = NotAGitRepoError("not a repo")
-            with pytest.raises(ValueError, match="not a repo"):
+            with pytest.raises(ToolError, match="not a repo"):
                 mcp_server.xray_file("mod.py")
 
 

@@ -10,7 +10,8 @@ restart the server to pick up new commits.
 from pathlib import Path
 from typing import Literal
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
+from mcp.server.mcpserver.exceptions import ToolError
 
 from .analysis import run_analysis
 from .config import ReviewOverrides, resolve_review_settings
@@ -20,7 +21,7 @@ from .git.changes import BaseChange, StagedChange, WorkingTreeChange
 from .git.xray import xray_file as _xray_file
 from .review import run_change_review as _run_change_review
 
-mcp = FastMCP("black-box-unlock")
+mcp = MCPServer("black-box-unlock")
 
 _cache: dict[tuple[str, int, bool], AnalysisResult] = {}
 
@@ -34,11 +35,11 @@ def _analysis(repo_path: str, days: int, include_ci: bool = False) -> AnalysisRe
 
 
 def _safe_analysis(repo_path: str, days: int, include_ci: bool = False) -> AnalysisResult:
-    """Call _analysis and surface BlackBoxUnlockError as ValueError on the MCP error channel."""
+    """Call _analysis and surface BlackBoxUnlockError as a ToolError so the message reaches the client."""
     try:
         return _analysis(repo_path, days, include_ci)
     except BlackBoxUnlockError as e:
-        raise ValueError(str(e)) from e
+        raise ToolError(str(e)) from e
 
 
 def _file_dict(f: FileForensics) -> dict:
@@ -78,7 +79,7 @@ def get_file_forensics(
     for f in result.files:
         if f.path == file_path:
             return _file_dict(f)
-    raise ValueError(f"No history for {file_path} in the last {days} days")
+    raise ToolError(f"No history for {file_path} in the last {days} days")
 
 
 @mcp.tool()
@@ -122,7 +123,7 @@ def get_ownership(
                 "author_count": f.author_count,
                 "is_high_risk": f.is_high_risk,
             }
-    raise ValueError(f"No history for {file_path} in the last {days} days")
+    raise ToolError(f"No history for {file_path} in the last {days} days")
 
 
 @mcp.tool()
@@ -184,7 +185,7 @@ def xray_file(
             min_coupling=min_coupling,
         )
     except BlackBoxUnlockError as e:
-        raise ValueError(str(e)) from e
+        raise ToolError(str(e)) from e
     return result.model_dump(mode="json")
 
 
@@ -229,7 +230,7 @@ def review_change(
             path_role_rules=settings.path_roles,
         )
     except BlackBoxUnlockError as error:
-        raise ValueError(str(error)) from error
+        raise ToolError(str(error)) from error
     return result.model_dump(mode="json")
 
 

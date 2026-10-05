@@ -12,7 +12,7 @@ src/black_box_unlock/
 ├── cli.py                  # Typer CLI: bbu analyze-repo / version
 ├── complexity.py           # Indentation-depth complexity proxy
 ├── analysis.py             # Pipeline: fetch -> parse -> join -> AnalysisResult
-├── mcp_server.py           # FastMCP server: cached signals + fresh review
+├── mcp_server.py           # MCP server: cached signals + fresh review
 ├── review.py               # Pure review projection and bounded action policy
 ├── config.py               # .bbu.toml parsing and named profile resolution
 ├── path_roles.py           # Project and built-in path-role classifier

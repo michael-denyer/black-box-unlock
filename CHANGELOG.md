@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Updated locked dependencies: mcp 1.29.0 to 2.2.0, typer 0.27.0 to 0.27.2,
+  pydantic 2.13.4 to 2.13.5, pytest-randomly 4.1.0 to 5.0.0, ruff 0.16.0 to
+  0.16.9, prek 0.4.11 to 0.5.4, pyrefly 1.1.1 to 1.3.1, zizmor 1.28.0 to
+  1.30.1, and the hatchling build pin 1.31.0 to 1.32.4
+- The MCP server now uses the mcp 2 `MCPServer` class, and the `mcp`
+  requirement is now `>=2.2.0,<3`. Tool names, arguments, and results are
+  unchanged; tool errors are raised as `ToolError` so clients still see the
+  message
+
 ### Security
 
 - Updated locked PyJWT (2.13.0 to 2.15.1), anyio (4.13.0 to 4.15.1), and

@@ -99,10 +99,10 @@ class TestMcpTools:
         )
         mock_analysis.return_value = result
 
-        source = mcp_server.get_hotspots(repo_path=".", top_n=1, roles=["source"])
-        tests = mcp_server.get_hotspots(repo_path=".", roles=["test"])
-        both = mcp_server.get_hotspots(repo_path=".", roles=["test", "source"])
-        unfiltered = mcp_server.get_hotspots(repo_path=".")
+        source = mcp_server.get_hotspots(repo_path=".", top_n=1, roles=["source"])["hotspots"]
+        tests = mcp_server.get_hotspots(repo_path=".", roles=["test"])["hotspots"]
+        both = mcp_server.get_hotspots(repo_path=".", roles=["test", "source"])["hotspots"]
+        unfiltered = mcp_server.get_hotspots(repo_path=".")["hotspots"]
 
         assert [f["path"] for f in source] == ["src/auth.py"]
         assert [f["path"] for f in tests] == ["tests/test_auth.py"]

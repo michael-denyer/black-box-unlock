@@ -209,10 +209,19 @@ def _show(repo_path: Path, sha: str, file_path: str) -> str | None:
 
 
 def _spans_for(source: str) -> list[FunctionSpan]:
+    """Spans for one snapshot; empty when the source is too deeply nested to parse.
+
+    Pathological (usually generated) source makes ast recurse past the
+    interpreter limit. That snapshot is treated as unparseable so the rest of
+    the history is still analyzed.
+    """
     try:
         return python_spans(source)
     except SyntaxError:
         return indentation_spans(source)
+    except RecursionError:
+        logger.warning("X-Ray: snapshot too deeply nested to parse; skipping its spans")
+        return []
 
 
 def _spans_at(repo_path: Path, rev: str, file_path: str) -> list[FunctionSpan]:

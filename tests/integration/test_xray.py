@@ -168,3 +168,21 @@ class TestUnsupportedLanguage:
         assert js.xray_failed is False
         assert js.functions == []
         assert result.summary.xrayed_files == 0
+
+
+class TestUnparseableSnapshot:
+    @pytest.fixture
+    def deep_repo(self, tmp_path):
+        _run(["git", "init", "-b", "main"], tmp_path)
+        _run(["git", "config", "user.email", "t@example.com"], tmp_path)
+        _run(["git", "config", "user.name", "Tester"], tmp_path)
+        deep = "1" + "+1" * 50000  # ast.parse hits its recursion limit on this
+        for i in range(2):
+            (tmp_path / "gen.py").write_text(f"def f():\n    x = {i}\n    return {deep}\n")
+            _run(["git", "add", "."], tmp_path)
+            _run(["git", "commit", "-m", f"step {i}"], tmp_path)
+        return tmp_path
+
+    def test_recursion_error_does_not_abort_xray(self, deep_repo):
+        result = xray_file(deep_repo, "gen.py", days=365)
+        assert result.revisions_analyzed == 2

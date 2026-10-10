@@ -126,6 +126,19 @@ def indentation_complexity(file_path: Path, tab_size: int = TAB_SIZE) -> float:
         text = file_path.read_text(errors="ignore")
     except OSError:
         return 0.0
+    return indentation_complexity_text(file_path, text, tab_size)
+
+
+def indentation_complexity_text(file_path: Path, text: str, tab_size: int = TAB_SIZE) -> float:
+    """Score `text` as the contents of `file_path` without touching the disk.
+
+    Applies the same rules as `indentation_complexity`: data and generated
+    files, binary content, notebooks, and generator markers all score 0.
+    Callers that already hold the content (for example a historical revision
+    read from git) use this entry point.
+    """
+    if _is_data_or_generated(file_path):
+        return 0.0
 
     if "\x00" in text:
         return 0.0

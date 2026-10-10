@@ -11,22 +11,41 @@ from typer.testing import CliRunner
 
 from black_box_unlock.cli import app
 from black_box_unlock.core.exceptions import InsufficientHistoryError
-from black_box_unlock.validation import ValidationResult
+from black_box_unlock.validation import MethodScore, RandomBaseline, ValidationReport
 
 runner = CliRunner()
 
 
-def _validation_result(repo: str = "demo", spearman: float | None = 0.62) -> ValidationResult:
-    return ValidationResult(
+def _validation_result(
+    repo: str = "demo", spearman: float | None = 0.62, insufficient: bool = False
+) -> ValidationReport:
+    return ValidationReport(
         repo=repo,
         days=730,
         split=0.5,
         cutoff=datetime(2025, 6, 12, tzinfo=timezone.utc),
-        file_count=120,
-        spearman=spearman,
-        top_decile_share=0.45,
-        bugfix_coverage=0.88,
+        cutoff_sha="0123456789abcdef0123456789abcdef01234567",
+        clock="committer",
+        universe_size=120,
+        train_commits=300,
+        test_commits=280,
+        test_bugfix_commits=90,
         test_bugfix_touches=200,
+        bugfix_coverage=0.88,
+        methods={
+            "hotspot": MethodScore(spearman=spearman, top_decile_share=0.45, top_files=["a.py"])
+        },
+        random=RandomBaseline(
+            draws=200,
+            seed=1,
+            spearman_mean=0.0,
+            spearman_sd=0.1,
+            top_decile_share_mean=0.1,
+            top_decile_share_sd=0.03,
+        ),
+        p_value=0.005,
+        insufficient_data=insufficient,
+        insufficient_reasons=["5 universe files < 20"] if insufficient else [],
     )
 
 
@@ -170,13 +189,43 @@ class TestValidateCommand:
         assert result.exit_code == 0
         assert "0.62" in result.stdout
 
+    def test_insufficient_data_prints_counts_not_percentages(self):
+        with patch("black_box_unlock.validation.validate_repo") as mock_validate:
+            mock_validate.return_value = _validation_result(insufficient=True)
+            result = runner.invoke(app, ["validate", "--repo", "."])
+        assert "insufficient data: 5 universe files < 20" in result.stdout
+        assert "0.62" not in result.stdout
+        assert "45%" not in result.stdout
+        assert "coverage" not in result.stdout
+
+    def test_all_repos_insufficient_exits_nonzero(self):
+        with patch("black_box_unlock.validation.validate_repo") as mock_validate:
+            mock_validate.return_value = _validation_result(insufficient=True)
+            result = runner.invoke(app, ["validate", "--repo", "."])
+        assert result.exit_code == 1
+        assert "no repo met the sample floor" in result.stdout
+
+    def test_p_at_the_permutation_floor_prints_as_a_bound(self):
+        # zero of 200 draws reached the share: (0 + 1) / 201 is a ceiling, not a measurement
+        report = _validation_result().model_copy(update={"p_value": 1 / 201})
+        with patch("black_box_unlock.validation.validate_repo") as mock_validate:
+            mock_validate.return_value = report
+            result = runner.invoke(app, ["validate", "--repo", "."])
+        assert "p<0.005 (no draw reached it)" in result.stdout
+
+    def test_report_lines_are_not_wrapped_at_80_columns(self):
+        with patch("black_box_unlock.validation.validate_repo") as mock_validate:
+            mock_validate.return_value = _validation_result()
+            result = runner.invoke(app, ["validate", "--repo", "."])
+        assert "90 bug-fix commits after the cutoff, 200 touches on the universe" in result.stdout
+
     def test_json_output(self):
         with patch("black_box_unlock.validation.validate_repo") as mock_validate:
             mock_validate.return_value = _validation_result()
             result = runner.invoke(app, ["validate", "--repo", ".", "--json"])
         assert result.exit_code == 0
         parsed = json.loads(result.stdout)
-        assert parsed[0]["spearman"] == 0.62
+        assert parsed[0]["methods"]["hotspot"]["spearman"] == 0.62
 
     def test_median_rho_for_multiple_repos(self):
         results = [
@@ -190,6 +239,18 @@ class TestValidateCommand:
         assert result.exit_code == 0
         assert "median" in result.stdout.lower()
         assert "0.60" in result.stdout
+
+    def test_median_rho_skips_insufficient_repos(self):
+        results = [
+            _validation_result("a", 0.4, insufficient=True),
+            _validation_result("b", 0.6),
+            _validation_result("c", 0.8),
+        ]
+        with patch("black_box_unlock.validation.validate_repo") as mock_validate:
+            mock_validate.side_effect = results
+            result = runner.invoke(app, ["validate", "--repo", "a", "--repo", "b", "--repo", "c"])
+        assert result.exit_code == 0
+        assert "median rho=0.70 across 2 repos" in result.stdout
 
     def test_failing_repo_reports_error_but_others_continue(self):
         with patch("black_box_unlock.validation.validate_repo") as mock_validate:

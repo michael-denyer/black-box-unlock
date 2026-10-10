@@ -1,26 +1,35 @@
 """Unit tests for hotspot-vs-bugfix self-validation."""
 
-from datetime import datetime, timedelta, timezone
-from pathlib import Path
+import hashlib
+import subprocess
 from unittest.mock import patch
 
 import pytest
 
-from black_box_unlock.core.exceptions import InsufficientHistoryError
-from black_box_unlock.git.log import Commit
-from black_box_unlock.validation import spearman_rho, split_history, validate_repo
-from tests.factories import make_commit
-
-INDENTED = "def f(x):\n    if x:\n        return 1\n    return 0\n"
-FLAT = "X = 1\nY = 2\n"
-
-
-def _days_ago(n: int) -> str:
-    return (datetime.now(timezone.utc) - timedelta(days=n)).isoformat()
+from black_box_unlock.core.exceptions import BlackBoxUnlockError, GitToolNotFoundError
+from black_box_unlock.validation import (
+    _tree_contents,
+    permutation_p,
+    random_draws,
+    score_ranking,
+    spearman_rho,
+)
 
 
-def _entry(timestamp: str, message: str = "feat: x", paths: list[str] | None = None) -> Commit:
-    return make_commit(paths or ["a.py"], timestamp=timestamp, message=message)
+class TestTreeContents:
+    @patch("black_box_unlock.validation.subprocess.run")
+    def test_missing_git_raises_git_tool_not_found(self, mock_run, tmp_path):
+        mock_run.side_effect = FileNotFoundError(2, "No such file or directory", "git")
+        with pytest.raises(GitToolNotFoundError):
+            _tree_contents(tmp_path, "abc", ["a.py"])
+
+    @patch("black_box_unlock.validation.subprocess.run")
+    def test_failed_cat_file_raises_project_error_with_stderr(self, mock_run, tmp_path):
+        mock_run.side_effect = subprocess.CalledProcessError(
+            128, ["git"], stderr=b"fatal: not a git repository"
+        )
+        with pytest.raises(BlackBoxUnlockError, match="not a git repository"):
+            _tree_contents(tmp_path, "abc", ["a.py"])
 
 
 class TestSpearmanRho:
@@ -46,100 +55,65 @@ class TestSpearmanRho:
         assert spearman_rho([1], [2]) is None
 
 
-class TestSplitHistory:
-    CUTOFF = datetime(2026, 3, 1, tzinfo=timezone.utc)
-
-    def test_partitions_entries_at_cutoff(self):
-        history = [
-            _entry("2026-05-01T10:00:00+00:00"),
-            _entry("2026-01-01T10:00:00+00:00"),
-        ]
-        train, test = split_history(history, self.CUTOFF)
-        assert [c.timestamp for c in train] == [datetime(2026, 1, 1, 10, 0, tzinfo=timezone.utc)]
-        assert [c.timestamp for c in test] == [datetime(2026, 5, 1, 10, 0, tzinfo=timezone.utc)]
-
-    def test_entry_exactly_at_cutoff_goes_to_test(self):
-        history = [_entry("2026-03-01T00:00:00+00:00")]
-        train, test = split_history(history, self.CUTOFF)
-        assert train == []
-        assert len(test) == 1
-
-    def test_zulu_suffix_timestamps_parse(self):
-        # git %aI emits +00:00 offsets but fixtures and other tools use Z
-        history = [_entry("2026-01-01T10:00:00Z")]
-        train, test = split_history(history, self.CUTOFF)
-        assert len(train) == 1
-        assert test == []
-
-    def test_empty_history(self):
-        train, test = split_history([], self.CUTOFF)
-        assert train == []
-        assert test == []
+class TestRandomDraws:
+    def test_seeded_draw_sequence_matches_the_stored_hash(self):
+        # The published p-values depend on these 200 orderings. A change to
+        # random.shuffle across Python versions, or to the seed or draw count,
+        # changes this hash and the docs must be re-derived.
+        paths = [f"f{i:02d}.py" for i in range(25)]
+        draws = random_draws(paths, {"f03.py": 2, "f17.py": 1})
+        digest = hashlib.sha256("\n".join(",".join(d.top_files) for d in draws).encode())
+        assert len(draws) == 200
+        assert draws[0].top_files == ["f22.py", "f00.py", "f14.py"]
+        assert digest.hexdigest() == (
+            "13756f9e397567fa7277ca5685d574a51d57e42a0ae613b28571593de85fc02c"
+        )
 
 
-def _fake_history() -> list[Commit]:
-    # Train half (older than the 50-day cutoff for days=100, split=0.5):
-    # hot.py churns 3x, cold.py once. Test half: 2 bugfix commits touch hot.py.
-    return [
-        _entry(_days_ago(90), "feat: a", ["hot.py"]),
-        _entry(_days_ago(80), "feat: b", ["hot.py", "cold.py"]),
-        _entry(_days_ago(70), "feat: c", ["hot.py", "gone.py"]),
-        _entry(_days_ago(30), "fix: crash", ["hot.py"]),
-        _entry(_days_ago(10), "fix: regression", ["hot.py"]),
-    ]
+class TestPermutationP:
+    def test_counts_draws_at_or_above_observed_with_plus_one_correction(self):
+        # one of four draws ties the observed share: (1 + 1) / (4 + 1)
+        assert permutation_p(0.5, [0.5, 0.0, 0.0, 0.0]) == pytest.approx(0.4)
+
+    def test_observed_above_every_draw_is_the_floor_not_zero(self):
+        assert permutation_p(1.0, [0.0] * 199) == pytest.approx(1 / 200)
+
+    def test_undefined_observed_share_gives_none(self):
+        assert permutation_p(None, [0.1, 0.2]) is None
 
 
-class TestValidateRepo:
-    def _run(self, tmp_path: Path):
-        (tmp_path / "hot.py").write_text(INDENTED)
-        (tmp_path / "cold.py").write_text(FLAT)
-        # gone.py intentionally absent: deleted files drop out of the universe
-        with patch("black_box_unlock.validation.fetch_git_history") as mock_fetch:
-            mock_fetch.return_value = _fake_history()
-            return validate_repo(tmp_path, days=100, split=0.5)
+class TestScoreRanking:
+    SCORES = {"hot.py": 9.0, "warm.py": 4.0, "cold.py": 1.0, "zero.py": 0.0}
 
-    def test_correlates_train_hotspots_with_test_bugfixes(self, tmp_path):
-        result = self._run(tmp_path)
-        assert result.spearman == pytest.approx(1.0)  # hot.py: top score, all fixes
+    def test_top_decile_is_the_ceiling_of_ten_percent(self):
+        # four files -> ceil(0.4) = 1 top file, which takes 2 of 3 touches
+        result = score_ranking(self.SCORES, {"hot.py": 2, "cold.py": 1})
+        assert result.top_files == ["hot.py"]
+        assert result.top_decile_share == pytest.approx(2 / 3)
 
-    def test_universe_excludes_deleted_files(self, tmp_path):
-        result = self._run(tmp_path)
-        assert result.file_count == 2  # hot.py, cold.py — not gone.py
+    def test_spearman_pairs_scores_with_touches_in_universe_order(self):
+        result = score_ranking(self.SCORES, {"hot.py": 3, "warm.py": 2, "cold.py": 1})
+        assert result.spearman == pytest.approx(1.0)
 
-    def test_top_decile_share_counts_bugfix_touches(self, tmp_path):
-        # universe of 2 -> top decile is ceil(0.2)=1 file (hot.py) with all touches
-        result = self._run(tmp_path)
-        assert result.top_decile_share == pytest.approx(1.0)
-        assert result.test_bugfix_touches == 2
-
-    def test_coverage_is_full_when_all_fixes_hit_ranked_files(self, tmp_path):
-        result = self._run(tmp_path)
-        assert result.bugfix_coverage == pytest.approx(1.0)
-
-    def test_no_test_window_bugfixes_yields_none_share(self, tmp_path):
-        (tmp_path / "hot.py").write_text(INDENTED)
-        history = [
-            _entry(_days_ago(90), "feat: a", ["hot.py"]),
-            _entry(_days_ago(10), "feat: quiet period", ["hot.py"]),
-        ]
-        with patch("black_box_unlock.validation.fetch_git_history") as mock_fetch:
-            mock_fetch.return_value = history
-            result = validate_repo(tmp_path, days=100, split=0.5)
+    def test_no_touches_yields_none_share(self):
+        result = score_ranking(self.SCORES, {})
         assert result.top_decile_share is None
-        assert result.bugfix_coverage is None
 
-    def test_empty_train_half_raises(self, tmp_path):
-        (tmp_path / "hot.py").write_text(INDENTED)
-        history = [_entry(_days_ago(10), "feat: a", ["hot.py"])]
-        with patch("black_box_unlock.validation.fetch_git_history") as mock_fetch:
-            mock_fetch.return_value = history
-            with pytest.raises(InsufficientHistoryError):
-                validate_repo(tmp_path, days=100, split=0.5)
+    def test_ties_break_on_path_so_top_files_are_deterministic(self):
+        result = score_ranking({"b.py": 1.0, "a.py": 1.0}, {})
+        assert result.top_files == ["a.py"]
 
-    def test_empty_test_half_raises(self, tmp_path):
-        (tmp_path / "hot.py").write_text(INDENTED)
-        history = [_entry(_days_ago(90), "feat: a", ["hot.py"])]
-        with patch("black_box_unlock.validation.fetch_git_history") as mock_fetch:
-            mock_fetch.return_value = history
-            with pytest.raises(InsufficientHistoryError):
-                validate_repo(tmp_path, days=100, split=0.5)
+    def test_boundary_ties_share_the_top_slots_pro_rata(self):
+        # twenty files -> two top slots. a.py holds one outright; b.py and c.py
+        # tie for the other, so each gets half credit: 2 + (0 + 2) / 2 = 3 of 4.
+        # Breaking the tie on path would credit b.py alone and report 2 of 4.
+        scores = {"a.py": 9.0, "b.py": 5.0, "c.py": 5.0}
+        scores.update({f"z{i}.py": 0.0 for i in range(17)})
+        result = score_ranking(scores, {"a.py": 2, "c.py": 2})
+        assert result.top_decile_share == pytest.approx(3 / 4)
+
+    def test_all_tied_at_the_boundary_credits_the_average(self):
+        # ten files, one slot, all scores equal: the slot takes 1/10 of every touch
+        scores = {f"f{i}.py": 1.0 for i in range(10)}
+        result = score_ranking(scores, {"f9.py": 5})
+        assert result.top_decile_share == pytest.approx(0.1)

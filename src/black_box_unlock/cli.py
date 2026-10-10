@@ -323,22 +323,22 @@ def validate(
             results.append(validation.validate_repo(repo, days=days, split=split))
         except BlackBoxUnlockError as e:
             console.print(f"[red]Error:[/red] {repo}: {e}")
+    usable = [r for r in results if not r.insufficient_data]
     if json_output:
         print(json.dumps([r.model_dump(mode="json") for r in results], indent=2))
     else:
         for r in results:
-            rho = f"{r.spearman:.2f}" if r.spearman is not None else "n/a"
-            share = f"{r.top_decile_share:.0%}" if r.top_decile_share is not None else "n/a"
-            coverage = f"{r.bugfix_coverage:.0%}" if r.bugfix_coverage is not None else "n/a"
-            console.print(
-                f"{r.repo}: files={r.file_count} rho={rho} "
-                f"top-10% files take {share} of {r.test_bugfix_touches} bug-fix touches "
-                f"(coverage {coverage})"
-            )
-        rhos = [r.spearman for r in results if r.spearman is not None]
+            console.print(validation.render_report(r), soft_wrap=True)
+        rhos = [
+            r.methods["hotspot"].spearman
+            for r in usable
+            if r.methods["hotspot"].spearman is not None
+        ]
         if len(rhos) > 1:
             console.print(f"median rho={statistics.median(rhos):.2f} across {len(rhos)} repos")
-    if not results:
+        if results and not usable:
+            console.print("no repo met the sample floor")
+    if not usable:
         raise typer.Exit(code=1)
 
 

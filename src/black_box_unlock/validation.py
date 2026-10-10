@@ -119,11 +119,25 @@ def spearman_rho(xs: list[float], ys: list[float]) -> float | None:
     return cov / (var_x * var_y) ** 0.5
 
 
+def _top_hits(universe: list[str], hits: list[int], scores: dict[str, float], top_k: int) -> float:
+    """Touches credited to the top `top_k` slots.
+
+    Files tied at the boundary score share the slots they compete for pro
+    rata, so a tie is not decided by path order.
+    """
+    boundary = scores[universe[top_k - 1]]
+    above = [h for p, h in zip(universe, hits, strict=True) if scores[p] > boundary]
+    tied = [h for p, h in zip(universe, hits, strict=True) if scores[p] == boundary]
+    need = top_k - len(above)
+    return sum(above) + need * sum(tied) / len(tied)
+
+
 def score_ranking(scores: dict[str, float], touches: dict[str, int]) -> MethodScore:
     """Score one ranking against bug-fix touches over the same universe.
 
-    `scores` maps every universe file to its rank score; higher ranks first,
-    ties break on path so the result is deterministic.
+    `scores` maps every universe file to its rank score; higher ranks first.
+    `top_files` lists the top slots with ties broken on path so it is
+    deterministic; `top_decile_share` gives boundary ties fractional credit.
     """
     universe = sorted(scores, key=lambda p: (-scores[p], p))
     hits = [touches.get(p, 0) for p in universe]
@@ -131,7 +145,7 @@ def score_ranking(scores: dict[str, float], touches: dict[str, int]) -> MethodSc
     top_k = math.ceil(len(universe) * TOP_DECILE)
     return MethodScore(
         spearman=spearman_rho([scores[p] for p in universe], [float(h) for h in hits]),
-        top_decile_share=sum(hits[:top_k]) / total if total else None,
+        top_decile_share=_top_hits(universe, hits, scores, top_k) / total if total else None,
         top_files=universe[:top_k],
     )
 

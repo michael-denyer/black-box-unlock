@@ -64,3 +64,18 @@ class TestScoreRanking:
     def test_ties_break_on_path_so_top_files_are_deterministic(self):
         result = score_ranking({"b.py": 1.0, "a.py": 1.0}, {})
         assert result.top_files == ["a.py"]
+
+    def test_boundary_ties_share_the_top_slots_pro_rata(self):
+        # twenty files -> two top slots. a.py holds one outright; b.py and c.py
+        # tie for the other, so each gets half credit: 2 + (0 + 2) / 2 = 3 of 4.
+        # Breaking the tie on path would credit b.py alone and report 2 of 4.
+        scores = {"a.py": 9.0, "b.py": 5.0, "c.py": 5.0}
+        scores.update({f"z{i}.py": 0.0 for i in range(17)})
+        result = score_ranking(scores, {"a.py": 2, "c.py": 2})
+        assert result.top_decile_share == pytest.approx(3 / 4)
+
+    def test_all_tied_at_the_boundary_credits_the_average(self):
+        # ten files, one slot, all scores equal: the slot takes 1/10 of every touch
+        scores = {f"f{i}.py": 1.0 for i in range(10)}
+        result = score_ranking(scores, {"f9.py": 5})
+        assert result.top_decile_share == pytest.approx(0.1)

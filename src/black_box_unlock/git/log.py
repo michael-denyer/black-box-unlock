@@ -15,7 +15,8 @@ from .run import run_git
 # \x01 marks the start of a commit record so we never collide with file content.
 _COMMIT_MARKER = "\x01"
 # %x09 is a git-side tab — the field separator _parse_log_output splits on.
-_PRETTY_FORMAT = f"{_COMMIT_MARKER}%aI%x09%ae%x09%s"
+# %aE applies .mailmap so one person with several emails counts once.
+_PRETTY_FORMAT = f"{_COMMIT_MARKER}%aI%x09%aE%x09%s"
 
 
 class CommitFile(BaseModel):

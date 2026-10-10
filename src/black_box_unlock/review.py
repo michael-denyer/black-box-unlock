@@ -10,7 +10,12 @@ from pydantic import BaseModel, Field
 from .analysis import run_analysis
 from .config import CONFIG_FILE_NAME, load_project_config
 from .core.exceptions import ConfigurationError
-from .core.models import AnalysisResult, FileForensics, SignalStatus
+from .core.models import (
+    HIGH_RISK_AUTHOR_THRESHOLD,
+    AnalysisResult,
+    FileForensics,
+    SignalStatus,
+)
 from .git.changes import (
     BaseProvenance,
     ChangedPath,
@@ -476,7 +481,10 @@ def project_change_review(
         )
         for file in files
         if file.evidence.role.role in _ACTIONABLE_ROLES
-        and (file.evidence.bugfix_commits > 0 or file.evidence.author_count > 3)
+        and (
+            file.evidence.bugfix_commits > 0
+            or file.evidence.author_count > HIGH_RISK_AUTHOR_THRESHOLD
+        )
     ]
     focus.sort(
         key=lambda item: (

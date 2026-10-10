@@ -219,6 +219,11 @@ def get_coupled_files(
 
     Warn before editing: if you change this file, its coupled files
     historically change too - missing them is a common defect source.
+    A partner is listed when rate_to_partner (the share of this file's
+    revisions that also changed it) reaches the coupling policy's min_ratio
+    and the pair has min_shared_revisions shared revisions. Commits touching
+    more than max_changeset_size files and partners deleted at HEAD are
+    excluded. The policy comes from the [coupling] table of .bbu.toml.
 
     Returns {"coupled_files": [...], "provenance": {...}}. file_path may be
     repo-relative or absolute inside the repo; an unknown path raises instead
@@ -354,7 +359,10 @@ def review_change(
     ``base`` includes branch commits and all local layers from the merge base.
     ``staged`` reads only the index. ``working_tree`` reads unstaged and
     untracked files. Review always runs fresh. CI stays off unless a selected
-    profile or ``include_ci`` turns it on.
+    profile or ``include_ci`` turns it on. ``min_coupling`` and
+    ``min_shared_revisions`` override the ``.bbu.toml`` coupling policy;
+    ``min_coupling`` applies to the share of the changed file's revisions
+    that also changed the partner.
     """
     selectors = {
         "base": BaseChange(base_ref=base_ref),

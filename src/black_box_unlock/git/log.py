@@ -41,6 +41,16 @@ class Commit(BaseModel):
     message: str = ""
     files: list[CommitFile] = []
 
+    def is_bulk(self, max_changeset_size: int) -> bool:
+        """True when the commit touches more distinct paths than max_changeset_size."""
+        return len({file.path for file in self.files}) > max_changeset_size
+
+
+def exclude_bulk(commits: list[Commit], max_changeset_size: int) -> tuple[list[Commit], int]:
+    """Drop bulk commits (migrations, vendoring, reformatting) and count them."""
+    kept = [commit for commit in commits if not commit.is_bulk(max_changeset_size)]
+    return kept, len(commits) - len(kept)
+
 
 def fetch_git_history(
     repo_path: Path, days: int, rev: str | None = None, *, clock: Clock = "author"

@@ -12,7 +12,7 @@ from loguru import logger
 from rich.console import Console
 
 from black_box_unlock.analysis import export_to_json, run_analysis
-from black_box_unlock.config import load_project_config
+from black_box_unlock.config import load_project_config, resolve_coupling_policy
 from black_box_unlock.core.exceptions import BlackBoxUnlockError
 from black_box_unlock.core.logging import configure_logging
 from black_box_unlock.git.changes import BaseChange, StagedChange, WorkingTreeChange
@@ -72,8 +72,16 @@ def _review_selector(
 def analyze_repo(  # [1a.1] Main analysis command
     days: int = typer.Option(30, help="Days of git history to analyze"),
     output: OutputFormat = typer.Option(OutputFormat.json, help="Output format: json, html"),
-    min_coupling: float = typer.Option(
-        0.3, min=0.0, max=1.0, help="Minimum coupling ratio to include"
+    min_coupling: float | None = typer.Option(
+        None, min=0.0, max=1.0, help="Minimum coupling ratio to include (default 0.3)"
+    ),
+    min_shared_revisions: int | None = typer.Option(
+        None, min=1, help="Minimum shared revisions for a coupled pair (default 2)"
+    ),
+    max_changeset_size: int | None = typer.Option(
+        None,
+        min=2,
+        help="Commits touching more files are bulk and excluded from every signal (default 50)",
     ),
     no_ci: bool = typer.Option(False, "--no-ci", help="Skip CI failure analysis"),
     repo: Path = typer.Option(Path("."), "--repo", help="Path to the git repository to analyze"),
@@ -91,9 +99,14 @@ def analyze_repo(  # [1a.1] Main analysis command
         result = run_analysis(
             repo_path,
             days=days,
-            min_coupling=min_coupling,
             include_ci=not no_ci,
             xray_top=xray_top,
+            policy=resolve_coupling_policy(
+                repo_path,
+                min_ratio=min_coupling,
+                min_shared_revisions=min_shared_revisions,
+                max_changeset_size=max_changeset_size,
+            ),
         )
     except BlackBoxUnlockError as e:
         console.print(f"[red]Error:[/red] {e}")
@@ -114,7 +127,13 @@ def analyze_repo(  # [1a.1] Main analysis command
 def coupling_guard(
     file: str = typer.Argument(..., help="Repo-relative path of the edited file"),
     repo: Path = typer.Option(Path("."), "--repo", help="Repository root"),
-    threshold: float = typer.Option(0.5, "--threshold", help="Minimum coupling ratio to warn"),
+    threshold: float | None = typer.Option(
+        None,
+        "--threshold",
+        min=0.0,
+        max=1.0,
+        help="Minimum share of FILE's revisions that touched a partner (default 0.3)",
+    ),
 ) -> None:
     """Emit a Claude Code hook warning when the edited file has strong temporal coupling.
 
@@ -124,7 +143,7 @@ def coupling_guard(
     from black_box_unlock.guard import coupling_warnings
 
     try:
-        warnings = coupling_warnings(file, repo, threshold)
+        warnings = coupling_warnings(file, repo, resolve_coupling_policy(repo, min_ratio=threshold))
     except Exception as e:
         # A guard must never break the edit it observes; degrade to silence — but
         # log so a permanently-failing guard stays diagnosable instead of silently dead.

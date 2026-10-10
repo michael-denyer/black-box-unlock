@@ -711,8 +711,8 @@
     const policy = analysis.parameters;
     document.getElementById("analysis-policy").append(definitionList([
       ["Analysis window", `${formatInteger(analysis.analyzed_days)} days`],
-      ["Coupling threshold", formatPercent(policy.min_coupling)],
-      ["Bulk changeset cap", `${formatInteger(policy.max_coupled_files_per_commit)} files`],
+      ["Coupling threshold", formatPercent(policy.coupling.min_ratio)],
+      ["Bulk changeset cap", `${formatInteger(policy.coupling.max_changeset_size)} files`],
       ["Ignored bulk changesets", formatInteger(analysis.summary.ignored_large_changesets)],
       ["X-Ray top files", formatInteger(policy.xray_top)],
       ["CI requested", policy.include_ci ? "Yes" : "No"],

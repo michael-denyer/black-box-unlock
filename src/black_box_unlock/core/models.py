@@ -5,15 +5,34 @@ from enum import Enum
 from math import sqrt
 from typing import Literal
 
-from pydantic import BaseModel, Field, computed_field, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    computed_field,
+    field_validator,
+    model_validator,
+)
 
 from ..path_roles import PathRole, classify_path_role
 
 HIGH_RISK_AUTHOR_THRESHOLD = 3
 """Files with more than this many authors are considered coordination risks."""
 
-DEFAULT_MAX_COUPLED_FILES_PER_COMMIT = 50
-"""Bulk changesets above this size do not contribute temporal-coupling pairs."""
+
+class CouplingPolicy(BaseModel):
+    """The one definition of which history counts as temporal-coupling evidence.
+
+    ``max_changeset_size`` also marks bulk commits, which every history signal
+    (churn, ownership, defects, coupling) excludes.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    min_ratio: float = Field(default=0.3, ge=0.0, le=1.0)
+    min_shared_revisions: int = Field(default=2, ge=1)
+    max_changeset_size: int = Field(default=50, ge=2)
+    require_live_partner: bool = True
 
 
 def _validate_non_empty_path(v: str) -> str:
@@ -83,8 +102,10 @@ class FileChurn(BaseModel):  # [4a] Churn metrics per file
 class TemporalCoupling(BaseModel):  # [4a.1] File pair co-change
     """Two files that change together frequently.
 
-    Coupling ratio uses Tornhill's formula: co_change_count / min(commits_a, commits_b).
-    A ratio >= 0.3 (30%) indicates a hidden dependency worth investigating.
+    ``coupling_ratio`` is Tornhill's symmetric co_change_count / min(commits_a,
+    commits_b). The directional rates divide by one side's revisions:
+    ``rate_a_to_b`` is the share of file_a's revisions that also touched file_b,
+    which is what "edit file_a, check file_b" needs.
     """
 
     file_a: str
@@ -99,14 +120,28 @@ class TemporalCoupling(BaseModel):  # [4a.1] File pair co-change
             raise ValueError("co-change count exceeds the smaller file revision count")
         return self
 
+    @computed_field
     @property
     def coupling_ratio(self) -> float:
         """Ratio of co-changes to minimum commit count (Tornhill's formula)."""
         return tornhill_ratio(self.co_change_count, self.commits_a, self.commits_b)
 
+    @computed_field
+    @property
+    def rate_a_to_b(self) -> float:
+        """Share of file_a's revisions that also changed file_b."""
+        return self.co_change_count / self.commits_a if self.commits_a else 0.0
+
+    @computed_field
+    @property
+    def rate_b_to_a(self) -> float:
+        """Share of file_b's revisions that also changed file_a."""
+        return self.co_change_count / self.commits_b if self.commits_b else 0.0
+
+    @computed_field
     @property
     def confidence_lower_bound(self) -> float:
-        """95% Wilson lower bound for the coupling ratio."""
+        """95% Wilson lower bound for the symmetric coupling ratio."""
         return wilson_lower_bound(
             self.co_change_count,
             min(self.commits_a, self.commits_b),
@@ -154,6 +189,12 @@ class CouplingInfo(BaseModel):
     file_revisions: int = Field(default=0, ge=0)
     coupled_file_revisions: int = Field(default=0, ge=0)
     confidence_lower_bound: float = Field(default=0.0, ge=0.0, le=1.0)
+
+    @computed_field
+    @property
+    def rate_to_partner(self) -> float:
+        """Share of this file's revisions that also changed the partner file."""
+        return self.shared_revisions / self.file_revisions if self.file_revisions else 0.0
 
 
 def coupling_info_for(coupling: TemporalCoupling, file_path: str) -> CouplingInfo:
@@ -294,13 +335,19 @@ class FileForensics(BaseModel):  # [4a.3] Combined forensics
 
 
 class AnalysisSummary(BaseModel):
-    """Summary statistics for analysis."""
+    """Summary statistics for analysis.
+
+    ``ignored_large_changesets`` counts bulk commits excluded from every
+    history signal. ``dropped_deleted_partners`` counts coupling pairs dropped
+    because one side no longer exists at HEAD.
+    """
 
     total_files: int
     high_risk_ownership: int
     coupled_pairs: int
     xrayed_files: int = 0
     ignored_large_changesets: int = 0
+    dropped_deleted_partners: int = 0
 
 
 class FlakyStepStats(BaseModel):
@@ -390,13 +437,9 @@ class FailedWorkflowRun(BaseModel):
 class AnalysisParameters(BaseModel):
     """Inputs and policies needed to interpret an analysis result."""
 
-    min_coupling: float = Field(default=0.3, ge=0.0, le=1.0)
+    coupling: CouplingPolicy = Field(default_factory=CouplingPolicy)
     include_ci: bool = False
     xray_top: int = Field(default=0, ge=0)
-    max_coupled_files_per_commit: int = Field(
-        default=DEFAULT_MAX_COUPLED_FILES_PER_COMMIT,
-        ge=2,
-    )
 
 
 class Provenance(BaseModel):

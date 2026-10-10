@@ -9,6 +9,7 @@ from black_box_unlock.core.exceptions import ConfigurationError
 from black_box_unlock.core.models import (
     AnalysisResult,
     AnalysisSummary,
+    CouplingPolicy,
     FailedWorkflowRun,
     FileForensics,
     SignalStatus,
@@ -101,8 +102,12 @@ def test_change_review_request_resolves_public_defaults(mock_collect, tmp_path):
     assert isinstance(result, NoChanges)
     assert result.parameters.model_dump() == {
         "days": 90,
-        "min_coupling": 0.3,
-        "min_shared_revisions": 2,
+        "coupling": {
+            "min_ratio": 0.3,
+            "min_shared_revisions": 2,
+            "max_changeset_size": 50,
+            "require_live_partner": True,
+        },
         "include_ci": False,
         "max_actions": 3,
         "profile": "default",
@@ -137,6 +142,57 @@ include_ci = true
     assert result.parameters.include_ci is False
     assert result.parameters.profile == "release"
     assert result.parameters.config_path == ".bbu.toml"
+
+
+@patch("black_box_unlock.review.collect_change_set")
+def test_coupling_table_then_profile_then_request_set_the_policy(mock_collect, tmp_path):
+    (tmp_path / ".bbu.toml").write_text(
+        """
+[coupling]
+min_ratio = 0.6
+min_shared_revisions = 4
+max_changeset_size = 80
+
+[profiles.release]
+min_shared_revisions = 3
+""".strip()
+        + "\n"
+    )
+    mock_collect.return_value = _change_set()
+
+    result = run_change_review(
+        tmp_path,
+        ChangeReviewRequest(selector=WorkingTreeChange(), profile="release", min_coupling=0.4),
+    )
+
+    assert result.parameters.coupling == CouplingPolicy(
+        min_ratio=0.4,
+        min_shared_revisions=3,
+        max_changeset_size=80,
+    )
+
+
+def test_editing_a_hub_does_not_recommend_a_leaf_it_once_touched():
+    analysis = _analysis()
+    analysis.couplings.append(
+        TemporalCoupling(
+            file_a="src/a.py",
+            file_b="src/leaf.py",
+            co_change_count=3,
+            commits_a=13,
+            commits_b=3,
+        )
+    )
+
+    hub_review = project_change_review(_change_set("src/a.py"), analysis, ReviewParameters())
+    leaf_review = project_change_review(_change_set("src/leaf.py"), analysis, ReviewParameters())
+
+    assert isinstance(hub_review, ChangeReview)
+    assert isinstance(leaf_review, ChangeReview)
+    assert "src/leaf.py" not in {item.coupled_path for item in hub_review.couplings}
+    [leaf_evidence] = leaf_review.couplings
+    assert (leaf_evidence.coupled_path, leaf_evidence.changed_to_coupled_rate) == ("src/a.py", 1.0)
+    assert leaf_review.actions[0].kind == "check_coupled_paths"
 
 
 def test_unknown_request_profile_lists_available_names(tmp_path):

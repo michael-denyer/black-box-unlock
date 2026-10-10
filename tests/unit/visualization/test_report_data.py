@@ -118,7 +118,7 @@ def test_complete_analysis_shape_is_retained_and_files_are_stable() -> None:
     payload = build_report_payload(_result())
 
     assert payload["schema_version"] == 2
-    assert payload["analysis"]["parameters"]["max_coupled_files_per_commit"] == 50
+    assert payload["analysis"]["parameters"]["coupling"]["max_changeset_size"] == 50
     assert payload["analysis"]["ci_status"]["state"] == "disabled"
     assert payload["analysis"]["files"][0]["path"] == "src/strong.py"
     assert payload["analysis"]["files"][0]["bugfix_commits"] == 3

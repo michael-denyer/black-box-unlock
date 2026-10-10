@@ -17,28 +17,37 @@ from typing import Literal
 from loguru import logger
 from pydantic import BaseModel, Field, ValidationError
 
+from .config import resolve_coupling_policy
 from .core.exceptions import BlackBoxUnlockError
-from .core.models import CouplingInfo, coupling_info_for, coupling_info_sort_key
+from .core.models import CouplingInfo, CouplingPolicy, coupling_info_for, coupling_info_sort_key
 from .git.coupling import analyze_temporal_coupling
-from .git.log import fetch_git_history
-from .git.run import repo_toplevel, run_git
+from .git.log import exclude_bulk, fetch_git_history
+from .git.run import head_paths, repo_toplevel, run_git
 
 CACHE_FILENAME = "cache.json"
 HOOK_LOG_FILENAME = "hook.log"
 HOOK_LOG_MAX_LINES = 200
 CACHE_MAX_AGE_HOURS = 24
-CACHE_VERSION = 2
+CACHE_VERSION = 3
 CACHE_HISTORY_DAYS = 90
 
 
 class CouplingSnapshot(BaseModel):
-    """The complete on-disk interface for the coupling guard."""
+    """The complete on-disk interface for the coupling guard.
 
-    version: Literal[2] = CACHE_VERSION
+    Every pair with at least one shared revision is stored, so the ratio and
+    support floors apply at query time. The bulk cap and live-partner rule
+    shape the stored pairs, so a snapshot built under other values is stale.
+    """
+
+    version: Literal[3] = CACHE_VERSION
     generated_at: datetime
     head_oid: str
+    max_changeset_size: int = Field(ge=2)
+    require_live_partner: bool
     files: dict[str, list[CouplingInfo]] = Field(default_factory=dict)
     ignored_large_changesets: int = Field(default=0, ge=0)
+    dropped_deleted_partners: int = Field(default=0, ge=0)
 
 
 def state_dir(repo_path: Path) -> Path:
@@ -87,9 +96,16 @@ def _head_oid(repo_path: Path) -> str:
         return "unknown"
 
 
-def _build_snapshot(repo_path: Path, head_oid: str) -> CouplingSnapshot:
-    history = fetch_git_history(repo_path, CACHE_HISTORY_DAYS)
-    analysis = analyze_temporal_coupling(history, min_ratio=0.0)
+def _build_snapshot(repo_path: Path, head_oid: str, policy: CouplingPolicy) -> CouplingSnapshot:
+    history, bulk_commits = exclude_bulk(
+        fetch_git_history(repo_path, CACHE_HISTORY_DAYS), policy.max_changeset_size
+    )
+    live_paths = head_paths(repo_path) if policy.require_live_partner and history else None
+    analysis = analyze_temporal_coupling(
+        history,
+        policy.model_copy(update={"min_ratio": 0.0, "min_shared_revisions": 1}),
+        live_paths,
+    )
     by_file: dict[str, list[CouplingInfo]] = defaultdict(list)
     for coupling in analysis.couplings:
         by_file[coupling.file_a].append(coupling_info_for(coupling, coupling.file_a))
@@ -99,12 +115,17 @@ def _build_snapshot(repo_path: Path, head_oid: str) -> CouplingSnapshot:
     return CouplingSnapshot(
         generated_at=datetime.now(timezone.utc),
         head_oid=head_oid,
+        max_changeset_size=policy.max_changeset_size,
+        require_live_partner=policy.require_live_partner,
         files=dict(by_file),
-        ignored_large_changesets=analysis.ignored_large_changesets,
+        ignored_large_changesets=bulk_commits,
+        dropped_deleted_partners=analysis.dropped_deleted_partners,
     )
 
 
-def _read_fresh_snapshot(cache: Path, head_oid: str) -> CouplingSnapshot | None:
+def _read_fresh_snapshot(
+    cache: Path, head_oid: str, policy: CouplingPolicy
+) -> CouplingSnapshot | None:
     if not cache.exists():
         return None
     try:
@@ -112,7 +133,13 @@ def _read_fresh_snapshot(cache: Path, head_oid: str) -> CouplingSnapshot | None:
         if age_seconds >= CACHE_MAX_AGE_HOURS * 3600:
             return None
         snapshot = CouplingSnapshot.model_validate_json(cache.read_text())
-        return snapshot if snapshot.head_oid == head_oid else None
+        built_under = (
+            snapshot.head_oid,
+            snapshot.max_changeset_size,
+            snapshot.require_live_partner,
+        )
+        wanted = (head_oid, policy.max_changeset_size, policy.require_live_partner)
+        return snapshot if built_under == wanted else None
     except (OSError, ValidationError) as error:
         logger.warning("coupling cache at {} is unusable, rebuilding: {}", cache, error)
         return None
@@ -140,13 +167,13 @@ def _write_snapshot(cache: Path, snapshot: CouplingSnapshot) -> None:
             temporary_path.unlink(missing_ok=True)
 
 
-def _load_or_build_cache(repo_path: Path) -> CouplingSnapshot:
+def _load_or_build_cache(repo_path: Path, policy: CouplingPolicy) -> CouplingSnapshot:
     cache = state_dir(repo_path) / CACHE_FILENAME
     head_oid = _head_oid(repo_path)
-    snapshot = _read_fresh_snapshot(cache, head_oid)
+    snapshot = _read_fresh_snapshot(cache, head_oid, policy)
     if snapshot is not None:
         return snapshot
-    snapshot = _build_snapshot(repo_path, head_oid)
+    snapshot = _build_snapshot(repo_path, head_oid, policy)
     try:
         _write_snapshot(cache, snapshot)
     except OSError as error:
@@ -157,36 +184,43 @@ def _load_or_build_cache(repo_path: Path) -> CouplingSnapshot:
 def coupling_warnings(  # [1c] Coupling guard for the edit hook
     file_path: str,
     repo_path: Path,
-    threshold: float = 0.5,
+    policy: CouplingPolicy | None = None,
     top: int = 3,
-    min_shared_revisions: int = 2,
 ) -> list[str]:
     """Return warnings for files strongly coupled to file_path.
 
-    Results are sorted by Wilson lower bound, shared revisions, observed ratio,
-    and path. At most ``top`` detailed warnings are returned, followed by a
-    summary when more matches exist.
+    A partner warns when the share of file_path's revisions that also changed
+    it reaches ``policy.min_ratio`` and the pair has at least
+    ``policy.min_shared_revisions`` shared revisions. Editing a hub therefore
+    stays quiet about leaves it once touched, while editing a leaf that always
+    moves with the hub warns. Results are sorted by Wilson lower bound, shared
+    revisions, observed ratio, and path. At most ``top`` detailed warnings are
+    returned, followed by a summary when more matches exist.
+
+    Args:
+        file_path: Repo-relative path of the edited file.
+        repo_path: Repository root.
+        policy: Coupling policy; None reads ``.bbu.toml``.
+        top: Maximum detailed warnings.
     """
-    if not 0.0 <= threshold <= 1.0:
-        raise ValueError("threshold must be between 0 and 1")
     if top < 1:
         raise ValueError("top must be at least 1")
-    if min_shared_revisions < 1:
-        raise ValueError("min_shared_revisions must be at least 1")
+    policy = policy if policy is not None else resolve_coupling_policy(repo_path)
 
-    snapshot = _load_or_build_cache(repo_path)
+    snapshot = _load_or_build_cache(repo_path, policy)
     above = sorted(
         (
             item
             for item in snapshot.files.get(file_path, [])
-            if item.ratio >= threshold and item.shared_revisions >= min_shared_revisions
+            if item.rate_to_partner >= policy.min_ratio
+            and item.shared_revisions >= policy.min_shared_revisions
         ),
         key=coupling_info_sort_key,
     )
     warnings = [
-        f"{file_path} historically co-changes with {item.file} "
-        f"{item.shared_revisions} times "
-        f"({round(item.ratio * 100)}%, 95% lower bound "
+        f"{file_path} historically co-changes with {item.file} in "
+        f"{item.shared_revisions} of its {item.file_revisions} revisions "
+        f"({round(item.rate_to_partner * 100)}%, 95% lower bound "
         f"{round(item.confidence_lower_bound * 100)}%) - check whether that file "
         "needs the same change"
         for item in above[:top]

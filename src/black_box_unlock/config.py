@@ -5,6 +5,7 @@ from pathlib import Path
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from .core.exceptions import ConfigurationError
+from .core.models import CouplingPolicy
 from .path_roles import PathRoleRule
 
 try:
@@ -33,6 +34,7 @@ class ProjectConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     default_profile: str | None = None
+    coupling: CouplingPolicy = Field(default_factory=CouplingPolicy)
     path_roles: tuple[PathRoleRule, ...] = ()
     profiles: dict[str, ReviewProfile] = Field(default_factory=dict)
 
@@ -56,3 +58,30 @@ def load_project_config(repo_path: Path) -> ProjectConfig:
         return ProjectConfig.model_validate(raw)
     except (OSError, tomllib.TOMLDecodeError, ValidationError) as error:
         raise ConfigurationError(f"Invalid {CONFIG_FILE_NAME}: {error}") from error
+
+
+def resolve_coupling_policy(
+    repo_path: Path,
+    *,
+    min_ratio: float | None = None,
+    min_shared_revisions: int | None = None,
+    max_changeset_size: int | None = None,
+) -> CouplingPolicy:
+    """Apply explicit overrides over the ``[coupling]`` table of ``.bbu.toml``.
+
+    Raises:
+        ConfigurationError: If ``.bbu.toml`` or an override is invalid.
+    """
+    overrides = {
+        "min_ratio": min_ratio,
+        "min_shared_revisions": min_shared_revisions,
+        "max_changeset_size": max_changeset_size,
+    }
+    base = load_project_config(repo_path).coupling
+    try:
+        return CouplingPolicy.model_validate(
+            base.model_dump()
+            | {key: value for key, value in overrides.items() if value is not None}
+        )
+    except ValidationError as error:
+        raise ConfigurationError(f"Invalid coupling policy: {error}") from error

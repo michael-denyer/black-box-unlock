@@ -24,7 +24,7 @@ src/black_box_unlock/
 ├── git/
 │   ├── log.py              # Native git log --numstat extraction
 │   ├── churn.py            # FileChurn aggregation
-│   ├── coupling.py         # Temporal coupling (Tornhill ratio, bulk-commit cap)
+│   ├── coupling.py         # Temporal coupling (symmetric ratio, directional rates)
 │   ├── changes.py          # Base, staged, and working-tree selection
 │   ├── ownership.py        # Authors per file
 │   └── defects.py          # Bug-fix commit detection
@@ -42,11 +42,17 @@ src/black_box_unlock/
 | Signal | Source | Formula |
 |--------|--------|---------|
 | Hotspot score | git + file contents | commits x indentation complexity (serialized-data/lockfile/generated-asset files and generator-marked files score 0; notebooks scored over code cells) |
-| Temporal coupling | git | co_changes / min(commits_a, commits_b), ordered by 95% Wilson lower bound; commits touching >50 files are excluded from pair generation |
+| Temporal coupling | git | co_changes / min(commits_a, commits_b), plus rate_a_to_b = co_changes / commits_a and rate_b_to_a = co_changes / commits_b. Pairs need at least 2 shared revisions and are ordered by the 95% Wilson lower bound of the symmetric ratio. `coupled_with`, the edit hook, and review keep a partner only when the edited file's own rate reaches min_ratio. Pairs with a side missing from HEAD are dropped and counted |
+| Bulk commits | git | Commits touching more than `max_changeset_size` (50) files are excluded from churn, ownership, bug-fix, and coupling counts. X-Ray reads one file's history and keeps them |
 | Ownership risk | git | > 3 authors |
 | Bug-fix commits | git messages | fix(ing)/bug/hotfix/defect/regression/revert + repair verbs (correct/broke/crash/repair/fault/malfunction/stuck/hang) markers, excluding docs/style/test/chore/ci/build/refactor/feat-prefixed commits |
 | Build failures | gh CLI | failed workflow details plus paths changed in each failed commit; implication, not causality |
 | Flaky steps | gh api | flaky_runs / runs, where a flaky run has a step that failed on attempt N and passed on attempt M>N of the same run, and runs counts only the re-run runs examined in which the step executed |
+
+One frozen `CouplingPolicy` in `core/models.py` holds the coupling and bulk
+thresholds: `min_ratio` 0.3, `min_shared_revisions` 2, `max_changeset_size`
+50, and `require_live_partner` true. The `[coupling]` table in `.bbu.toml`
+overrides the defaults, and CLI or MCP arguments override the table.
 
 ## Data flow
 

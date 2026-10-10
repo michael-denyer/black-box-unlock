@@ -44,6 +44,31 @@ bbu review-change --profile release --days 90
 The MCP `review_change` tool accepts the same `profile`, `days`,
 `min_coupling`, `min_shared_revisions`, and `include_ci` values.
 
+## Coupling policy
+
+The optional `[coupling]` table sets the coupling policy that `analyze-repo`,
+the MCP tools, the edit hook, and review share:
+
+```toml
+[coupling]
+min_ratio = 0.3
+min_shared_revisions = 2
+max_changeset_size = 50
+require_live_partner = true
+```
+
+| Setting | Default | Constraint | Meaning |
+|---------|---------|------------|---------|
+| `min_ratio` | `0.3` | Between 0 and 1 | Smallest share of the edited file's revisions that also changed the partner |
+| `min_shared_revisions` | `2` | At least 1 | Smallest number of commits the pair changed in together |
+| `max_changeset_size` | `50` | At least 2 | Commits touching more files are bulk and are excluded from churn, ownership, bug-fix, and coupling counts |
+| `require_live_partner` | `true` | Boolean | Drop pairs whose other file no longer exists at HEAD |
+
+The `bbu analyze-repo` flags `--min-coupling`, `--min-shared-revisions`, and
+`--max-changeset-size` override the table. `bbu coupling-guard --threshold`
+overrides `min_ratio`. A review profile's `min_coupling` and
+`min_shared_revisions` override the table for that review.
+
 ## Path roles
 
 Each `[[path_roles]]` entry has a `pattern` and one role:
@@ -111,8 +136,8 @@ Every profile may set:
 | Setting | Default | Constraint |
 |---------|---------|------------|
 | `days` | `90` | At least 1 |
-| `min_coupling` | `0.3` | Between 0 and 1 |
-| `min_shared_revisions` | `2` | At least 1 |
+| `min_coupling` | `[coupling].min_ratio` | Between 0 and 1 |
+| `min_shared_revisions` | `[coupling].min_shared_revisions` | At least 1 |
 | `include_ci` | `false` | Boolean |
 | `max_actions` | `3` | From 1 to 3 |
 

@@ -86,3 +86,14 @@ def head_oid(repo_path: Path, rev: str = "HEAD") -> str | None:
 def is_shallow(repo_path: Path) -> bool:
     """Return True when the repository is a shallow clone."""
     return run_git(repo_path, ["rev-parse", "--is-shallow-repository"]).strip() == "true"
+
+
+def head_paths(repo_path: Path) -> frozenset[str]:
+    """Return every repo-relative file path in the HEAD tree.
+
+    Raises:
+        NotAGitRepoError: If repo_path is not a git repository.
+        GitToolNotFoundError: If the git binary is not installed.
+    """
+    output = run_git(repo_path, ["ls-tree", "-r", "--name-only", "--full-tree", "HEAD"])
+    return frozenset(output.splitlines())

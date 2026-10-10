@@ -11,12 +11,13 @@ from . import __version__
 from .cicd.github_actions import collect_ci_signals
 from .cicd.models import CIAnalysis
 from .complexity import indentation_complexity
-from .config import load_project_config
+from .config import load_project_config, resolve_coupling_policy
 from .core.models import (
     AnalysisParameters,
     AnalysisResult,
     AnalysisSummary,
     CouplingInfo,
+    CouplingPolicy,
     FileForensics,
     Provenance,
     SignalState,
@@ -27,9 +28,9 @@ from .core.models import (
 from .git.churn import parse_history_entries
 from .git.coupling import analyze_temporal_coupling
 from .git.defects import bugfix_counts
-from .git.log import Commit, CommitFile, fetch_git_history
+from .git.log import Commit, CommitFile, exclude_bulk, fetch_git_history
 from .git.ownership import parse_ownership_from_history
-from .git.run import is_shallow
+from .git.run import head_paths, is_shallow
 from .git.xray import xray_file
 from .path_roles import classify_path_role
 
@@ -112,10 +113,10 @@ def build_provenance(
 def run_analysis(  # [2a] Main analysis pipeline
     repo_path: Path,
     days: int = 30,
-    min_coupling: float = 0.3,
     include_ci: bool = True,
     xray_top: int = 5,
     *,
+    policy: CouplingPolicy | None = None,
     ensure_paths: frozenset[str] = frozenset(),
     path_aliases: dict[str, str] | None = None,
     rev: str | None = None,
@@ -125,12 +126,19 @@ def run_analysis(  # [2a] Main analysis pipeline
     Complexity is measured from current file contents: files deleted or renamed
     within the window score 0 and drop from the hotspot ranking.
 
+    Bulk commits (more than ``policy.max_changeset_size`` files) are excluded
+    from churn, ownership, defects, and coupling. Auto X-Ray reads each file's
+    own history and keeps them. A file's ``coupled_with`` lists a partner only
+    when the share of the file's revisions that touched it reaches
+    ``policy.min_ratio``. With ``policy.require_live_partner``, pairs whose
+    side is absent from HEAD (and not in ensure_paths) are dropped.
+
     Args:
         repo_path: Path to git repository.
         days: Number of days of history to analyze.
-        min_coupling: Minimum coupling ratio to include.
         include_ci: Whether to include CI/CD build failure data.
         xray_top: Auto X-Ray the top N hotspot files (0 disables).
+        policy: Coupling and bulk-commit policy; None reads ``.bbu.toml``.
         ensure_paths: Current paths to include even when they have no history.
         path_aliases: Historical paths mapped to their current renamed path.
         rev: Last revision whose history is analyzed (HEAD when None).
@@ -138,8 +146,17 @@ def run_analysis(  # [2a] Main analysis pipeline
     Returns:
         AnalysisResult with file forensics and summary.
     """
+    policy = policy if policy is not None else resolve_coupling_policy(repo_path)
     aliases = path_aliases or {}
-    history = _canonicalize_history_paths(fetch_git_history(repo_path, days, rev), aliases)
+    history, bulk_commits = exclude_bulk(
+        _canonicalize_history_paths(fetch_git_history(repo_path, days, rev), aliases),
+        policy.max_changeset_size,
+    )
+    live_paths = (
+        head_paths(repo_path) | ensure_paths | frozenset(aliases.values())
+        if policy.require_live_partner and history
+        else None
+    )
 
     ci_analysis = CIAnalysis(
         status=SignalStatus(state=SignalState.disabled),
@@ -153,7 +170,7 @@ def run_analysis(  # [2a] Main analysis pipeline
     # Parse individual analyses
     churn_list = parse_history_entries(history)
     ownership_list = parse_ownership_from_history(history)
-    coupling_analysis = analyze_temporal_coupling(history, min_ratio=min_coupling)
+    coupling_analysis = analyze_temporal_coupling(history, policy, live_paths)
     coupling_list = coupling_analysis.couplings
     defect_counts = bugfix_counts(history)
 
@@ -164,8 +181,10 @@ def run_analysis(  # [2a] Main analysis pipeline
     # Build coupling lookup: for each file, which files is it coupled with?
     coupling_by_file: dict[str, list[CouplingInfo]] = defaultdict(list)
     for coupling in coupling_list:
-        coupling_by_file[coupling.file_a].append(coupling_info_for(coupling, coupling.file_a))
-        coupling_by_file[coupling.file_b].append(coupling_info_for(coupling, coupling.file_b))
+        for path in (coupling.file_a, coupling.file_b):
+            info = coupling_info_for(coupling, path)
+            if info.rate_to_partner >= policy.min_ratio:
+                coupling_by_file[path].append(info)
     for coupled_files in coupling_by_file.values():
         coupled_files.sort(key=coupling_info_sort_key)
 
@@ -233,7 +252,7 @@ def run_analysis(  # [2a] Main analysis pipeline
         files=files,
         couplings=coupling_list,
         parameters=AnalysisParameters(
-            min_coupling=min_coupling,
+            coupling=policy,
             include_ci=include_ci,
             xray_top=xray_top,
         ),
@@ -245,7 +264,8 @@ def run_analysis(  # [2a] Main analysis pipeline
             high_risk_ownership=high_risk_count,
             coupled_pairs=coupled_pairs,
             xrayed_files=xrayed,
-            ignored_large_changesets=coupling_analysis.ignored_large_changesets,
+            ignored_large_changesets=bulk_commits,
+            dropped_deleted_partners=coupling_analysis.dropped_deleted_partners,
         ),
     )
 

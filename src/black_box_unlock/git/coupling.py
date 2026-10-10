@@ -4,77 +4,73 @@ from collections import defaultdict
 from dataclasses import dataclass
 from itertools import combinations
 
-from ..core.models import DEFAULT_MAX_COUPLED_FILES_PER_COMMIT, TemporalCoupling
+from ..core.models import CouplingPolicy, TemporalCoupling
 from .log import Commit
 
 
 @dataclass(frozen=True)
 class CouplingAnalysis:
-    """Coupling pairs plus the bulk changesets excluded from pair generation."""
+    """Coupling pairs plus the pairs dropped because a side is gone at HEAD."""
 
     couplings: list[TemporalCoupling]
-    ignored_large_changesets: int
+    dropped_deleted_partners: int
 
 
-def analyze_temporal_coupling(
+def analyze_temporal_coupling(  # [3b] Find co-changing files
     commits: list[Commit],
-    min_ratio: float = 0.3,
-    min_shared_revisions: int = 1,
-    max_changeset_size: int = DEFAULT_MAX_COUPLED_FILES_PER_COMMIT,
+    policy: CouplingPolicy,
+    live_paths: frozenset[str] | None = None,
 ) -> CouplingAnalysis:
     """Detect files that change together frequently.
 
-    Every file revision contributes to the denominator. Changesets above
-    max_changeset_size do not generate pairs because bulk migrations, vendoring,
-    and formatting commits create quadratic work and meaningless coupling.
+    ``commits`` must already exclude bulk commits (see ``exclude_bulk``), so
+    every remaining file revision counts toward the denominators and no commit
+    generates quadratic pairs. A pair is kept when its symmetric ratio, which
+    equals the larger directional rate, reaches ``policy.min_ratio`` and it has
+    at least ``policy.min_shared_revisions`` shared revisions. Pairs are
+    ordered by the 95% Wilson lower bound of the symmetric ratio, then shared
+    revisions, ratio, and paths, so repeated evidence outranks a perfect
+    one-off.
 
     Args:
-        commits: Commit history from fetch_git_history.
-        min_ratio: Minimum coupling ratio to include (default 0.3 = 30%).
-        min_shared_revisions: Minimum co-changing revisions needed to include a pair.
-        max_changeset_size: Largest commit that contributes co-change pairs.
+        commits: Non-bulk commit history.
+        policy: Thresholds for including a pair.
+        live_paths: Paths present at HEAD. When given, pairs with a side
+            outside it are dropped and counted.
 
     Returns:
-        Coupling pairs at or above the threshold and the number of excluded
-        bulk changesets.
+        Included pairs and the number dropped for a deleted side.
     """
-    if max_changeset_size < 2:
-        raise ValueError("max_changeset_size must be at least 2")
-    if min_shared_revisions < 1:
-        raise ValueError("min_shared_revisions must be at least 1")
-
     commit_counts: dict[str, int] = defaultdict(int)
     co_change_counts: dict[tuple[str, str], int] = defaultdict(int)
-    ignored_large_changesets = 0
 
     for commit in commits:
         files = sorted({f.path for f in commit.files})
-
         for path in files:
             commit_counts[path] += 1
-
-        if len(files) > max_changeset_size:
-            ignored_large_changesets += 1
-            continue
-
         for file_a, file_b in combinations(files, 2):
             co_change_counts[(file_a, file_b)] += 1
 
-    couplings = [
-        TemporalCoupling(
+    included: list[TemporalCoupling] = []
+    dropped_deleted_partners = 0
+    for (file_a, file_b), co_changes in co_change_counts.items():
+        coupling = TemporalCoupling(
             file_a=file_a,
             file_b=file_b,
             co_change_count=co_changes,
             commits_a=commit_counts[file_a],
             commits_b=commit_counts[file_b],
         )
-        for (file_a, file_b), co_changes in co_change_counts.items()
-    ]
-    included = [
-        coupling
-        for coupling in couplings
-        if coupling.coupling_ratio >= min_ratio and coupling.co_change_count >= min_shared_revisions
-    ]
+        if (
+            coupling.coupling_ratio < policy.min_ratio
+            or coupling.co_change_count < policy.min_shared_revisions
+        ):
+            continue
+        if live_paths is not None and not {file_a, file_b} <= live_paths:
+            dropped_deleted_partners += 1
+            continue
+        included.append(coupling)
+
     included.sort(
         key=lambda coupling: (
             -coupling.confidence_lower_bound,
@@ -86,20 +82,5 @@ def analyze_temporal_coupling(
     )
     return CouplingAnalysis(
         couplings=included,
-        ignored_large_changesets=ignored_large_changesets,
+        dropped_deleted_partners=dropped_deleted_partners,
     )
-
-
-def detect_temporal_coupling(  # [3b] Find co-changing files
-    commits: list[Commit],
-    min_ratio: float = 0.3,
-    min_shared_revisions: int = 1,
-    max_changeset_size: int = DEFAULT_MAX_COUPLED_FILES_PER_COMMIT,
-) -> list[TemporalCoupling]:
-    """Compatibility interface returning only the detected coupling pairs."""
-    return analyze_temporal_coupling(
-        commits,
-        min_ratio=min_ratio,
-        min_shared_revisions=min_shared_revisions,
-        max_changeset_size=max_changeset_size,
-    ).couplings

@@ -146,6 +146,36 @@ class TestAnalyzeRepoCommand:
 
         assert mock_analysis.call_args[0][0] == Path("/some/repo")
 
+    def test_coupling_options_build_the_policy(self, tmp_path):
+        from black_box_unlock.core.models import CouplingPolicy
+
+        (tmp_path / ".bbu.toml").write_text("[coupling]\nrequire_live_partner = false\n")
+        with patch("black_box_unlock.cli.run_analysis") as mock_analysis:
+            mock_analysis.return_value = MagicMock()
+            with patch("black_box_unlock.cli.export_to_json", return_value="{}"):
+                result = runner.invoke(
+                    app,
+                    [
+                        "analyze-repo",
+                        "--repo",
+                        str(tmp_path),
+                        "--min-coupling",
+                        "0.5",
+                        "--min-shared-revisions",
+                        "3",
+                        "--max-changeset-size",
+                        "80",
+                    ],
+                )
+
+        assert result.exit_code == 0
+        assert mock_analysis.call_args.kwargs["policy"] == CouplingPolicy(
+            min_ratio=0.5,
+            min_shared_revisions=3,
+            max_changeset_size=80,
+            require_live_partner=False,
+        )
+
     def test_ci_included_by_default(self):
         """Without --no-ci, include_ci defaults to True."""
         mock_result = MagicMock()

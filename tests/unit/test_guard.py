@@ -8,15 +8,18 @@ from unittest.mock import patch
 
 import pytest
 
+from black_box_unlock.core.models import CouplingPolicy
 from black_box_unlock.guard import coupling_warnings
 from tests.factories import make_commit
 
 
 def _cache_payload(files: dict | None = None) -> dict:
     return {
-        "version": 2,
+        "version": 3,
         "generated_at": "2026-06-12T10:00:00Z",
         "head_oid": "unknown",
+        "max_changeset_size": 50,
+        "require_live_partner": True,
         "files": files
         if files is not None
         else {
@@ -123,11 +126,49 @@ class TestCouplingWarnings:
     def test_warns_above_threshold_only(self, tmp_path):
         _write_cache(tmp_path, _cache_payload())
 
-        warnings = coupling_warnings("src/auth.py", tmp_path, threshold=0.5)
+        warnings = coupling_warnings("src/auth.py", tmp_path, CouplingPolicy(min_ratio=0.5))
 
         assert len(warnings) == 1
         assert "src/token.py" in warnings[0]
-        assert "80%" in warnings[0]
+        assert "8 of its 10 revisions (80%" in warnings[0]
+
+    def test_threshold_applies_to_the_edited_files_share_not_the_symmetric_ratio(self, tmp_path):
+        _write_cache(
+            tmp_path,
+            _cache_payload(
+                {
+                    "hub.py": [
+                        {
+                            "file": "leaf.py",
+                            "ratio": 1.0,
+                            "shared_revisions": 3,
+                            "file_revisions": 30,
+                            "coupled_file_revisions": 3,
+                            "confidence_lower_bound": 0.44,
+                        }
+                    ],
+                    "leaf.py": [
+                        {
+                            "file": "hub.py",
+                            "ratio": 1.0,
+                            "shared_revisions": 3,
+                            "file_revisions": 3,
+                            "coupled_file_revisions": 30,
+                            "confidence_lower_bound": 0.44,
+                        }
+                    ],
+                }
+            ),
+        )
+
+        assert coupling_warnings("hub.py", tmp_path) == []
+        assert "hub.py" in coupling_warnings("leaf.py", tmp_path)[0]
+
+    def test_policy_comes_from_bbu_toml(self, tmp_path):
+        _write_cache(tmp_path, _cache_payload())
+        (tmp_path / ".bbu.toml").write_text("[coupling]\nmin_ratio = 0.9\n")
+
+        assert coupling_warnings("src/auth.py", tmp_path) == []
 
     def test_tied_ratios_break_by_path_ascending(self, tmp_path):
         _write_cache(
@@ -135,10 +176,13 @@ class TestCouplingWarnings:
             _cache_payload(
                 {
                     "src/hub.py": [
-                        {"file": "zeta.py", "ratio": 1.0, "shared_revisions": 2},
-                        {"file": "alpha.py", "ratio": 1.0, "shared_revisions": 2},
-                        {"file": "mid.py", "ratio": 1.0, "shared_revisions": 2},
-                        {"file": "beta.py", "ratio": 1.0, "shared_revisions": 2},
+                        {
+                            "file": name,
+                            "ratio": 1.0,
+                            "shared_revisions": 2,
+                            "file_revisions": 2,
+                        }
+                        for name in ("zeta.py", "alpha.py", "mid.py", "beta.py")
                     ]
                 }
             ),
@@ -156,12 +200,16 @@ class TestCouplingWarnings:
 
         assert coupling_warnings("src/new.py", tmp_path) == []
 
+    @patch("black_box_unlock.guard.head_paths")
     @patch("black_box_unlock.guard.fetch_git_history")
-    def test_missing_cache_builds_minimal_versioned_snapshot(self, mock_history, tmp_path):
+    def test_missing_cache_builds_minimal_versioned_snapshot(
+        self, mock_history, mock_head_paths, tmp_path
+    ):
         mock_history.return_value = [
             make_commit(["src/auth.py", "src/token.py"]),
             make_commit(["src/auth.py", "src/token.py"]),
         ]
+        mock_head_paths.return_value = frozenset({"src/auth.py", "src/token.py"})
 
         warnings = coupling_warnings("src/auth.py", tmp_path)
 
@@ -172,8 +220,11 @@ class TestCouplingWarnings:
             "version",
             "generated_at",
             "head_oid",
+            "max_changeset_size",
+            "require_live_partner",
             "files",
             "ignored_large_changesets",
+            "dropped_deleted_partners",
         }
 
     @pytest.mark.parametrize(
@@ -194,7 +245,7 @@ class TestCouplingWarnings:
 
         mock_history.assert_called_once_with(tmp_path, 90)
         rebuilt = json.loads(_cache_file(tmp_path).read_text())
-        assert rebuilt["version"] == 2
+        assert rebuilt["version"] == 3
         assert rebuilt["files"] == {}
 
     @patch("black_box_unlock.guard.fetch_git_history")
@@ -241,13 +292,41 @@ class TestCouplingWarnings:
 
         assert coupling_warnings("src/auth.py", tmp_path) == []
 
-    @pytest.mark.parametrize(
-        ("threshold", "top"),
-        [(-0.1, 3), (1.1, 3), (0.5, 0)],
-    )
-    def test_rejects_invalid_limits(self, threshold, top, tmp_path):
+    @patch("black_box_unlock.guard.fetch_git_history")
+    def test_cache_built_under_another_bulk_cap_is_rebuilt(self, mock_history, tmp_path):
+        _write_cache(tmp_path, _cache_payload())
+        mock_history.return_value = []
+
+        coupling_warnings("src/auth.py", tmp_path, CouplingPolicy(max_changeset_size=80))
+
+        mock_history.assert_called_once_with(tmp_path, 90)
+
+    def test_rejects_invalid_top(self, tmp_path):
         with pytest.raises(ValueError):
-            coupling_warnings("src/auth.py", tmp_path, threshold=threshold, top=top)
+            coupling_warnings("src/auth.py", tmp_path, top=0)
+
+
+class TestLivePartners:
+    def test_partner_deleted_at_head_does_not_warn(self, tmp_path):
+        _commit_coupled_pair(tmp_path)
+        _git(tmp_path, "rm", "b.py")
+        _git(tmp_path, "commit", "-m", "remove b")
+
+        assert coupling_warnings("a.py", tmp_path) == []
+        payload = json.loads(_cache_file(tmp_path).read_text())
+        assert payload["dropped_deleted_partners"] == 1
+
+    def test_bulk_commit_is_not_coupling_evidence(self, tmp_path):
+        _git(tmp_path, "config", "user.email", "dev@example.com")
+        _git(tmp_path, "config", "user.name", "Dev")
+        for revision in ("1", "2"):
+            for index in range(3):
+                (tmp_path / f"f{index}.py").write_text(revision)
+            _git(tmp_path, "add", ".")
+            _git(tmp_path, "commit", "-m", f"bulk {revision}")
+
+        assert coupling_warnings("f0.py", tmp_path, CouplingPolicy(max_changeset_size=2)) == []
+        assert coupling_warnings("f0.py", tmp_path, CouplingPolicy(max_changeset_size=3)) != []
 
 
 class TestStateDirPerWorktree:

@@ -17,7 +17,7 @@ from black_box_unlock.core.exceptions import BlackBoxUnlockError
 from black_box_unlock.core.logging import configure_logging
 from black_box_unlock.git.changes import BaseChange, StagedChange, WorkingTreeChange
 from black_box_unlock.git.run import is_shallow
-from black_box_unlock.review import ChangeReviewRequest, run_change_review
+from black_box_unlock.review import ChangeReview, ChangeReviewRequest, run_change_review
 from black_box_unlock.visualization.html import generate_html_report
 
 
@@ -272,6 +272,12 @@ def review_change_command(
     except BlackBoxUnlockError as error:
         console.print(f"[red]Error:[/red] {error}")
         raise typer.Exit(code=1) from error
+    if isinstance(result, ChangeReview) and result.omitted_actions:
+        logger.warning(
+            "{} more actions omitted (max_actions={})",
+            result.omitted_actions,
+            result.parameters.max_actions,
+        )
     print(json.dumps(result.model_dump(mode="json"), indent=2))
 
 

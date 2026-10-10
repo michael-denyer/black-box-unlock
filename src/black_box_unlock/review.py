@@ -230,6 +230,7 @@ class ChangeReview(BaseModel):
     files: list[ChangedFileReview]
     couplings: list[CouplingEvidence] = Field(max_length=MAX_REVIEW_COUPLINGS)
     actions: list[ReviewAction] = Field(max_length=3)
+    omitted_actions: int = Field(default=0, ge=0)
     ci_status: SignalStatus
 
 
@@ -528,6 +529,7 @@ def project_change_review(
             )
         )
 
+    kept_actions = actions[: parameters.max_actions]
     return ChangeReview(
         repo=analysis.repo,
         generated_at=analysis.generated_at,
@@ -535,7 +537,8 @@ def project_change_review(
         parameters=parameters,
         files=files,
         couplings=couplings[:MAX_REVIEW_COUPLINGS],
-        actions=actions[: parameters.max_actions],
+        actions=kept_actions,
+        omitted_actions=len(actions) - len(kept_actions),
         ci_status=analysis.ci_status,
     )
 

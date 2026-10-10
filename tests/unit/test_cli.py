@@ -11,6 +11,9 @@ from typer.testing import CliRunner
 
 from black_box_unlock.cli import app
 from black_box_unlock.core.exceptions import InsufficientHistoryError
+from black_box_unlock.core.models import SignalStatus
+from black_box_unlock.git.changes import WorkingTreeProvenance
+from black_box_unlock.review import ChangeReview, ReviewParameters
 from black_box_unlock.validation import MethodScore, RandomBaseline, ValidationReport
 
 runner = CliRunner()
@@ -478,6 +481,31 @@ include_ci = true
         assert result.exit_code == 1
         assert "Invalid .bbu.toml" in result.stdout
         assert "Traceback" not in result.stdout
+
+
+@pytest.mark.parametrize(("omitted", "announced"), [(1, True), (0, False)])
+def test_review_change_announces_omitted_actions_on_stderr(tmp_path, omitted, announced):
+    when = datetime(2026, 7, 30, tzinfo=timezone.utc)
+    review = ChangeReview(
+        repo="demo",
+        generated_at=when,
+        provenance=WorkingTreeProvenance(head_oid="abc123", observed_at=when),
+        parameters=ReviewParameters(max_actions=3),
+        files=[],
+        couplings=[],
+        actions=[],
+        omitted_actions=omitted,
+        ci_status=SignalStatus(),
+    )
+
+    with (
+        patch("black_box_unlock.cli.run_change_review", return_value=review),
+        patch("black_box_unlock.cli.is_shallow", return_value=False),
+    ):
+        result = runner.invoke(app, ["review-change", "--repo", str(tmp_path)])
+
+    assert result.exit_code == 0, result.stderr
+    assert ("1 more actions omitted (max_actions=3)" in result.stderr) is announced
 
 
 def _git(repo, *args: str) -> None:

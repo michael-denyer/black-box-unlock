@@ -120,6 +120,8 @@ Each action embeds the typed evidence that caused it. Empty action lists are
 valid. A separate `no_changes` result distinguishes no selected change from a
 change for which no evidence met the action floor. Both variants report CI
 status.
+`omitted_actions` counts the candidate actions that `max_actions` cut. The CLI
+reports a non-zero count on stderr, so a dropped action is never silent.
 The supporting coupling list is capped at the strongest 20 relationships so a
 large change cannot turn the primary result into an unbounded metrics dump.
 

@@ -40,8 +40,14 @@ def fetch_workflow_runs(limit: int = 100, repo_path: Path = Path(".")) -> list[W
 
 
 def get_files_changed(commit_sha: str, repo_path: Path = Path(".")) -> list[str]:
-    """Return files changed in a commit from the analyzed local repository."""
-    output = run_git(repo_path, ["show", "--name-only", "--format=", commit_sha])
+    """Return files changed in a commit from the analyzed local repository.
+
+    A merge commit lists the files it brought in relative to its first parent,
+    so a CI failure on a merge or merge-queue commit still implicates paths.
+    """
+    output = run_git(
+        repo_path, ["show", "--name-only", "--format=", "-m", "--first-parent", commit_sha]
+    )
     return [line for line in output.splitlines() if line.strip()]
 
 

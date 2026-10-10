@@ -83,7 +83,9 @@ class TestGetFilesChanged:
         files = get_files_changed("abc123", repo_path=tmp_path)
 
         assert files == ["src/main.py", "tests/test_main.py"]
-        mock_git.assert_called_once_with(tmp_path, ["show", "--name-only", "--format=", "abc123"])
+        mock_git.assert_called_once_with(
+            tmp_path, ["show", "--name-only", "--format=", "-m", "--first-parent", "abc123"]
+        )
 
     @patch("black_box_unlock.cicd.github_actions.run_git")
     def test_invalid_sha_propagates_to_collector(self, mock_git):

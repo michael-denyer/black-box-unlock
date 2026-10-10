@@ -1,5 +1,6 @@
 """Behavior tests for the complete CI signal collection interface."""
 
+import os
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
@@ -138,3 +139,42 @@ class TestGetFilesChangedPaths:
         )
 
         assert get_files_changed("HEAD", tmp_path) == ["café.py"]
+
+
+_GIT_ENV = {
+    "GIT_AUTHOR_NAME": "a",
+    "GIT_AUTHOR_EMAIL": "a@x",
+    "GIT_COMMITTER_NAME": "a",
+    "GIT_COMMITTER_EMAIL": "a@x",
+}
+
+
+def _git(repo: Path, *args: str) -> str:
+    result = subprocess.run(
+        ["git", "-C", str(repo), *args],
+        check=True,
+        capture_output=True,
+        text=True,
+        env={**os.environ, **_GIT_ENV},
+    )
+    return result.stdout.strip()
+
+
+class TestGetFilesChangedMergeCommit:
+    def test_merge_commit_lists_the_files_it_brought_in(self, tmp_path):
+        from black_box_unlock.cicd.github_actions import get_files_changed
+
+        _git(tmp_path, "init", "-b", "main")
+        _git(tmp_path, "commit", "--allow-empty", "-m", "base")
+        _git(tmp_path, "checkout", "-b", "feature")
+        (tmp_path / "feature.py").write_text("x = 1\n")
+        _git(tmp_path, "add", ".")
+        _git(tmp_path, "commit", "-m", "feature")
+        _git(tmp_path, "checkout", "main")
+        (tmp_path / "mainline.py").write_text("y = 2\n")
+        _git(tmp_path, "add", ".")
+        _git(tmp_path, "commit", "-m", "mainline")
+        _git(tmp_path, "merge", "--no-ff", "feature", "-m", "merge feature")
+        merge_sha = _git(tmp_path, "rev-parse", "HEAD")
+
+        assert get_files_changed(merge_sha, tmp_path) == ["feature.py"]

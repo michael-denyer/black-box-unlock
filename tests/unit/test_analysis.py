@@ -255,6 +255,27 @@ class TestRunAnalysis:
         assert a_file.coupled_with[0].confidence_lower_bound > 0
         assert result.couplings[0].co_change_count == 2
 
+    def test_renamed_from_lists_every_former_name_including_caller_renames(self):
+        """History git followed and the caller's own rename both surface on the final path."""
+        history = [
+            make_commit(files=[{"path": "src/b.py", "former_paths": ["src/a.py"]}]),
+            make_commit(files=[{"path": "src/b.py", "former_paths": ["src/a.py"]}]),
+            make_commit(["src/other.py"]),
+        ]
+        with patch("black_box_unlock.analysis.fetch_git_history", return_value=history):
+            result = run_analysis(
+                Path("/fake/repo"),
+                include_ci=False,
+                xray_top=0,
+                path_aliases={"src/b.py": "src/c.py"},
+            )
+
+        by_path = {file.path: file for file in result.files}
+        assert set(by_path) == {"src/c.py", "src/other.py"}
+        assert by_path["src/c.py"].commits == 2
+        assert by_path["src/c.py"].renamed_from == ["src/a.py", "src/b.py"]
+        assert by_path["src/other.py"].renamed_from == []
+
     def test_ensure_paths_includes_a_current_file_without_history(self):
         with (
             patch("black_box_unlock.analysis.fetch_git_history", return_value=[]),
@@ -543,6 +564,36 @@ class TestCIInPipeline:
         assert result.flaky_steps[0].step_name == "Run tests"
         assert result.failed_ci_runs[0].run_id == 42
         assert result.ci_status.state is SignalState.available
+
+    @patch("black_box_unlock.analysis.collect_ci_signals")
+    @patch("black_box_unlock.analysis.fetch_git_history")
+    def test_ci_failures_under_a_former_name_count_on_the_current_path(self, mock_history, mock_ci):
+        """A failed run that touched a.py before its rename implicates b.py; a reused name does not move."""
+        mock_history.return_value = [
+            make_commit(files=[{"path": "b.py", "former_paths": ["a.py"]}]),
+            make_commit(files=[{"path": "c.py", "former_paths": ["d.py"]}, {"path": "d.py"}]),
+        ]
+        mock_ci.return_value = CIAnalysis(
+            status=SignalStatus(state=SignalState.available),
+            file_failures={"a.py": 1, "d.py": 1},
+            failed_runs=[
+                FailedWorkflowRun(
+                    run_id=7,
+                    workflow_name="CI",
+                    run_url="https://github.com/example/repo/actions/runs/7",
+                    commit_sha="abc123",
+                    conclusion="failure",
+                    created_at=datetime(2026, 6, 2),
+                    implicated_paths=["a.py", "d.py"],
+                )
+            ],
+        )
+
+        result = run_analysis(Path("/fake/repo"), include_ci=True, xray_top=0)
+
+        failures = {file.path: file.build_failures for file in result.files}
+        assert failures == {"b.py": 1, "c.py": 0, "d.py": 1}
+        assert result.failed_ci_runs[0].implicated_paths == ["b.py", "d.py"]
 
     @patch("black_box_unlock.analysis.collect_ci_signals")
     @patch("black_box_unlock.analysis.fetch_git_history")

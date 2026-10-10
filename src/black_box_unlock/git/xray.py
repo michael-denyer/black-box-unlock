@@ -1,6 +1,6 @@
 """Per-function churn for one file via git patch parsing (Tornhill's X-Ray).
 
-Engine: one `git log -p -U0` pass with git's built-in language diff drivers
+Engine: one `git log --follow -p -U0` pass with git's built-in language diff drivers
 injected via a temp core.attributesFile (an in-repo .gitattributes still wins).
 For .py files, each revision's content is fetched and hunks are attributed to
 exact ast spans (indentation fallback on SyntaxError); other languages use the
@@ -91,6 +91,11 @@ class Hunk:
 class CommitPatch:
     sha: str
     hunks: list[Hunk] = field(default_factory=list)
+    old_path: str | None = None  # file's name in the parent; None when the patch omits it
+    new_path: str | None = None  # file's name at sha; differs from the X-Rayed path before a rename
+    created: bool = (
+        False  # the patch adds the file; --follow keeps walking past this into a reused name
+    )
 
 
 def _attributes_content() -> str:
@@ -98,10 +103,26 @@ def _attributes_content() -> str:
     return "\n".join(f"*{ext} diff={drv}" for ext, drv in sorted(DIFF_DRIVERS.items())) + "\n"
 
 
+def _until_creation(commits: list[CommitPatch]) -> list[CommitPatch]:
+    """Cut a newest-first patch log at the commit that created the file.
+
+    ``git log --follow`` keeps the old pathspec after a rename chain reaches
+    the file's creation, so a name reused by an unrelated earlier file would
+    leak that file's history in. File-level history keeps the two apart, and
+    X-Ray must agree with it.
+    """
+    for index, commit in enumerate(commits):
+        if commit.created:
+            return commits[: index + 1]
+    return commits
+
+
 def parse_patch_log(output: str) -> list[CommitPatch]:
     """Parse `git log -p -U0 --pretty=<marker>%H` output into commits with hunks.
 
-    Commits without hunks (binary changes, merges) are dropped.
+    The ``--- a/`` and ``+++ b/`` lines before a commit's first hunk name the
+    file on each side, which differ on a rename that ``--follow`` crossed.
+    Commits without hunks (binary changes, merges, pure renames) are dropped.
     """
     commits: list[CommitPatch] = []
     current: CommitPatch | None = None
@@ -109,6 +130,14 @@ def parse_patch_log(output: str) -> list[CommitPatch]:
         if line.startswith(_COMMIT_MARKER):
             current = CommitPatch(sha=line[1:].strip())
             commits.append(current)
+        elif current is not None and not current.hunks and line.startswith("--- /dev/null"):
+            current.created = True
+        elif current is not None and not current.hunks and line.startswith(("--- a/", "+++ b/")):
+            path = line[len("--- a/") :].rstrip("\t")
+            if line.startswith("-"):
+                current.old_path = path
+            else:
+                current.new_path = path
         elif current is not None:
             m = _HUNK_RE.match(line)
             if m:
@@ -165,7 +194,11 @@ def _attribute_hunk(
 
 
 def _git_patch_log(repo_path: Path, file_path: str, days: int) -> str:
-    """Run one `git log -p -U0` pass for the file, with diff drivers injected."""
+    """Run one `git log --follow -p -U0` pass for the file, with diff drivers injected.
+
+    ``--follow`` continues the history across renames using git's default
+    similarity threshold (50%).
+    """
     attrs = tempfile.NamedTemporaryFile("w", suffix=".gitattributes", delete=False)
     attrs.write(_attributes_content())
     attrs.close()
@@ -175,7 +208,7 @@ def _git_patch_log(repo_path: Path, file_path: str, days: int) -> str:
             [
                 "log",
                 f"--since={days} days ago",
-                "--no-renames",
+                "--follow",
                 "-p",
                 "-U0",
                 f"--pretty=format:{_PRETTY_FORMAT}",
@@ -297,7 +330,7 @@ def xray_file(
             functions=[],
             skipped=UNSUPPORTED_LANGUAGE,
         )
-    commits = parse_patch_log(_git_patch_log(repo_path, file_path, days))
+    commits = _until_creation(parse_patch_log(_git_patch_log(repo_path, file_path, days)))
     cap_hit = len(commits) > rev_cap
     commits = commits[:rev_cap]  # git log emits newest first
     is_python = file_path.endswith(".py")
@@ -308,9 +341,9 @@ def xray_file(
         new_spans: list[FunctionSpan] | None = None
         old_spans: list[FunctionSpan] | None = None
         if is_python:
-            new_spans = _spans_at(repo_path, commit.sha, file_path)
+            new_spans = _spans_at(repo_path, commit.sha, commit.new_path or file_path)
             if any(h.old_count for h in commit.hunks):
-                old_spans = _spans_at(repo_path, f"{commit.sha}^", file_path)
+                old_spans = _spans_at(repo_path, f"{commit.sha}^", commit.old_path or file_path)
         for hunk in commit.hunks:
             for name, (added, deleted) in _attribute_hunk(hunk, new_spans, old_spans).items():
                 tallies[name][0] += added

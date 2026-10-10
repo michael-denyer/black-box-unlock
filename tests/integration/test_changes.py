@@ -113,6 +113,32 @@ def test_rename_keeps_one_continuous_changed_path_identity(tmp_path):
     assert result.files[0].evidence.complexity == 1.0
 
 
+def test_review_follows_a_committed_rename_and_the_changes_own_rename(tmp_path):
+    repo = tmp_path / "renamed-twice"
+    repo.mkdir()
+    _git(repo, "init")
+    (repo / "first.py").write_text("value = 1\n")
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-m", "add first")
+    (repo / "first.py").write_text("value = 2\n")
+    _git(repo, "commit", "-am", "fix: repair first")
+    _git(repo, "mv", "first.py", "second.py")
+    _git(repo, "commit", "-m", "rename first to second")
+    _git(repo, "tag", "review-base")
+    _git(repo, "mv", "second.py", "third.py")
+    _git(repo, "commit", "-m", "rename second to third")
+
+    result = run_change_review(
+        repo,
+        ChangeReviewRequest(selector=BaseChange(base_ref="review-base")),
+    )
+
+    assert isinstance(result, ChangeReview)
+    assert result.files[0].change.path == "third.py"
+    assert result.files[0].evidence.commits == 3
+    assert result.files[0].evidence.bugfix_commits == 1
+
+
 def test_base_mode_history_excludes_the_reviewed_branch_commits(tmp_path):
     repo = tmp_path / "branch-fixes"
     repo.mkdir()

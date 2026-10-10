@@ -15,7 +15,7 @@ from tests.factories import make_commit
 
 def _cache_payload(files: dict | None = None) -> dict:
     return {
-        "version": 3,
+        "version": 4,
         "generated_at": "2026-06-12T10:00:00Z",
         "head_oid": "unknown",
         "max_changeset_size": 50,
@@ -245,7 +245,7 @@ class TestCouplingWarnings:
 
         mock_history.assert_called_once_with(tmp_path, 90)
         rebuilt = json.loads(_cache_file(tmp_path).read_text())
-        assert rebuilt["version"] == 3
+        assert rebuilt["version"] == 4
         assert rebuilt["files"] == {}
 
     @patch("black_box_unlock.guard.fetch_git_history")

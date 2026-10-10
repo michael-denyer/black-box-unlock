@@ -5,9 +5,9 @@ Black Box Unlock turns repository history and current change state into evidence
 ## Language
 
 **Changed Path Identity**:
-The identity Change Review uses to join a selected path with historical evidence. A rename continues
-the identity across its old and current paths; a copy starts a new identity and retains its source
-only as provenance.
+The identity every history signal uses to join a current path with historical evidence. A rename,
+whether committed within the window or made by the reviewed change, continues the identity across
+its old and current paths; a copy starts a new identity and retains its source only as provenance.
 _Avoid_: File identity, path alias
 
 **Change Review Request**:

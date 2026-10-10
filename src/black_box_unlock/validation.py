@@ -305,6 +305,28 @@ def _tree_contents(repo_path: Path, sha: str, paths: list[str]) -> dict[str, str
     return contents
 
 
+def _touches_by_cutoff_name(
+    test_counts: dict[str, int], test: list[Commit], universe_paths: set[str]
+) -> dict[str, int]:
+    """Attribute test-half touches to the name each file had at the cutoff.
+
+    Test-half paths are the names at HEAD. A file renamed after the cutoff is
+    in the universe under its old name, which its commits record in
+    ``former_paths``.
+    """
+    former: dict[str, list[str]] = {}
+    for commit in test:
+        for file in commit.files:
+            former.setdefault(file.path, []).extend(file.former_paths)
+    touches: dict[str, int] = {}
+    for path, count in test_counts.items():
+        for name in (path, *former.get(path, [])):
+            if name in universe_paths:
+                touches[name] = touches.get(name, 0) + count
+                break
+    return touches
+
+
 def cutoff_universe(repo_path: Path, cutoff_sha: str, train: list[Commit]) -> list[CutoffFile]:
     """Files churned in the train half that exist in the cutoff tree.
 
@@ -363,9 +385,9 @@ def validate_repo(repo_path: Path, days: int = 730, split: float = 0.5) -> Valid
     if not universe:
         raise InsufficientHistoryError("No train-half file exists in the cutoff tree")
 
-    test_counts = bugfix_counts(test)
     universe_paths = {f.path for f in universe}
-    touches = {p: n for p, n in test_counts.items() if p in universe_paths}
+    test_counts = bugfix_counts(test)
+    touches = _touches_by_cutoff_name(test_counts, test, universe_paths)
     universe_touches = sum(touches.values())
     total_touches = sum(test_counts.values())
     methods = {

@@ -259,3 +259,17 @@ class TestBulkCommits:
         report = validate_repo(scratch.path, days=100, split=0.5)
 
         assert report.test_bugfix_commits == 1
+
+
+class TestRenamesAfterTheCutoff:
+    def test_fix_on_a_renamed_file_counts_toward_its_cutoff_name(self, scratch: ScratchRepo):
+        _seed_train_half(scratch)
+        scratch.commit("fix: bug in hot", {"hot.py": INDENTED + "Z = 5\n"}, days_ago=8)
+        scratch.commit(
+            "refactor: move hot", {"hot.py": None, "warm.py": INDENTED + "Z = 5\n"}, days_ago=5
+        )
+        scratch.commit("fix: bug in warm", {"warm.py": INDENTED + "Z = 6\n"}, days_ago=3)
+
+        report = validate_repo(scratch.path, days=100, split=0.5)
+
+        assert report.test_bugfix_touches == 2

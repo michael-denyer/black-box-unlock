@@ -43,6 +43,27 @@ class TestParsePatchLog:
         h = commits[0].hunks[1]
         assert h.new_count == 0 and h.old_count == 1
 
+    def test_records_each_sides_path_across_a_rename(self):
+        """A removed line that looks like a header after the first hunk does not move the path."""
+        commits = parse_patch_log(
+            "\x01ccc333\n"
+            "diff --git a/old name.py b/new.py\n"
+            "similarity index 90%\n"
+            "rename from old name.py\n"
+            "rename to new.py\n"
+            "--- a/old name.py\t\n"
+            "+++ b/new.py\n"
+            "@@ -3 +2,0 @@ def f():\n"
+            "--- a/decoy.py\n"
+        )
+
+        assert (commits[0].old_path, commits[0].new_path) == ("old name.py", "new.py")
+
+    def test_new_file_has_no_parent_path(self):
+        commits = parse_patch_log("\x01c1\n--- /dev/null\n+++ b/mod.py\n@@ -0,0 +1 @@\n")
+
+        assert (commits[0].old_path, commits[0].new_path) == (None, "mod.py")
+
 
 class TestAttributeHunk:
     SPANS = [FunctionSpan("alpha", 1, 10), FunctionSpan("beta", 12, 20)]

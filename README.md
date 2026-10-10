@@ -166,6 +166,7 @@ format and glob rules are in
 |--------|-------------|
 | **Hotspot Score** | commits × indentation complexity - identifies unstable complex code |
 | **Temporal Coupling** | Files changing together in at least two commits reveal hidden dependencies. Each pair reports the symmetric ratio and both directional rates. The edit hook and review warn from the edited file's rate, so editing a hub stays quiet about leaves. Repeated evidence ranks by a 95% Wilson lower bound, and partners deleted at HEAD are dropped |
+| **Rename Following** | History recorded under an older name follows git's rename detection to the current path, so hotspots, coupling, ownership, bug-fix counts, the edit hook, and X-Ray keep a renamed file's past. `renamed_from` lists the older names |
 | **Bulk Commits** | Commits touching more than 50 files are excluded from churn, ownership, bug-fix, and coupling counts and reported as `ignored_large_changesets` |
 | **Change Review** | A fresh branch, staged, or working-tree review returns at most three typed actions with raw evidence |
 | **Ownership Risk** | More than three authors with no one holding half the commits is diffuse, a coordination risk. More than three authors with one at 50% or more of non-bot commits is shared. Each file reports `main_author`, `main_author_share`, and `last_active` |

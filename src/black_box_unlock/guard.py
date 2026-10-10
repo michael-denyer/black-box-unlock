@@ -28,7 +28,7 @@ CACHE_FILENAME = "cache.json"
 HOOK_LOG_FILENAME = "hook.log"
 HOOK_LOG_MAX_LINES = 200
 CACHE_MAX_AGE_HOURS = 24
-CACHE_VERSION = 3
+CACHE_VERSION = 4
 CACHE_HISTORY_DAYS = 90
 
 
@@ -40,7 +40,7 @@ class CouplingSnapshot(BaseModel):
     shape the stored pairs, so a snapshot built under other values is stale.
     """
 
-    version: Literal[3] = CACHE_VERSION
+    version: Literal[4] = CACHE_VERSION
     generated_at: datetime
     head_oid: str
     max_changeset_size: int = Field(ge=2)

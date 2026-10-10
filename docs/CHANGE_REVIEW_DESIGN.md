@@ -65,11 +65,14 @@ conflict is a typed selection error rather than a misleading review.
 Staged and working-tree review also work before the repository's first commit;
 their provenance records `head_oid` as `null`.
 
-Change Review gives each rename one Changed Path Identity across its old and
-current paths. History is canonicalized before aggregation, so the rename
-revision counts once while earlier churn, defects, ownership, coupling, and CI
-evidence follow the current path. A copy starts a new identity; its source path
-is provenance, not inherited evidence.
+Repository history already follows renames git detected within the window
+(see [ARCHITECTURE.md](ARCHITECTURE.md#renames)). Change Review adds the
+renames the selected change makes, which history cannot see yet, and history
+is canonicalized before aggregation. The rename revision counts once while
+earlier churn, defects, ownership, coupling, and CI evidence follow the
+current path, including across a rename committed before the reviewed
+change. A copy starts a new identity; its source path is provenance, not
+inherited evidence.
 
 ## Evidence and ordering
 

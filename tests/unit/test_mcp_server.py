@@ -280,6 +280,32 @@ class TestXrayFileTool:
             out = mcp_server.xray_file("mod.py", repo_path=".", days=365)
         assert out["functions"][0]["hotspot_score"] == 4.0
 
+    def test_unmeasurable_complexity_serializes_as_null_with_reason(self):
+        from black_box_unlock.core.models import FileXRay, FunctionChurn
+
+        fake = FileXRay(
+            path="gen.py",
+            days=365,
+            revisions_analyzed=1,
+            revision_cap_hit=False,
+            functions=[
+                FunctionChurn(
+                    name="f",
+                    revisions=1,
+                    lines_added=1,
+                    lines_deleted=0,
+                    complexity=None,
+                    score_unavailable_reason="current snapshot could not be parsed",
+                )
+            ],
+        )
+        with patch("black_box_unlock.mcp_server._xray_file", return_value=fake):
+            out = mcp_server.xray_file("gen.py")
+        fn = out["functions"][0]
+        assert fn["hotspot_score"] is None
+        assert fn["complexity"] is None
+        assert fn["score_unavailable_reason"] == "current snapshot could not be parsed"
+
     def test_bbu_error_becomes_tool_error(self):
         with patch("black_box_unlock.mcp_server._xray_file") as mock_xray:
             mock_xray.side_effect = NotAGitRepoError("not a repo")

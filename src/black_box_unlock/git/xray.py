@@ -37,6 +37,8 @@ _ABSENT_PATH_MARKERS = ("does not exist in", "exists on disk, but not in")
 
 UNSUPPORTED_LANGUAGE = "unsupported language"
 
+UNPARSEABLE_SNAPSHOT = "current snapshot could not be parsed"
+
 _COMMIT_MARKER = "\x01"
 _PRETTY_FORMAT = f"{_COMMIT_MARKER}%H"
 _HUNK_RE = re.compile(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@ ?(.*)$")
@@ -208,8 +210,8 @@ def _show(repo_path: Path, sha: str, file_path: str) -> str | None:
         return None
 
 
-def _spans_for(source: str) -> list[FunctionSpan]:
-    """Spans for one snapshot; empty when the source is too deeply nested to parse.
+def _spans_for(source: str) -> list[FunctionSpan] | None:
+    """Spans for one snapshot; None when the source is too deeply nested to parse.
 
     Pathological (usually generated) source makes ast recurse past the
     interpreter limit. That snapshot is treated as unparseable so the rest of
@@ -221,13 +223,13 @@ def _spans_for(source: str) -> list[FunctionSpan]:
         return indentation_spans(source)
     except RecursionError:
         logger.warning("X-Ray: snapshot too deeply nested to parse; skipping its spans")
-        return []
+        return None
 
 
 def _spans_at(repo_path: Path, rev: str, file_path: str) -> list[FunctionSpan]:
     """Function spans of the file at a revision; empty if the path is absent there."""
     content = _show(repo_path, rev, file_path)
-    return _spans_for(content) if content is not None else []
+    return (_spans_for(content) or []) if content is not None else []
 
 
 def _function_coupling(
@@ -310,7 +312,7 @@ def xray_file(
                 touched[name].add(commit.sha)
 
     functions = _build_functions(repo_path, file_path, is_python, tallies, touched)
-    functions.sort(key=lambda f: (-f.hotspot_score, -f.revisions, f.name))
+    functions.sort(key=lambda f: (-(f.hotspot_score or 0.0), -f.revisions, f.name))
     coupling = _function_coupling(touched, {f.name for f in functions}, min_coupling)
     return FileXRay(
         path=file_path,
@@ -344,7 +346,20 @@ def _build_functions(
     if not full_path.exists():
         return []
     lines = full_path.read_text(errors="ignore").splitlines()
-    current = {s.name: s for s in _spans_for("\n".join(lines))}
+    spans = _spans_for("\n".join(lines))
+    if spans is None:
+        return [
+            FunctionChurn(
+                name=name,
+                revisions=len(touched[name]),
+                lines_added=added,
+                lines_deleted=deleted,
+                complexity=None,
+                score_unavailable_reason=UNPARSEABLE_SNAPSHOT,
+            )
+            for name, (added, deleted) in tallies.items()
+        ]
+    current = {s.name: s for s in spans}
     functions: list[FunctionChurn] = []
     for name, (added, deleted) in tallies.items():
         span = current.get(name)

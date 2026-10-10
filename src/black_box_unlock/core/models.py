@@ -195,12 +195,18 @@ class FunctionChurn(BaseModel):
     revisions: int
     lines_added: int
     lines_deleted: int
-    complexity: float = 0.0
+    complexity: float | None = 0.0  # None = could not be measured (see reason)
+    score_unavailable_reason: str | None = None
 
     @computed_field
     @property
-    def hotspot_score(self) -> float:
-        """Function hotspot score = revisions x complexity (file formula, function scale)."""
+    def hotspot_score(self) -> float | None:
+        """Function hotspot score = revisions x complexity (file formula, function scale).
+
+        None when complexity could not be measured, never a misleading 0.
+        """
+        if self.complexity is None:
+            return None
         return self.revisions * self.complexity
 
 

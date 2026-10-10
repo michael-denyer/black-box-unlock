@@ -186,3 +186,14 @@ class TestUnparseableSnapshot:
     def test_recursion_error_does_not_abort_xray(self, deep_repo):
         result = xray_file(deep_repo, "gen.py", days=365)
         assert result.revisions_analyzed == 2
+        assert [f.name for f in result.functions] == ["f"]
+        # the creation hunk has no header context, so only the edit is attributable
+        assert result.functions[0].revisions == 1
+
+    def test_unparseable_snapshot_has_explicit_null_score(self, deep_repo):
+        f = xray_file(deep_repo, "gen.py", days=365).functions[0]
+        assert f.complexity is None
+        assert f.hotspot_score is None
+        assert f.score_unavailable_reason == "current snapshot could not be parsed"
+        dumped = f.model_dump(mode="json")
+        assert dumped["hotspot_score"] is None and dumped["complexity"] is None

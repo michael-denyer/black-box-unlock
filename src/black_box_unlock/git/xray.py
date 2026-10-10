@@ -130,28 +130,31 @@ def _header_name(header: str) -> str | None:
     return header.strip() or None
 
 
-def _attribute_hunk(hunk: Hunk, spans: list[FunctionSpan]) -> dict[str, list[int]]:
+def _attribute_hunk(
+    hunk: Hunk, new_spans: list[FunctionSpan], old_spans: list[FunctionSpan]
+) -> dict[str, list[int]]:
     """Map function name -> [added, deleted] for one hunk.
 
-    With spans (Python): added lines are apportioned per post-image line to the
-    innermost containing span; deletions go to the span containing the hunk's
-    post-image position. Without spans: the hunk-header name takes everything.
+    With spans (Python): each added line goes to the innermost span containing
+    it in the post-image (new_spans); each deleted line goes to the innermost
+    span containing it in the pre-image (old_spans), so a function removed by
+    the commit still receives its deletions. Without spans on either side: the
+    hunk-header name takes everything.
     """
     out: dict[str, list[int]] = {}
-    if not spans:
+    if not new_spans and not old_spans:
         name = _header_name(hunk.header)
         if name:
             out[name] = [hunk.new_count, hunk.old_count]
         return out
     for line in range(hunk.new_start, hunk.new_start + hunk.new_count):
-        span = span_at(spans, line)
+        span = span_at(new_spans, line)
         if span:
             out.setdefault(span.name, [0, 0])[0] += 1
-    if hunk.old_count:
-        probe = max(hunk.new_start, 1)
-        span = span_at(spans, probe)
+    for line in range(hunk.old_start, hunk.old_start + hunk.old_count):
+        span = span_at(old_spans, line)
         if span:
-            out.setdefault(span.name, [0, 0])[1] += hunk.old_count
+            out.setdefault(span.name, [0, 0])[1] += 1
     return out
 
 
@@ -210,6 +213,12 @@ def _spans_for(source: str) -> list[FunctionSpan]:
         return indentation_spans(source)
 
 
+def _spans_at(repo_path: Path, rev: str, file_path: str) -> list[FunctionSpan]:
+    """Function spans of the file at a revision; empty if the path is absent there."""
+    content = _show(repo_path, rev, file_path)
+    return _spans_for(content) if content is not None else []
+
+
 def _function_coupling(
     touched: dict[str, set[str]], names: set[str], min_ratio: float
 ) -> list[FunctionCoupling]:
@@ -266,13 +275,14 @@ def xray_file(
     tallies: dict[str, list[int]] = defaultdict(lambda: [0, 0])  # name -> [added, deleted]
     touched: dict[str, set[str]] = defaultdict(set)  # name -> commit shas
     for commit in commits:
-        spans: list[FunctionSpan] = []
+        new_spans: list[FunctionSpan] = []
+        old_spans: list[FunctionSpan] = []
         if is_python:
-            content = _show(repo_path, commit.sha, file_path)
-            if content is not None:
-                spans = _spans_for(content)
+            new_spans = _spans_at(repo_path, commit.sha, file_path)
+            if any(h.old_count for h in commit.hunks):
+                old_spans = _spans_at(repo_path, f"{commit.sha}^", file_path)
         for hunk in commit.hunks:
-            for name, (added, deleted) in _attribute_hunk(hunk, spans).items():
+            for name, (added, deleted) in _attribute_hunk(hunk, new_spans, old_spans).items():
                 tallies[name][0] += added
                 tallies[name][1] += deleted
                 touched[name].add(commit.sha)

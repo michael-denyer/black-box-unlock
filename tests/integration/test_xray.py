@@ -122,3 +122,21 @@ class TestXrayCoupling:
         assert {pair.function_a, pair.function_b} == {"alpha", "beta"}
         assert pair.shared_revisions == 3  # creation + p1 + p2
         assert pair.coupling_ratio == 3 / 4  # beta: 4 revisions, alpha: 5
+
+
+class TestDeletionAttribution:
+    def test_deleting_a_function_does_not_credit_its_neighbour(self, tmp_path):
+        _run(["git", "init", "-b", "main"], tmp_path)
+        _run(["git", "config", "user.email", "t@example.com"], tmp_path)
+        _run(["git", "config", "user.name", "Tester"], tmp_path)
+        mod = tmp_path / "mod.py"
+        mod.write_text("def a():\n    return 1\n\n\ndef b():\n    return 2\n")
+        _run(["git", "add", "."], tmp_path)
+        _run(["git", "commit", "-m", "add a and b"], tmp_path)
+        mod.write_text("def b():\n    return 2\n")
+        _run(["git", "commit", "-am", "delete a"], tmp_path)
+
+        result = xray_file(tmp_path, "mod.py", days=365)
+
+        b = next(f for f in result.functions if f.name == "b")
+        assert (b.revisions, b.lines_added, b.lines_deleted) == (1, 2, 0)

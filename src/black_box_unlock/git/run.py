@@ -69,3 +69,14 @@ def run_git(
             return ""
         raise
     return result.stdout
+
+
+def head_oid(repo_path: Path, rev: str = "HEAD") -> str | None:
+    """Return the full oid of rev (HEAD by default), or None for an unborn-HEAD repository."""
+    out = run_git(repo_path, ["rev-parse", rev], tolerate_unborn=True).strip()
+    return out or None
+
+
+def is_shallow(repo_path: Path) -> bool:
+    """Return True when the repository is a shallow clone."""
+    return run_git(repo_path, ["rev-parse", "--is-shallow-repository"]).strip() == "true"

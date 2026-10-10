@@ -3,20 +3,24 @@
 Run with: bbu-mcp (stdio transport). Register in Claude Code via the
 black-box-unlock plugin or .mcp.json.
 
-Results are cached per (repo, days, include_ci) for the server process lifetime;
-restart the server to pick up new commits.
+Results are cached per (repo, HEAD oid, days, include_ci, hour) in a small LRU,
+so a new commit or a new hour triggers a fresh analysis. Every result carries a
+``provenance`` object saying which HEAD it read and whether the cache served it.
 """
 
+import time
+from collections import OrderedDict
 from pathlib import Path
 from typing import Literal
 
 from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 
-from .analysis import run_analysis
+from .analysis import build_provenance, run_analysis
 from .core.exceptions import BlackBoxUnlockError
 from .core.models import AnalysisResult, FileForensics
 from .git.changes import BaseChange, StagedChange, WorkingTreeChange
+from .git.run import head_oid, run_git
 from .git.xray import xray_file as _xray_file
 from .path_roles import PathRole
 from .review import ChangeReviewRequest
@@ -24,15 +28,43 @@ from .review import run_change_review as _run_change_review
 
 mcp = MCPServer("black-box-unlock")  # [1b] MCP server - forensic signals as agent tools
 
-_cache: dict[tuple[str, int, bool], AnalysisResult] = {}
+_CACHE_SIZE = 8
+_cache: OrderedDict[tuple[str, str | None, int, bool, int], AnalysisResult] = OrderedDict()
+
+
+def _hour_bucket() -> int:
+    return int(time.time() // 3600)
 
 
 def _analysis(repo_path: str, days: int, include_ci: bool = False) -> AnalysisResult:
-    """Run (or reuse) an analysis for a (repo, days, include_ci) triple."""
-    key = (str(Path(repo_path).resolve()), days, include_ci)
-    if key not in _cache:
-        _cache[key] = run_analysis(Path(repo_path), days=days, include_ci=include_ci)
-    return _cache[key]
+    """Run (or reuse) an analysis for the repo's current HEAD.
+
+    The key holds the HEAD oid and the current hour, so a new commit or a
+    rolled ``--days`` window forces a re-run. X-Ray is off here: ``xray_file``
+    is the on-demand path.
+    """
+    root = Path(repo_path).resolve()
+    oid = head_oid(root)
+    key = (str(root), oid, days, include_ci, _hour_bucket())
+    hit = _cache.get(key)
+    if hit is not None:
+        _cache.move_to_end(key)
+        if hit.provenance is None:
+            return hit
+        provenance = hit.provenance.model_copy(update={"cached": True})
+        return hit.model_copy(update={"provenance": provenance})
+    result = run_analysis(root, days=days, include_ci=include_ci, xray_top=0)
+    result = result.model_copy(
+        update={
+            "provenance": build_provenance(
+                root, days, include_ci, oid=oid, analysed_at=result.generated_at
+            )
+        }
+    )
+    _cache[key] = result
+    while len(_cache) > _CACHE_SIZE:
+        _cache.popitem(last=False)
+    return result
 
 
 def _safe_analysis(repo_path: str, days: int, include_ci: bool = False) -> AnalysisResult:
@@ -60,6 +92,46 @@ def _file_dict(f: FileForensics) -> dict:
     return f.model_dump(mode="json")
 
 
+def _provenance(result: AnalysisResult) -> dict | None:
+    return result.provenance.model_dump(mode="json") if result.provenance else None
+
+
+def _repo_relative(repo_path: str, file_path: str) -> str:
+    """Return file_path relative to the repo root.
+
+    Raises:
+        ToolError: If the path resolves outside the repository.
+    """
+    root = Path(repo_path).resolve()
+    resolved = (root / file_path).resolve()  # an absolute file_path replaces root
+    try:
+        return resolved.relative_to(root).as_posix()
+    except ValueError:
+        raise ToolError(f"{file_path} is outside the repository at {root}") from None
+
+
+def _in_tree(repo_path: str, rel: str) -> bool:
+    root = Path(repo_path).resolve()
+    if (root / rel).exists():
+        return True
+    return bool(run_git(root, ["ls-tree", "HEAD", "--", rel], tolerate_unborn=True).strip())
+
+
+def _no_history(repo_path: str, rel: str, days: int) -> ToolError:
+    """Say why a path has no record: absent from the tree, or present but quiet in the window."""
+    if _in_tree(repo_path, rel):
+        return ToolError(f"{rel} exists but has no history in the last {days} days")
+    return ToolError(f"{rel} is not in the repository tree")
+
+
+def _find_file(repo_path: str, file_path: str, days: int, result: AnalysisResult) -> FileForensics:
+    rel = _repo_relative(repo_path, file_path)
+    for f in result.files:
+        if f.path == rel:
+            return f
+    raise _no_history(repo_path, rel, days)
+
+
 @mcp.tool()
 def get_hotspots(
     repo_path: str = ".",
@@ -67,11 +139,17 @@ def get_hotspots(
     top_n: int = 10,
     include_ci: bool = False,
     roles: list[str] | None = None,
-) -> list[dict]:
+) -> dict:
     """Top hotspot files (commits x complexity), with bug-fix and CI failure counts.
 
     Use this to prioritize code review and refactoring: the highest-scoring
     files are the unstable, complex code where defects concentrate.
+
+    Returns {"hotspots": [...], "provenance": {...}}. ``provenance`` names the
+    HEAD oid analysed, when, the window, whether the repo is a shallow clone
+    (history is truncated), the bbu version, and whether this call hit the
+    cache. The cache follows HEAD, so a new commit is reflected. Per-function
+    X-Ray is not included here; call xray_file for it.
 
     Set include_ci=True to include CI build-failure counts; slower, needs gh.
     Set roles (source, test, docs, config, migration, generated, other) to keep
@@ -80,7 +158,10 @@ def get_hotspots(
     wanted = _parse_roles(roles)
     result = _safe_analysis(repo_path, days, include_ci)
     files = [f for f in result.files if wanted is None or f.path_role in wanted]
-    return [_file_dict(f) for f in files[:top_n]]
+    return {
+        "hotspots": [_file_dict(f) for f in files[:top_n]],
+        "provenance": _provenance(result),
+    }
 
 
 @mcp.tool()
@@ -92,13 +173,17 @@ def get_file_forensics(
 ) -> dict:
     """Full forensic record for one file: churn, complexity, authors, coupling, CI failures.
 
+    file_path may be repo-relative or an absolute path inside the repo. Errors
+    distinguish a path outside the repo, a path not in the tree, and a path
+    with no history in the window. The result has a ``provenance`` object (HEAD
+    oid, time, window, shallow-clone flag, cache hit). Functions are not
+    included; call xray_file.
+
     Set include_ci=True to include CI build-failure counts; slower, needs gh.
     """
     result = _safe_analysis(repo_path, days, include_ci)
-    for f in result.files:
-        if f.path == file_path:
-            return _file_dict(f)
-    raise ToolError(f"No history for {file_path} in the last {days} days")
+    found = _find_file(repo_path, file_path, days, result)
+    return {**_file_dict(found), "provenance": _provenance(result)}
 
 
 @mcp.tool()
@@ -107,19 +192,24 @@ def get_coupled_files(
     repo_path: str = ".",
     days: int = 30,
     include_ci: bool = False,
-) -> list[dict]:
+) -> dict:
     """Files that change together with the given file (hidden dependencies).
 
     Warn before editing: if you change this file, its coupled files
     historically change too - missing them is a common defect source.
 
+    Returns {"coupled_files": [...], "provenance": {...}}. file_path may be
+    repo-relative or absolute inside the repo; an unknown path raises instead
+    of returning an empty list.
+
     Set include_ci=True to include CI build-failure counts; slower, needs gh.
     """
     result = _safe_analysis(repo_path, days, include_ci)
-    for f in result.files:
-        if f.path == file_path:
-            return [c.model_dump(mode="json") for c in f.coupled_with]
-    return []
+    found = _find_file(repo_path, file_path, days, result)
+    return {
+        "coupled_files": [c.model_dump(mode="json") for c in found.coupled_with],
+        "provenance": _provenance(result),
+    }
 
 
 @mcp.tool()
@@ -131,18 +221,20 @@ def get_ownership(
 ) -> dict:
     """Authors of a file and whether it is a coordination risk (>3 authors).
 
+    file_path may be repo-relative or absolute inside the repo. The result has
+    a ``provenance`` object.
+
     Set include_ci=True to include CI build-failure counts; slower, needs gh.
     """
     result = _safe_analysis(repo_path, days, include_ci)
-    for f in result.files:
-        if f.path == file_path:
-            return {
-                "path": f.path,
-                "authors": f.authors,
-                "author_count": f.author_count,
-                "is_high_risk": f.is_high_risk,
-            }
-    raise ToolError(f"No history for {file_path} in the last {days} days")
+    f = _find_file(repo_path, file_path, days, result)
+    return {
+        "path": f.path,
+        "authors": f.authors,
+        "author_count": f.author_count,
+        "is_high_risk": f.is_high_risk,
+        "provenance": _provenance(result),
+    }
 
 
 @mcp.tool()
@@ -151,6 +243,7 @@ def get_ci_failures(repo_path: str = ".") -> dict:
 
     Scans workflow runs created in the last 30 days (at most 10 pages of 100).
     Changed paths are correlated with the failed run, not proven causal.
+    The result has a ``provenance`` object.
     """
     # days=30: canonical window for cache reuse; CI runs are bounded to the same window
     result = _safe_analysis(repo_path, 30, include_ci=True)
@@ -161,6 +254,7 @@ def get_ci_failures(repo_path: str = ".") -> dict:
         "errors": result.ci_status.errors,
         "files": [{"path": f.path, "build_failures": f.build_failures} for f in failing],
         "runs": [run.model_dump(mode="json") for run in result.failed_ci_runs],
+        "provenance": _provenance(result),
     }
 
 
@@ -169,6 +263,7 @@ def get_flaky_steps(repo_path: str = ".") -> dict:
     """CI steps that failed then passed on re-run (unreliable tests/infra).
 
     Scans workflow runs created in the last 30 days (at most 10 pages of 100).
+    The result has a ``provenance`` object.
     """
     # days=30: canonical window for cache reuse; CI runs are bounded to the same window
     result = _safe_analysis(repo_path, 30, include_ci=True)
@@ -176,6 +271,7 @@ def get_flaky_steps(repo_path: str = ".") -> dict:
         "status": result.ci_status.state.value,
         "errors": result.ci_status.errors,
         "steps": [s.model_dump(mode="json") for s in result.flaky_steps],
+        "provenance": _provenance(result),
     }
 
 
@@ -196,18 +292,28 @@ def xray_file(
     files get exact attribution; other languages with a git diff driver are
     ranked by revisions only; extensions without one return no functions and
     "skipped": "unsupported language".
+
+    file_path may be repo-relative or absolute inside the repo. Always computed
+    fresh from git, never cached; the result has a ``provenance`` object.
     """
     try:
+        root = Path(repo_path).resolve()
+        rel = _repo_relative(repo_path, file_path)
         result = _xray_file(
-            Path(repo_path),
-            file_path,
+            root,
+            rel,
             days=days,
             rev_cap=revision_cap,
             min_coupling=min_coupling,
         )
+        if result.revisions_analyzed == 0 and (
+            result.skipped is None or not _in_tree(repo_path, rel)
+        ):
+            raise _no_history(repo_path, rel, days)
+        provenance = build_provenance(root, days, False, oid=head_oid(root))
     except BlackBoxUnlockError as e:
         raise ToolError(str(e)) from e
-    return result.model_dump(mode="json")
+    return {**result.model_dump(mode="json"), "provenance": provenance.model_dump(mode="json")}
 
 
 @mcp.tool()

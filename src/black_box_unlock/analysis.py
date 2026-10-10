@@ -7,6 +7,7 @@ from pathlib import Path
 
 from loguru import logger
 
+from . import __version__
 from .cicd.github_actions import collect_ci_signals
 from .cicd.models import CIAnalysis
 from .complexity import indentation_complexity
@@ -17,6 +18,7 @@ from .core.models import (
     AnalysisSummary,
     CouplingInfo,
     FileForensics,
+    Provenance,
     SignalState,
     SignalStatus,
     coupling_info_for,
@@ -27,6 +29,7 @@ from .git.coupling import analyze_temporal_coupling
 from .git.defects import bugfix_counts
 from .git.log import Commit, CommitFile, fetch_git_history
 from .git.ownership import parse_ownership_from_history
+from .git.run import is_shallow
 from .git.xray import xray_file
 from .path_roles import classify_path_role
 
@@ -84,6 +87,25 @@ def _canonicalize_ci_paths(
             "file_failures": dict(file_failures),
             "failed_runs": failed_runs,
         }
+    )
+
+
+def build_provenance(
+    repo_path: Path,
+    days: int,
+    include_ci: bool,
+    *,
+    oid: str | None,
+    analysed_at: datetime | None = None,
+) -> Provenance:
+    """Describe the repository state an analysis reads (oid is its HEAD)."""
+    return Provenance(
+        head_oid=oid,
+        analysed_at=analysed_at or datetime.now(timezone.utc),
+        days=days,
+        include_ci=include_ci,
+        shallow_clone=is_shallow(repo_path),
+        bbu_version=__version__,
     )
 
 

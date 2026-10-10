@@ -21,6 +21,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   generated, and config rules. `run_analysis` now reads `.bbu.toml`, so a
   malformed file fails `analyze-repo` and the MCP read tools with a
   `ConfigurationError`. The pydantic floor is 2.10.
+- Every `bbu-mcp` result now carries a `provenance` object: `head_oid`,
+  `analysed_at`, `days`, `include_ci`, `shallow_clone`, `bbu_version`, and
+  `cached`. `get_hotspots` returns `{"hotspots": [...], "provenance": {...}}`
+  and `get_coupled_files` returns `{"coupled_files": [...], "provenance":
+  {...}}` instead of bare lists. `Provenance` is a new model on
+  `AnalysisResult`; the CLI leaves it unset.
+- `bbu-mcp` analyses skip the automatic X-Ray pass (`xray_top=0`), which cost
+  about 1.4 s on this repo at 365 days. Use `xray_file` for per-function
+  churn.
 - `bbu validate` v2. The universe and its complexity are read from the tree
   at the cutoff commit instead of HEAD, history is split by ancestry of the
   cutoff commit on the committer clock that `git log --since` already
@@ -36,6 +45,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `bbu-mcp` no longer serves stale results after a new commit. The analysis
+  cache key now includes the HEAD oid and the current hour, and the cache is
+  a least-recently-used store of 8 entries.
+- `get_file_forensics`, `get_coupled_files`, `get_ownership`, and `xray_file`
+  accept absolute paths inside the repository. They raise a `ToolError` that
+  separates "outside the repository", "not in the repository tree", and
+  "exists but has no history in the last N days", instead of returning an
+  empty result.
 - CI failures on merge commits now implicate the files the merge brought in
   (the diff against its first parent). Before, a merge or merge-queue commit
   listed no files and its failure was attributed to nothing

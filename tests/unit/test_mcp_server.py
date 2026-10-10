@@ -1,7 +1,10 @@
 """Unit tests for the bbu-mcp server tools."""
 
 import asyncio
-from datetime import datetime
+import os
+import subprocess
+from datetime import datetime, timezone
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -15,6 +18,7 @@ from black_box_unlock.core.models import (
     CouplingInfo,
     FailedWorkflowRun,
     FileForensics,
+    Provenance,
     SignalState,
     SignalStatus,
 )
@@ -56,6 +60,14 @@ def _result() -> AnalysisResult:
         ],
         summary=AnalysisSummary(total_files=2, high_risk_ownership=0, coupled_pairs=1),
         ci_status=SignalStatus(state=SignalState.available),
+        provenance=Provenance(
+            head_oid="a" * 40,
+            analysed_at=datetime(2026, 6, 12, tzinfo=timezone.utc),
+            days=30,
+            include_ci=False,
+            shallow_clone=False,
+            bbu_version="1.5.2",
+        ),
     )
 
 
@@ -64,7 +76,8 @@ class TestMcpTools:
     def test_get_hotspots_returns_top_n_sorted(self, mock_analysis):
         mock_analysis.return_value = _result()
 
-        hotspots = mcp_server.get_hotspots(repo_path=".", days=30, top_n=1)
+        out = mcp_server.get_hotspots(repo_path=".", days=30, top_n=1)
+        hotspots = out["hotspots"]
 
         assert len(hotspots) == 1
         assert hotspots[0]["path"] == "src/auth.py"
@@ -119,7 +132,7 @@ class TestMcpTools:
     def test_get_file_forensics_unknown_file_raises(self, mock_analysis):
         mock_analysis.return_value = _result()
 
-        with pytest.raises(ToolError, match="No history for nope.py"):
+        with pytest.raises(ToolError, match="nope.py is not in the repository tree"):
             mcp_server.get_file_forensics("nope.py", repo_path=".", days=30)
 
     def test_get_coupled_files(self, mock_analysis):
@@ -127,7 +140,7 @@ class TestMcpTools:
 
         coupled = mcp_server.get_coupled_files("src/auth.py", repo_path=".", days=30)
 
-        assert coupled == [
+        assert coupled["coupled_files"] == [
             {
                 "file": "src/token.py",
                 "ratio": 0.8,
@@ -143,6 +156,7 @@ class TestMcpTools:
 
         failures = mcp_server.get_ci_failures(repo_path=".")
 
+        assert failures.pop("provenance")["head_oid"] == "a" * 40
         assert failures == {
             "status": "available",
             "errors": [],
@@ -183,6 +197,7 @@ class TestMcpTools:
 
         flaky = mcp_server.get_flaky_steps(repo_path=".")
 
+        assert flaky.pop("provenance")["head_oid"] == "a" * 40
         assert flaky == {
             "status": "available",
             "errors": [],
@@ -192,7 +207,7 @@ class TestMcpTools:
     def test_get_ownership_unknown_file_raises(self, mock_analysis):
         mock_analysis.return_value = _result()
 
-        with pytest.raises(ToolError, match="No history for nope.py"):
+        with pytest.raises(ToolError, match="nope.py is not in the repository tree"):
             mcp_server.get_ownership("nope.py", repo_path=".", days=30)
 
     def test_bad_repo_raises_tool_error(self, mock_analysis):
@@ -316,6 +331,8 @@ class TestXrayFileTool:
             mock_xray.return_value = fake
             out = mcp_server.xray_file("mod.py", repo_path=".", days=365)
         assert out["functions"][0]["hotspot_score"] == 4.0
+        assert out["provenance"]["days"] == 365
+        assert out["provenance"]["cached"] is False
 
     def test_unmeasurable_complexity_serializes_as_null_with_reason(self):
         from black_box_unlock.core.models import FileXRay, FunctionChurn
@@ -375,3 +392,171 @@ class TestXrayFileToolCoupling:
             out = mcp_server.xray_file("mod.py", min_coupling=0.5)
         assert mock_xray.call_args[1]["min_coupling"] == 0.5
         assert out["coupling"][0]["coupling_ratio"] == 1.0
+
+
+def _git(repo: Path, *args: str, date: str | None = None) -> None:
+    env = {**os.environ, "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_SYSTEM": os.devnull}
+    if date:
+        env["GIT_AUTHOR_DATE"] = env["GIT_COMMITTER_DATE"] = date
+    subprocess.run(["git", "-C", str(repo), *args], check=True, capture_output=True, env=env)
+
+
+def _commit(repo: Path, name: str, date: str | None = None) -> None:
+    (repo / name).write_text("def f():\n    if True:\n        return 1\n")
+    _git(repo, "add", name)
+    _git(
+        repo,
+        "-c",
+        "user.name=T",
+        "-c",
+        "user.email=t@example.com",
+        "commit",
+        "-m",
+        f"add {name}",
+        date=date,
+    )
+
+
+@pytest.fixture
+def scratch(tmp_path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(repo, "init", "-b", "main")
+    _commit(repo, "a.py")
+    mcp_server._cache.clear()
+    return repo
+
+
+class TestCacheFollowsRepositoryState:
+    def test_new_commit_is_reflected(self, scratch):
+        before = mcp_server.get_hotspots(repo_path=str(scratch))
+        _commit(scratch, "b.py")
+
+        after = mcp_server.get_hotspots(repo_path=str(scratch))
+
+        assert {h["path"] for h in before["hotspots"]} == {"a.py"}
+        assert {h["path"] for h in after["hotspots"]} == {"a.py", "b.py"}
+        assert after["provenance"]["head_oid"] != before["provenance"]["head_oid"]
+
+    def test_cached_flag_reports_whether_the_call_hit_the_cache(self, scratch):
+        first = mcp_server.get_hotspots(repo_path=str(scratch))
+        second = mcp_server.get_hotspots(repo_path=str(scratch))
+
+        assert first["provenance"]["cached"] is False
+        assert second["provenance"]["cached"] is True
+        assert second["provenance"]["analysed_at"] == first["provenance"]["analysed_at"]
+
+    def test_new_hour_bucket_reruns_the_analysis(self, scratch):
+        with patch("black_box_unlock.mcp_server._hour_bucket", side_effect=[1, 1, 2]):
+            first = mcp_server.get_hotspots(repo_path=str(scratch))
+            second = mcp_server.get_hotspots(repo_path=str(scratch))
+            third = mcp_server.get_hotspots(repo_path=str(scratch))
+
+        assert [r["provenance"]["cached"] for r in (first, second, third)] == [False, True, False]
+
+    @patch("black_box_unlock.mcp_server.run_analysis")
+    def test_cache_is_bounded(self, mock_run, scratch):
+        mock_run.return_value = _result()
+
+        for days in range(1, 13):
+            mcp_server._analysis(str(scratch), days)
+
+        assert len(mcp_server._cache) == mcp_server._CACHE_SIZE == 8
+        mock_run.reset_mock()
+        mcp_server._analysis(str(scratch), 12)
+        assert mock_run.call_count == 0
+        mcp_server._analysis(str(scratch), 1)
+        assert mock_run.call_count == 1
+
+
+class TestAnalysisRequest:
+    @patch("black_box_unlock.mcp_server.run_analysis")
+    def test_mcp_skips_auto_xray(self, mock_run, scratch):
+        mock_run.return_value = _result()
+
+        mcp_server._analysis(str(scratch), 30)
+
+        assert mock_run.call_args.kwargs["xray_top"] == 0
+
+
+class TestProvenance:
+    def test_every_tool_result_carries_provenance(self, scratch):
+        calls = [
+            mcp_server.get_hotspots(repo_path=str(scratch)),
+            mcp_server.get_file_forensics("a.py", repo_path=str(scratch)),
+            mcp_server.get_coupled_files("a.py", repo_path=str(scratch)),
+            mcp_server.get_ownership("a.py", repo_path=str(scratch)),
+            mcp_server.xray_file("a.py", repo_path=str(scratch)),
+        ]
+        for out in calls:
+            prov = out["provenance"]
+            assert set(prov) == {
+                "head_oid",
+                "analysed_at",
+                "days",
+                "include_ci",
+                "shallow_clone",
+                "bbu_version",
+                "cached",
+            }
+            assert len(prov["head_oid"]) == 40
+            assert prov["shallow_clone"] is False
+
+    def test_shallow_clone_is_flagged(self, scratch, tmp_path):
+        _commit(scratch, "b.py")
+        clone = tmp_path / "clone"
+        subprocess.run(
+            ["git", "clone", "--depth", "1", f"file://{scratch}", str(clone)],
+            check=True,
+            capture_output=True,
+        )
+
+        out = mcp_server.get_hotspots(repo_path=str(clone))
+
+        assert out["provenance"]["shallow_clone"] is True
+
+
+class TestPathHandling:
+    def test_absolute_path_inside_repo_is_normalised(self, scratch):
+        rel = mcp_server.get_file_forensics("a.py", repo_path=str(scratch))
+        absolute = mcp_server.get_file_forensics(str(scratch / "a.py"), repo_path=str(scratch))
+
+        assert absolute["path"] == rel["path"] == "a.py"
+
+    def test_absolute_path_outside_repo_raises(self, scratch, tmp_path):
+        outside = tmp_path / "elsewhere.py"
+        outside.write_text("x = 1\n")
+
+        for call in (
+            lambda: mcp_server.get_file_forensics(str(outside), repo_path=str(scratch)),
+            lambda: mcp_server.get_coupled_files(str(outside), repo_path=str(scratch)),
+            lambda: mcp_server.xray_file(str(outside), repo_path=str(scratch)),
+        ):
+            with pytest.raises(ToolError, match="outside the repository"):
+                call()
+
+    def test_dotdot_escape_raises(self, scratch):
+        with pytest.raises(ToolError, match="outside the repository"):
+            mcp_server.get_ownership("../x.py", repo_path=str(scratch))
+
+    def test_nonexistent_path_is_not_in_tree(self, scratch):
+        for call in (
+            lambda: mcp_server.get_file_forensics("nope.py", repo_path=str(scratch)),
+            lambda: mcp_server.get_coupled_files("nope.py", repo_path=str(scratch)),
+            lambda: mcp_server.get_ownership("nope.py", repo_path=str(scratch)),
+            lambda: mcp_server.xray_file("nope.py", repo_path=str(scratch)),
+        ):
+            with pytest.raises(ToolError, match="nope.py is not in the repository tree"):
+                call()
+
+    def test_existing_path_without_history_in_window(self, scratch):
+        _commit(scratch, "old.py", date="2020-01-01T00:00:00Z")
+        mcp_server._cache.clear()
+
+        for call in (
+            lambda: mcp_server.get_file_forensics("old.py", repo_path=str(scratch), days=30),
+            lambda: mcp_server.get_coupled_files("old.py", repo_path=str(scratch), days=30),
+            lambda: mcp_server.xray_file("old.py", repo_path=str(scratch), days=30),
+        ):
+            with pytest.raises(ToolError, match="old.py exists but has no history in the last 30"):
+                call()

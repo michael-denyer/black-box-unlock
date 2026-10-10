@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from ..core.models import FailedWorkflowRun, FlakyStepSummary, SignalState, SignalStatus
+from ..git.run import run_git
 from .models import CIAnalysis, FlakyStep, WorkflowJob, WorkflowRun
 
 
@@ -40,15 +41,8 @@ def fetch_workflow_runs(limit: int = 100, repo_path: Path = Path(".")) -> list[W
 
 def get_files_changed(commit_sha: str, repo_path: Path = Path(".")) -> list[str]:
     """Return files changed in a commit from the analyzed local repository."""
-    cmd = [
-        "git",
-        "show",
-        "--name-only",
-        "--format=",
-        commit_sha,
-    ]
-    result = subprocess.run(cmd, capture_output=True, text=True, check=True, cwd=repo_path)
-    return [line for line in result.stdout.splitlines() if line.strip()]
+    output = run_git(repo_path, ["show", "--name-only", "--format=", commit_sha])
+    return [line for line in output.splitlines() if line.strip()]
 
 
 def fetch_jobs_for_run(run_id: int, repo_path: Path = Path(".")) -> list[WorkflowJob]:
@@ -148,6 +142,8 @@ def summarize_flaky_steps(steps: list[FlakyStep]) -> list[FlakyStepSummary]:
 
 def _error_message(context: str, error: Exception) -> str:
     detail = str(error).strip() or type(error).__name__
+    if isinstance(error, subprocess.CalledProcessError) and error.stderr:
+        detail = f"{detail} {' '.join(error.stderr.split())}"
     return f"{context}: {detail}"
 
 

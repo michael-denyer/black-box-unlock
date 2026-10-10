@@ -92,3 +92,25 @@ class TestCollectCISignals:
 
         assert result.status.state is SignalState.available
         assert result.status.errors == []
+
+
+class TestCIAttributionGitFailure:
+    @patch("black_box_unlock.cicd.github_actions.fetch_workflow_runs")
+    def test_git_stderr_reaches_the_warning_log_and_paths_stay_empty(self, mock_runs, tmp_path):
+        from loguru import logger
+
+        from black_box_unlock.analysis import run_analysis
+
+        subprocess.run(["git", "init", str(tmp_path)], check=True, capture_output=True)
+        mock_runs.return_value = [_run(1)]
+        messages: list[str] = []
+        sink = logger.add(messages.append, level="WARNING")
+        try:
+            result = run_analysis(tmp_path, include_ci=True, xray_top=0)
+        finally:
+            logger.remove(sink)
+
+        assert result.failed_ci_runs[0].implicated_paths == []
+        assert result.ci_status.state is SignalState.partial
+        assert any("unknown revision" in message for message in messages)
+        assert "unknown revision" in result.ci_status.errors[0]

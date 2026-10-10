@@ -76,25 +76,18 @@ class TestFetchWorkflowRuns:
 
 
 class TestGetFilesChanged:
-    @patch("black_box_unlock.cicd.github_actions.subprocess.run")
-    def test_returns_nonempty_paths_and_uses_repo_cwd(self, mock_run, tmp_path):
-        mock_run.return_value = MagicMock(stdout="src/main.py\n\ntests/test_main.py\n")
+    @patch("black_box_unlock.cicd.github_actions.run_git")
+    def test_returns_nonempty_paths_from_the_analyzed_repo(self, mock_git, tmp_path):
+        mock_git.return_value = "src/main.py\n\ntests/test_main.py\n"
 
         files = get_files_changed("abc123", repo_path=tmp_path)
 
         assert files == ["src/main.py", "tests/test_main.py"]
-        assert mock_run.call_args.kwargs["cwd"] == tmp_path
-        assert mock_run.call_args.args[0] == [
-            "git",
-            "show",
-            "--name-only",
-            "--format=",
-            "abc123",
-        ]
+        mock_git.assert_called_once_with(tmp_path, ["show", "--name-only", "--format=", "abc123"])
 
-    @patch("black_box_unlock.cicd.github_actions.subprocess.run")
-    def test_invalid_sha_propagates_to_collector(self, mock_run):
-        mock_run.side_effect = subprocess.CalledProcessError(128, ["git", "show"])
+    @patch("black_box_unlock.cicd.github_actions.run_git")
+    def test_invalid_sha_propagates_to_collector(self, mock_git):
+        mock_git.side_effect = subprocess.CalledProcessError(128, ["git", "show"])
 
         with pytest.raises(subprocess.CalledProcessError):
             get_files_changed("invalid")

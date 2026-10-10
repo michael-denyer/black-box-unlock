@@ -1,6 +1,6 @@
 [project]
 name = "black-box-unlock"
-version = "1.5.1"
+version = "1.5.2"
 description = "Code forensics tool - investigate your codebase like a crime scene"
 readme = "README.md"
 license = { text = "MIT" }

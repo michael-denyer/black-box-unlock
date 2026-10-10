@@ -11,7 +11,7 @@ from typer.testing import CliRunner
 
 from black_box_unlock.cli import app
 from black_box_unlock.core.exceptions import InsufficientHistoryError
-from black_box_unlock.validation import MethodScore, ValidationReport
+from black_box_unlock.validation import MethodScore, RandomBaseline, ValidationReport
 
 runner = CliRunner()
 
@@ -33,6 +33,14 @@ def _validation_result(repo: str = "demo", spearman: float | None = 0.62) -> Val
         methods={
             "hotspot": MethodScore(spearman=spearman, top_decile_share=0.45, top_files=["a.py"])
         },
+        random=RandomBaseline(
+            draws=200,
+            seed=1,
+            spearman_mean=0.0,
+            spearman_sd=0.1,
+            top_decile_share_mean=0.1,
+            top_decile_share_sd=0.03,
+        ),
     )
 
 

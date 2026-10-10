@@ -6,6 +6,8 @@ docs/VALIDATION.md.
 """
 
 import math
+import random
+import statistics
 import subprocess
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -23,6 +25,8 @@ TOP_DECILE = 0.10
 # The committer date orders history and is what `git log --since` filters on,
 # so the window, the split, and the cutoff commit all read the same clock.
 CLOCK: Clock = "committer"
+RANDOM_DRAWS = 200
+RANDOM_SEED = 20260612
 
 
 class MethodScore(BaseModel):
@@ -31,6 +35,17 @@ class MethodScore(BaseModel):
     spearman: float | None
     top_decile_share: float | None
     top_files: list[str]
+
+
+class RandomBaseline(BaseModel):
+    """Score distribution of `draws` seeded random rankings of the same universe."""
+
+    draws: int
+    seed: int
+    spearman_mean: float | None
+    spearman_sd: float | None
+    top_decile_share_mean: float | None
+    top_decile_share_sd: float | None
 
 
 class ValidationReport(BaseModel):
@@ -49,6 +64,7 @@ class ValidationReport(BaseModel):
     test_bugfix_touches: int
     bugfix_coverage: float | None
     methods: dict[str, MethodScore]
+    random: RandomBaseline
 
 
 class CutoffFile(BaseModel):
@@ -126,6 +142,43 @@ def score_ranking(scores: dict[str, float], touches: dict[str, int]) -> MethodSc
     )
 
 
+def _mean_sd(values: list[float]) -> tuple[float | None, float | None]:
+    if not values:
+        return None, None
+    mean = statistics.fmean(values)
+    sd = statistics.pstdev(values) if len(values) > 1 else 0.0
+    return mean, sd
+
+
+def random_draws(
+    paths: list[str], touches: dict[str, int], draws: int = RANDOM_DRAWS, seed: int = RANDOM_SEED
+) -> list[MethodScore]:
+    """Score `draws` uniformly random rankings of `paths` with the shared metric."""
+    rng = random.Random(seed)
+    order = list(paths)
+    scored = []
+    for _ in range(draws):
+        rng.shuffle(order)
+        scored.append(score_ranking({p: float(-i) for i, p in enumerate(order)}, touches))
+    return scored
+
+
+def summarize_random(draws: list[MethodScore], seed: int = RANDOM_SEED) -> RandomBaseline:
+    """Collapse scored random draws into mean and sd per metric."""
+    rho_mean, rho_sd = _mean_sd([d.spearman for d in draws if d.spearman is not None])
+    share_mean, share_sd = _mean_sd(
+        [d.top_decile_share for d in draws if d.top_decile_share is not None]
+    )
+    return RandomBaseline(
+        draws=len(draws),
+        seed=seed,
+        spearman_mean=rho_mean,
+        spearman_sd=rho_sd,
+        top_decile_share_mean=share_mean,
+        top_decile_share_sd=share_sd,
+    )
+
+
 def _pct(value: float | None) -> str:
     return f"{value:.0%}" if value is not None else "n/a"
 
@@ -147,6 +200,13 @@ def render_report(report: ValidationReport) -> str:
         lines.append(
             f"  {name:<8} rho={_rho(score.spearman)}  top-10% share={_pct(score.top_decile_share)}"
         )
+    rnd = report.random
+    sd = f" (sd {rnd.top_decile_share_sd:.0%})" if rnd.top_decile_share_sd is not None else ""
+    lines.append(
+        f"  {'random':<8} rho={_rho(rnd.spearman_mean)}  "
+        f"top-10% share={_pct(rnd.top_decile_share_mean)}{sd}  "
+        f"mean of {rnd.draws} draws, seed {rnd.seed}"
+    )
     return "\n".join(lines)
 
 
@@ -235,6 +295,12 @@ def validate_repo(repo_path: Path, days: int = 730, split: float = 0.5) -> Valid
     touches = {p: n for p, n in test_counts.items() if p in universe_paths}
     universe_touches = sum(touches.values())
     total_touches = sum(test_counts.values())
+    methods = {
+        "hotspot": score_ranking({f.path: f.commits * f.complexity for f in universe}, touches),
+        "churn": score_ranking({f.path: float(f.commits) for f in universe}, touches),
+        "length": score_ranking({f.path: float(f.lines) for f in universe}, touches),
+    }
+    draws = random_draws(sorted(universe_paths), touches)
 
     return ValidationReport(
         repo=repo_path.resolve().name,
@@ -249,7 +315,6 @@ def validate_repo(repo_path: Path, days: int = 730, split: float = 0.5) -> Valid
         test_bugfix_commits=sum(1 for c in test if is_bugfix_message(c.message)),
         test_bugfix_touches=universe_touches,
         bugfix_coverage=universe_touches / total_touches if total_touches else None,
-        methods={
-            "hotspot": score_ranking({f.path: f.commits * f.complexity for f in universe}, touches),
-        },
+        methods=methods,
+        random=summarize_random(draws),
     )

@@ -122,3 +122,38 @@ class TestOneClock:
         assert report.clock == "committer"
         assert report.test_bugfix_commits == 1
         assert report.methods["hotspot"].top_decile_share == pytest.approx(1.0)
+
+
+class TestBaselines:
+    def _seed(self, repo: ScratchRepo) -> None:
+        # flat.py churns most but has no indentation; long.py is the longest file.
+        # Hotspot, churn, and length rankings therefore each pick a different file.
+        _seed_train_half(repo)
+        for i in range(4):
+            repo.commit(f"feat: flat {i}", {"flat.py": FLAT + f"N = {i}\n"}, days_ago=88 - i)
+        repo.commit("feat: long", {"long.py": "X = 1\n" * 200}, days_ago=75)
+        repo.commit("fix: crash", {"hot.py": INDENTED + "Z = 5\n"}, days_ago=10)
+        repo.commit("fix: flat", {"flat.py": FLAT}, days_ago=8)
+
+    def test_churn_and_length_rankings_sit_beside_hotspot(self, scratch: ScratchRepo):
+        self._seed(scratch)
+
+        report = validate_repo(scratch.path, days=100, split=0.5)
+
+        assert report.methods["hotspot"].top_files == ["hot.py"]
+        assert report.methods["churn"].top_files == ["flat.py"]
+        assert report.methods["length"].top_files == ["long.py"]
+        assert report.methods["churn"].top_decile_share == pytest.approx(0.5)
+
+    def test_random_baseline_is_seeded_and_reproducible(self, scratch: ScratchRepo):
+        self._seed(scratch)
+
+        first = validate_repo(scratch.path, days=100, split=0.5).random
+        second = validate_repo(scratch.path, days=100, split=0.5).random
+
+        assert first.draws == 200
+        assert first == second
+        # four files, one top slot, two touches split over two files: each draw
+        # scores 0.5 or 0, so the mean sits strictly between and the sd is positive
+        assert 0 < first.top_decile_share_mean < 0.5
+        assert first.top_decile_share_sd > 0

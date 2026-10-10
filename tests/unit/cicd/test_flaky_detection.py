@@ -85,6 +85,57 @@ class TestFlakyStepsFromJobs:
         assert flaky_steps_from_jobs(jobs) == []
 
 
+class TestFlakyRateDenominator:
+    def _retried_run(self, *attempts: list[tuple[str, str]]) -> list[WorkflowJob]:
+        return [_job(index, steps) for index, steps in enumerate(attempts, start=1)]
+
+    def test_rate_counts_runs_where_the_step_executed_not_attempts(self):
+        flaky_run = self._retried_run(
+            [("Run tests", "failure")],
+            [("Run tests", "failure")],
+            [("Run tests", "success")],
+        )
+        stable_run = self._retried_run(
+            [("Run tests", "success")],
+            [("Run tests", "success")],
+        )
+        observations = [
+            *flaky_steps_from_jobs(flaky_run, include_stable=True),
+            *flaky_steps_from_jobs(stable_run, include_stable=True),
+        ]
+
+        summary = summarize_flaky_steps(observations)[0]
+
+        assert (summary.runs, summary.flaky_runs) == (2, 1)
+        assert summary.flaky_count == 2
+        assert summary.flaky_rate == 0.5
+
+    def test_runs_without_the_step_stay_out_of_the_denominator(self):
+        with_step = self._retried_run(
+            [("Deploy", "failure"), ("Run tests", "success")],
+            [("Deploy", "success"), ("Run tests", "success")],
+        )
+        without_deploy = self._retried_run(
+            [("Run tests", "success")],
+            [("Run tests", "success")],
+        )
+        observations = [
+            *flaky_steps_from_jobs(with_step, include_stable=True),
+            *flaky_steps_from_jobs(without_deploy, include_stable=True),
+        ]
+
+        deploy = next(
+            step for step in summarize_flaky_steps(observations) if step.step_name == "Deploy"
+        )
+
+        assert (deploy.runs, deploy.flaky_runs, deploy.flaky_rate) == (1, 1, 1.0)
+
+    def test_steps_that_never_recovered_are_not_reported(self):
+        stable = self._retried_run([("Run tests", "success")], [("Run tests", "success")])
+
+        assert summarize_flaky_steps(flaky_steps_from_jobs(stable, include_stable=True)) == []
+
+
 class TestSummarizeFlakySteps:
     def _step(
         self,
@@ -95,12 +146,16 @@ class TestSummarizeFlakySteps:
         failures: int,
         flaky: int,
         step: str = "Run tests",
+        runs: int = 1,
+        flaky_runs: int = 1,
     ) -> FlakyStep:
         return FlakyStep(
             job_name="test (3.11)",
             step_name=step,
             first_seen=first,
             last_seen=last,
+            runs=runs,
+            flaky_runs=flaky_runs,
             total_attempts=attempts,
             failures=failures,
             flaky_count=flaky,
@@ -129,6 +184,7 @@ class TestSummarizeFlakySteps:
         assert len(result) == 1
         merged = result[0]
         assert (merged.total_attempts, merged.failures, merged.flaky_count) == (5, 3, 3)
+        assert (merged.runs, merged.flaky_runs) == (2, 2)
         assert merged.first_seen == datetime(2026, 6, 1, tzinfo=timezone.utc)
         assert merged.last_seen == datetime(2026, 6, 4, tzinfo=timezone.utc)
 

@@ -246,6 +246,8 @@ class TestFlakyStepStatsInvariant:
             "step_name": "Run tests",
             "first_seen": datetime(2026, 6, 1, tzinfo=timezone.utc),
             "last_seen": datetime(2026, 6, 2, tzinfo=timezone.utc),
+            "runs": 2,
+            "flaky_runs": 1,
             "total_attempts": 3,
             "failures": 2,
             "flaky_count": 1,
@@ -270,6 +272,18 @@ class TestFlakyStepStatsInvariant:
 
         with pytest.raises(ValueError):
             FlakyStepStats(**self._fields(failures=5, total_attempts=3))
+
+    def test_rejects_flaky_runs_above_runs(self):
+        from black_box_unlock.core.models import FlakyStepStats
+
+        with pytest.raises(ValueError):
+            FlakyStepStats(**self._fields(flaky_runs=3, runs=2))
+
+    def test_flaky_rate_is_flaky_runs_over_runs(self):
+        from black_box_unlock.core.models import FlakyStepStats
+
+        stats = FlakyStepStats(**self._fields(runs=4, flaky_runs=1, total_attempts=9, failures=3))
+        assert stats.flaky_rate == 0.25
 
     def test_rejects_negative_flaky_count(self):
         from black_box_unlock.core.models import FlakyStepStats

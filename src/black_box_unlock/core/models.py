@@ -297,12 +297,22 @@ class AnalysisSummary(BaseModel):
 
 
 class FlakyStepStats(BaseModel):
-    """A job/step's flakiness counts and seen window, per-run or merged across runs."""
+    """A job/step's flakiness counts and seen window, per-run or merged across runs.
+
+    ``runs`` counts the workflow runs in which the step executed. ``flaky_runs``
+    counts those runs where the step failed on one attempt and passed on a
+    later attempt of the same run. ``flaky_rate`` is ``flaky_runs / runs``.
+    Runs where the step never executed are not in the denominator, and retry
+    attempts inside one run do not inflate it. ``total_attempts``, ``failures``
+    and ``flaky_count`` stay attempt-level counts for display.
+    """
 
     job_name: str
     step_name: str
     first_seen: datetime
     last_seen: datetime
+    runs: int
+    flaky_runs: int
     total_attempts: int
     failures: int
     flaky_count: int
@@ -311,6 +321,11 @@ class FlakyStepStats(BaseModel):
     def _counts_consistent(self) -> "FlakyStepStats":
         """Reject impossible counts: can't recover more often than you fail, or fail
         more often than you run. Keeps flaky_rate in [0, 1] for every construction."""
+        if not 0 <= self.flaky_runs <= self.runs:
+            raise ValueError(
+                f"flaky-step runs must satisfy 0 <= flaky_runs <= runs; "
+                f"got flaky_runs={self.flaky_runs}, runs={self.runs}"
+            )
         if not 0 <= self.flaky_count <= self.failures <= self.total_attempts:
             raise ValueError(
                 "flaky-step counts must satisfy 0 <= flaky_count <= failures <= "
@@ -322,8 +337,8 @@ class FlakyStepStats(BaseModel):
     @computed_field
     @property
     def flaky_rate(self) -> float:
-        """flaky_count / total_attempts (recoveries per attempt observation)."""
-        return self.flaky_count / self.total_attempts if self.total_attempts else 0.0
+        """flaky_runs / runs, over runs in which the step executed."""
+        return self.flaky_runs / self.runs if self.runs else 0.0
 
     @computed_field
     @property

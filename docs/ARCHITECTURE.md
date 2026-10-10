@@ -46,7 +46,7 @@ src/black_box_unlock/
 | Ownership risk | git | > 3 authors |
 | Bug-fix commits | git messages | fix(ing)/bug/hotfix/defect/regression/revert + repair verbs (correct/broke/crash/repair/fault/malfunction/stuck/hang) markers, excluding docs/style/test/chore/ci/build/refactor/feat-prefixed commits |
 | Build failures | gh CLI | failed workflow details plus paths changed in each failed commit; implication, not causality |
-| Flaky steps | gh api | step failed attempt N, passed attempt M>N (re-runs only) |
+| Flaky steps | gh api | flaky_runs / runs, where a flaky run has a step that failed on attempt N and passed on attempt M>N of the same run, and runs counts only the re-run runs examined in which the step executed |
 
 ## Data flow
 
@@ -58,6 +58,7 @@ src/black_box_unlock/
 - git missing -> `GitToolNotFoundError`, same handling
 - gh missing/unauthenticated -> `ci_status.state` is `unavailable`, errors are reported, analysis continues
 - one failed CI detail request -> `ci_status.state` is `partial`; successful run data is preserved
+- a `gh api` call that runs past 60 seconds -> treated as a failed request; run pages are followed up to 10 pages of 100, and only runs created within the analysis `--days` window count
 - missing review base -> `InvalidRevisionError`, CLI prints a clean error
 - unresolved merge conflict -> `ChangeSelectionError`; no misleading actions are returned
 - invalid `.bbu.toml` or unknown profile -> `ConfigurationError`; no review runs

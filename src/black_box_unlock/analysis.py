@@ -121,7 +121,7 @@ def run_analysis(  # [2a] Main analysis pipeline
         status=SignalStatus(state=SignalState.disabled),
     )
     if include_ci:
-        ci_analysis = collect_ci_signals(repo_path=repo_path, limit=100)
+        ci_analysis = collect_ci_signals(repo_path=repo_path, limit=100, days=days)
         ci_analysis = _canonicalize_ci_paths(ci_analysis, aliases)
         for error in ci_analysis.status.errors:
             logger.warning("CI data degraded: {}", error)

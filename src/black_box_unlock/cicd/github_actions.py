@@ -4,12 +4,44 @@ import json
 import subprocess
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from ..core.models import FailedWorkflowRun, FlakyStepSummary, SignalState, SignalStatus
 from ..git.run import run_git
 from .models import CIAnalysis, FlakyStep, WorkflowJob, WorkflowRun
+
+GH_TIMEOUT_SECONDS = 60
+MAX_PAGES = 10
+
+
+def _gh_api_pages(
+    endpoint: str, key: str, per_page: int, repo_path: Path
+) -> tuple[list[dict], bool]:
+    """Collect list items from consecutive gh api pages, bounded by MAX_PAGES.
+
+    Stops at the first short page. The flag is True when the last page fetched
+    was still full, meaning items beyond MAX_PAGES were left behind. Each call
+    is bounded by GH_TIMEOUT_SECONDS and raises subprocess.TimeoutExpired when
+    gh hangs.
+    """
+    separator = "&" if "?" in endpoint else "?"
+    items: list[dict] = []
+    for page in range(1, MAX_PAGES + 1):
+        cmd = ["gh", "api", f"{endpoint}{separator}per_page={per_page}&page={page}"]
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            check=True,
+            cwd=repo_path,
+            timeout=GH_TIMEOUT_SECONDS,
+        )
+        batch = json.loads(result.stdout)[key]
+        items.extend(batch)
+        if len(batch) < per_page:
+            return items, False
+    return items, True
 
 
 def parse_workflow_runs(gh_json: list[dict]) -> list[WorkflowRun]:
@@ -28,32 +60,49 @@ def parse_workflow_runs(gh_json: list[dict]) -> list[WorkflowRun]:
     ]
 
 
-def fetch_workflow_runs(limit: int = 100, repo_path: Path = Path(".")) -> list[WorkflowRun]:
-    """Fetch one typed workflow-run snapshot through the GitHub REST API."""
-    cmd = [
-        "gh",
-        "api",
-        f"/repos/{{owner}}/{{repo}}/actions/runs?per_page={limit}",
-    ]
-    result = subprocess.run(cmd, capture_output=True, text=True, check=True, cwd=repo_path)
-    return parse_workflow_runs(json.loads(result.stdout)["workflow_runs"])
+def fetch_workflow_runs(
+    limit: int = 100, repo_path: Path = Path("."), since: datetime | None = None
+) -> tuple[list[WorkflowRun], bool]:
+    """Fetch typed workflow runs through the GitHub REST API, following pages.
+
+    limit is the page size. since drops runs created before it, on the server
+    by date and again here by exact timestamp. Runs sharing a created_at can
+    shift between pages, so a run seen twice is kept once; a run that shifted
+    out of view is lost. The flag is True when MAX_PAGES was reached with a
+    full page, so older runs were not fetched.
+    """
+    endpoint = "/repos/{owner}/{repo}/actions/runs"
+    if since is not None:
+        endpoint += f"?created=>={since.astimezone(timezone.utc).date().isoformat()}"
+    items, truncated = _gh_api_pages(endpoint, "workflow_runs", limit, repo_path)
+    seen: set[int] = set()
+    runs = []
+    for run in parse_workflow_runs(items):
+        if run.run_id in seen or (since is not None and run.created_at < since):
+            continue
+        seen.add(run.run_id)
+        runs.append(run)
+    return runs, truncated
 
 
 def get_files_changed(commit_sha: str, repo_path: Path = Path(".")) -> list[str]:
-    """Return files changed in a commit from the analyzed local repository."""
-    output = run_git(repo_path, ["show", "--name-only", "--format=", commit_sha])
+    """Return files changed in a commit from the analyzed local repository.
+
+    A merge commit lists the files it brought in relative to its first parent,
+    so a CI failure on a merge or merge-queue commit still implicates paths.
+    For a "merge main into feature" commit that is everything main brought in.
+    """
+    output = run_git(
+        repo_path, ["show", "--name-only", "--format=", "-m", "--first-parent", commit_sha]
+    )
     return [line for line in output.splitlines() if line.strip()]
 
 
 def fetch_jobs_for_run(run_id: int, repo_path: Path = Path(".")) -> list[WorkflowJob]:
-    """Fetch all jobs and retry attempts for one workflow run."""
-    cmd = [
-        "gh",
-        "api",
-        f"/repos/{{owner}}/{{repo}}/actions/runs/{run_id}/jobs?filter=all&per_page=100",
-    ]
-    result = subprocess.run(cmd, capture_output=True, text=True, check=True, cwd=repo_path)
-    return [WorkflowJob.model_validate(item) for item in json.loads(result.stdout)["jobs"]]
+    """Fetch all jobs and retry attempts for one workflow run, following pages."""
+    endpoint = f"/repos/{{owner}}/{{repo}}/actions/runs/{run_id}/jobs?filter=all"
+    items, _ = _gh_api_pages(endpoint, "jobs", 100, repo_path)
+    return [WorkflowJob.model_validate(item) for item in items]
 
 
 @dataclass
@@ -72,8 +121,15 @@ class _StepHistory:
             self.last_seen = completed_at
 
 
-def flaky_steps_from_jobs(jobs: list[WorkflowJob]) -> list[FlakyStep]:
-    """Detect steps that failed and then passed on a later run attempt."""
+def flaky_steps_from_jobs(
+    jobs: list[WorkflowJob], *, include_stable: bool = False
+) -> list[FlakyStep]:
+    """Observe each executed step of one run and flag fail-then-pass retries.
+
+    Each returned step stands for one run in which the step executed. Only steps
+    that failed and then passed on a later attempt are returned unless
+    include_stable is set, which the cross-run rate needs for its denominator.
+    """
     histories: dict[tuple[str, str], _StepHistory] = defaultdict(_StepHistory)
     for job in jobs:
         for step in job.steps:
@@ -100,13 +156,15 @@ def flaky_steps_from_jobs(jobs: list[WorkflowJob]) -> list[FlakyStep]:
                 if later_attempt > attempt
             )
         )
-        if flaky_count:
+        if flaky_count or include_stable:
             flaky.append(
                 FlakyStep(
                     job_name=job_name,
                     step_name=step_name,
                     first_seen=history.first_seen or now,
                     last_seen=history.last_seen or now,
+                    runs=1,
+                    flaky_runs=1 if flaky_count else 0,
                     total_attempts=len(attempts),
                     failures=failures,
                     flaky_count=flaky_count,
@@ -116,7 +174,10 @@ def flaky_steps_from_jobs(jobs: list[WorkflowJob]) -> list[FlakyStep]:
 
 
 def summarize_flaky_steps(steps: list[FlakyStep]) -> list[FlakyStepSummary]:
-    """Merge per-run observations into one summary per job and step."""
+    """Merge per-run observations into one summary per job and step.
+
+    Steps that never recovered in any observed run are dropped.
+    """
     summaries: dict[tuple[str, str], FlakyStepSummary] = {}
     for step in steps:
         key = (step.job_name, step.step_name)
@@ -127,17 +188,22 @@ def summarize_flaky_steps(steps: list[FlakyStep]) -> list[FlakyStepSummary]:
                 step_name=step.step_name,
                 first_seen=step.first_seen,
                 last_seen=step.last_seen,
+                runs=step.runs,
+                flaky_runs=step.flaky_runs,
                 total_attempts=step.total_attempts,
                 failures=step.failures,
                 flaky_count=step.flaky_count,
             )
             continue
+        summary.runs += step.runs
+        summary.flaky_runs += step.flaky_runs
         summary.total_attempts += step.total_attempts
         summary.failures += step.failures
         summary.flaky_count += step.flaky_count
         summary.first_seen = min(summary.first_seen, step.first_seen)
         summary.last_seen = max(summary.last_seen, step.last_seen)
-    return sorted(summaries.values(), key=lambda step: (step.job_name, step.step_name))
+    flaky = (summary for summary in summaries.values() if summary.flaky_runs)
+    return sorted(flaky, key=lambda step: (step.job_name, step.step_name))
 
 
 def _error_message(context: str, error: Exception) -> str:
@@ -147,14 +213,20 @@ def _error_message(context: str, error: Exception) -> str:
     return f"{context}: {detail}"
 
 
-def collect_ci_signals(repo_path: Path = Path("."), limit: int = 100) -> CIAnalysis:
+def collect_ci_signals(
+    repo_path: Path = Path("."), limit: int = 100, days: int | None = None
+) -> CIAnalysis:
     """Collect build failures and flaky steps from one workflow-run snapshot.
+
+    days bounds the snapshot to runs created within that many days, matching
+    the git history window. None keeps every fetched run.
 
     A run-specific failure produces a partial result and preserves other runs.
     Failure to acquire the run snapshot produces an explicit unavailable result.
     """
     try:
-        runs = fetch_workflow_runs(limit=limit, repo_path=repo_path)
+        since = datetime.now(timezone.utc) - timedelta(days=days) if days is not None else None
+        runs, truncated = fetch_workflow_runs(limit=limit, repo_path=repo_path, since=since)
     except Exception as error:
         return CIAnalysis(
             status=SignalStatus(
@@ -167,6 +239,8 @@ def collect_ci_signals(repo_path: Path = Path("."), limit: int = 100) -> CIAnaly
     failed_runs: list[FailedWorkflowRun] = []
     flaky_observations: list[FlakyStep] = []
     errors: list[str] = []
+    if truncated:
+        errors.append(f"run list truncated at {MAX_PAGES * limit} runs; older runs not examined")
     for run in runs:
         failure_conclusion = run.failure_conclusion
         if failure_conclusion is not None:
@@ -193,7 +267,7 @@ def collect_ci_signals(repo_path: Path = Path("."), limit: int = 100) -> CIAnaly
             except Exception as error:
                 errors.append(_error_message(f"jobs for run {run.run_id}", error))
             else:
-                flaky_observations.extend(flaky_steps_from_jobs(jobs))
+                flaky_observations.extend(flaky_steps_from_jobs(jobs, include_stable=True))
 
     state = SignalState.partial if errors else SignalState.available
     return CIAnalysis(

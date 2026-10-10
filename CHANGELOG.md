@@ -22,6 +22,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `docs/VALIDATION.md` is re-derived from the v2 method and the v1 per-repo
   table is withdrawn.
 
+### Fixed
+
+- CI failures on merge commits now implicate the files the merge brought in
+  (the diff against its first parent). Before, a merge or merge-queue commit
+  listed no files and its failure was attributed to nothing
+- A flaky step's `flaky_rate` is now `flaky_runs / runs`, over the runs in which
+  the step executed. Before, it divided recoveries by attempt observations of
+  flaky runs only, so retries inflated it and stable runs never counted. The
+  step output gains `runs` and `flaky_runs`. The rate covers only the re-run
+  runs examined, since jobs are fetched only for those. `total_attempts`,
+  `failures`, `first_seen`, and `last_seen` now include stable re-run runs too
+- `gh api` calls time out after 60 seconds and report the timeout in
+  `ci_status.errors`. Workflow runs are fetched across up to 10 pages of 100
+  instead of the first page, runs repeated across pages count once, a full
+  tenth page marks the result partial, and only runs created within the
+  analysis `--days` window count. `get_ci_failures` and `get_flaky_steps` cover
+  the last 30 days
+- Flaky detection stays within one workflow run, so a failure on one commit
+  followed by a pass on another is not flaky
+
 ## [1.5.2] - 2026-10-10
 
 ### Fixed

@@ -35,6 +35,8 @@ MIN_SHARED_REVISIONS = 2
 # logged. Narrowing these markers would spuriously warn on real deletions.
 _ABSENT_PATH_MARKERS = ("does not exist in", "exists on disk, but not in")
 
+UNSUPPORTED_LANGUAGE = "unsupported language"
+
 _COMMIT_MARKER = "\x01"
 _PRETTY_FORMAT = f"{_COMMIT_MARKER}%H"
 _HUNK_RE = re.compile(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@ ?(.*)$")
@@ -260,6 +262,8 @@ def xray_file(
 
     Ranks the file's functions by revisions x current indentation complexity
     and reports function pairs that change together (internal coupling).
+    Files whose extension has no diff driver return no functions and a
+    ``skipped`` reason instead of guessed names.
     Python files get exact ast attribution per revision; other languages use
     git hunk-header names (complexity 0.0, ranked by revisions).
 
@@ -267,6 +271,15 @@ def xray_file(
         NotAGitRepoError: If repo_path is not a git repository.
         GitToolNotFoundError: If the git binary is not installed.
     """
+    if Path(file_path).suffix.lower() not in DIFF_DRIVERS:
+        return FileXRay(
+            path=file_path,
+            days=days,
+            revisions_analyzed=0,
+            revision_cap_hit=False,
+            functions=[],
+            skipped=UNSUPPORTED_LANGUAGE,
+        )
     commits = parse_patch_log(_git_patch_log(repo_path, file_path, days))
     cap_hit = len(commits) > rev_cap
     commits = commits[:rev_cap]  # git log emits newest first

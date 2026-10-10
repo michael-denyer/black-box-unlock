@@ -229,6 +229,8 @@ class FileXRay(BaseModel):
     revision_cap_hit: bool
     functions: list[FunctionChurn]
     coupling: list[FunctionCoupling] = Field(default_factory=list)
+    skipped: str | None = None
+    """Why no X-Ray was attempted (e.g. "unsupported language"); None when it ran."""
 
 
 class FileForensics(BaseModel):  # [4a.3] Combined forensics
@@ -243,6 +245,8 @@ class FileForensics(BaseModel):  # [4a.3] Combined forensics
     build_failures: int = 0
     bugfix_commits: int = 0
     functions: list[FunctionChurn] = Field(default_factory=list)
+    xray_skipped: str | None = None
+    """Reason X-Ray was not attempted (e.g. "unsupported language"); None otherwise."""
     xray_failed: bool = False
     """True when an X-Ray attempt on this file raised; lets consumers tell a crash
     from a file that genuinely has no attributable functions (both leave functions empty)."""

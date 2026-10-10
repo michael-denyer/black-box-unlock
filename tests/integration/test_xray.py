@@ -140,3 +140,31 @@ class TestDeletionAttribution:
 
         b = next(f for f in result.functions if f.name == "b")
         assert (b.revisions, b.lines_added, b.lines_deleted) == (1, 2, 0)
+
+
+class TestUnsupportedLanguage:
+    @pytest.fixture
+    def js_repo(self, tmp_path):
+        _run(["git", "init", "-b", "main"], tmp_path)
+        _run(["git", "config", "user.email", "t@example.com"], tmp_path)
+        _run(["git", "config", "user.name", "Tester"], tmp_path)
+        for i in range(2):
+            (tmp_path / "x.js").write_text(f"function f() {{\n  return {i};\n}}\n")
+            _run(["git", "add", "."], tmp_path)
+            _run(["git", "commit", "-m", f"step {i}"], tmp_path)
+        return tmp_path
+
+    def test_xray_file_reports_skip_instead_of_guessing(self, js_repo):
+        result = xray_file(js_repo, "x.js", days=365)
+        assert result.functions == []
+        assert result.skipped == "unsupported language"
+
+    def test_top_hotspot_pass_records_skip(self, js_repo):
+        from black_box_unlock.analysis import run_analysis
+
+        result = run_analysis(js_repo, days=365, include_ci=False, xray_top=5)
+        js = next(f for f in result.files if f.path == "x.js")
+        assert js.xray_skipped == "unsupported language"
+        assert js.xray_failed is False
+        assert js.functions == []
+        assert result.summary.xrayed_files == 0

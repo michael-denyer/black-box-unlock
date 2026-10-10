@@ -60,6 +60,38 @@ Project rules use first match wins and run before the built-in classifier. The
 result records the matching pattern as `project:<pattern>`, so callers can
 explain why a path received its role.
 
+### Built-in rules
+
+Built-in rules apply when no project rule matches. They run in this order.
+
+- `test`: a `test`, `tests`, `spec`, `specs`, or `__tests__` directory at any
+  depth. A basename that starts with `test_`, `test.`, or `spec_`. `conftest.py`.
+  A basename ending in `_test`, `_tests`, `_spec`, `.test`, `.tests`, or `.spec`
+  plus an extension (`foo_test.go`, `Foo.test.tsx`, `foo.spec.ts`,
+  `foo_test.py`, `foo_spec.rb`, `foo_test.rs`). A class file ending in `Test` or
+  `Tests` (`FooTest.java`, `FooTests.cs`) or in `Spec` (`FooSpec.scala`).
+  A bare substring is not enough: `contest.py`, `latest.py`, and `protest/` are
+  not tests.
+- `docs`: a top-level `doc`, `docs`, or `documentation` directory, or a
+  `.md`, `.mdx`, `.rst`, or `.adoc` file.
+- `migration`: a `migration` or `migrations` directory at any depth.
+- `generated`: a `generated`, `vendor`, or `node_modules` directory at any
+  depth, a `.lock` or `.map` file, or a `.min.js` or `.min.css` file.
+- `config`: a top-level `config`, `hooks`, `.githooks`, `.github`, or
+  `.claude-plugin` directory, a `.toml`, `.yaml`, `.yml`, `.ini`, or `.cfg`
+  file, or a `Dockerfile`, `Makefile`, or `package.json`.
+- `source`: a known source extension.
+- `other`: everything else.
+
+The `docs` and `config` directory names match only the first path segment, so
+`src/hooks/useThing.ts` and `src/docs/render.py` stay `source`. Use a project
+rule for a nested directory that should differ.
+
+Every file in the analysis output carries its role as `path_role`. The MCP
+`get_hotspots` tool takes `roles`, a list of role names, and returns only files
+with those roles. The filter runs before `top_n`. An unknown role name is a
+tool error.
+
 Patterns match repository-relative POSIX paths:
 
 - `*` matches within one path segment.

@@ -52,6 +52,10 @@ Register the MCP server in Claude Code (`.mcp.json`):
 Tools: `get_hotspots`, `get_file_forensics`, `get_coupled_files`,
 `get_ownership`, `get_ci_failures`, `get_flaky_steps`, `xray_file`,
 `review_change`.
+Each file carries a `path_role` (`source`, `test`, `docs`, and so on), and
+`get_hotspots` accepts `roles` to keep only those roles, for example
+`roles=["source"]` to drop tests from the ranking. See
+[Path roles](docs/CONFIGURATION.md#path-roles).
 The CI tools return `status` and `errors`, so a missing or partial GitHub
 response cannot look like a clean result. Failed-run data includes the workflow,
 run URL, commit, time, and paths changed in that commit. Those paths are

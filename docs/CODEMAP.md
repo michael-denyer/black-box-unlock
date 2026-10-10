@@ -26,10 +26,10 @@ Agent-facing MCP tools and edit hook, and user-facing commands via Typer CLI.
 | 1a | CLI App | Typer application with `bbu` command | [cli.py:41](../src/black_box_unlock/cli.py#L41) |
 | 1a.1 | analyze_repo | Main analysis command | [cli.py:71](../src/black_box_unlock/cli.py#L71) |
 | 1a.2 | version | Version info command | [cli.py:344](../src/black_box_unlock/cli.py#L344) |
-| 1b | MCP Server | `bbu-mcp` server exposing forensic signals as agent tools | [mcp_server.py:24](../src/black_box_unlock/mcp_server.py#L24) |
-| 1b.1 | get_hotspots | First of six tools that read the cached analysis | [mcp_server.py:50](../src/black_box_unlock/mcp_server.py#L50) |
-| 1b.2 | xray_file | Per-function churn for one file, computed on each call | [mcp_server.py:164](../src/black_box_unlock/mcp_server.py#L164) |
-| 1b.3 | review_change | Fresh, uncached review of the selected change | [mcp_server.py:193](../src/black_box_unlock/mcp_server.py#L193) |
+| 1b | MCP Server | `bbu-mcp` server exposing forensic signals as agent tools | [mcp_server.py:25](../src/black_box_unlock/mcp_server.py#L25) |
+| 1b.1 | get_hotspots | First of six tools that read the cached analysis | [mcp_server.py:61](../src/black_box_unlock/mcp_server.py#L61) |
+| 1b.2 | xray_file | Per-function churn for one file, computed on each call | [mcp_server.py:180](../src/black_box_unlock/mcp_server.py#L180) |
+| 1b.3 | review_change | Fresh, uncached review of the selected change | [mcp_server.py:211](../src/black_box_unlock/mcp_server.py#L211) |
 | 1c | coupling_warnings | Coupling guard behind the `PostToolUse` edit hook | [guard.py:114](../src/black_box_unlock/guard.py#L114) |
 
 ---
@@ -86,8 +86,8 @@ Pydantic models and shared infrastructure.
 | 4a | FileChurn | Churn metrics per file | [models.py:56](../src/black_box_unlock/core/models.py#L56) |
 | 4a.1 | TemporalCoupling | File pair co-change | [models.py:81](../src/black_box_unlock/core/models.py#L81) |
 | 4a.2 | FileOwnership | Authors per file | [models.py:114](../src/black_box_unlock/core/models.py#L114) |
-| 4a.3 | FileForensics | Combined forensics | [models.py:234](../src/black_box_unlock/core/models.py#L234) |
-| 4a.4 | AnalysisResult | Complete analysis output, parameters, and signal status | [models.py:370](../src/black_box_unlock/core/models.py#L370) |
+| 4a.3 | FileForensics | Combined forensics | [models.py:244](../src/black_box_unlock/core/models.py#L244) |
+| 4a.4 | AnalysisResult | Complete analysis output, parameters, and signal status | [models.py:402](../src/black_box_unlock/core/models.py#L402) |
 | 4b | Exceptions | Custom exception classes | [exceptions.py:4](../src/black_box_unlock/core/exceptions.py#L4) |
 | 4c | configure_logging | Loguru configuration | [logging.py:8](../src/black_box_unlock/core/logging.py#L8) |
 

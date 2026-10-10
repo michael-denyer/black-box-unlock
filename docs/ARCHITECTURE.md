@@ -65,6 +65,8 @@ flowchart LR
     Change --> Review[fresh change review]
     Join --> Review
     Review --> MCP
+    MCP --> Agent[Coding agent<br/>chooses where to focus]
+    Guard --> Agent
 ```
 
 ## Degraded modes

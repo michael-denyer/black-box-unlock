@@ -21,7 +21,7 @@ from .git.changes import BaseChange, StagedChange, WorkingTreeChange
 from .git.xray import xray_file as _xray_file
 from .review import run_change_review as _run_change_review
 
-mcp = MCPServer("black-box-unlock")
+mcp = MCPServer("black-box-unlock")  # [1b] MCP server - forensic signals as agent tools
 
 _cache: dict[tuple[str, int, bool], AnalysisResult] = {}
 

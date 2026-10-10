@@ -18,6 +18,7 @@ from .core.exceptions import BlackBoxUnlockError
 from .core.models import AnalysisResult, FileForensics
 from .git.changes import BaseChange, StagedChange, WorkingTreeChange
 from .git.xray import xray_file as _xray_file
+from .path_roles import PathRole
 from .review import ChangeReviewRequest
 from .review import run_change_review as _run_change_review
 
@@ -42,6 +43,19 @@ def _safe_analysis(repo_path: str, days: int, include_ci: bool = False) -> Analy
         raise ToolError(str(e)) from e
 
 
+def _parse_roles(roles: list[str] | None) -> set[PathRole] | None:
+    """Validate role names at the tool boundary."""
+    if roles is None:
+        return None
+    if not roles:
+        raise ToolError("roles must not be empty; omit it to return every role")
+    valid = {role.value for role in PathRole}
+    unknown = sorted(set(roles) - valid)
+    if unknown:
+        raise ToolError(f"Unknown path role(s) {unknown}; valid roles: {sorted(valid)}")
+    return {PathRole(name) for name in roles}
+
+
 def _file_dict(f: FileForensics) -> dict:
     return f.model_dump(mode="json")
 
@@ -52,6 +66,7 @@ def get_hotspots(
     days: int = 30,
     top_n: int = 10,
     include_ci: bool = False,
+    roles: list[str] | None = None,
 ) -> list[dict]:
     """Top hotspot files (commits x complexity), with bug-fix and CI failure counts.
 
@@ -59,9 +74,13 @@ def get_hotspots(
     files are the unstable, complex code where defects concentrate.
 
     Set include_ci=True to include CI build-failure counts; slower, needs gh.
+    Set roles (source, test, docs, config, migration, generated, other) to keep
+    only files with those path roles; the filter runs before top_n.
     """
+    wanted = _parse_roles(roles)
     result = _safe_analysis(repo_path, days, include_ci)
-    return [_file_dict(f) for f in result.files[:top_n]]
+    files = [f for f in result.files if wanted is None or f.path_role in wanted]
+    return [_file_dict(f) for f in files[:top_n]]
 
 
 @mcp.tool()

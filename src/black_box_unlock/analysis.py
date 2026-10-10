@@ -10,6 +10,7 @@ from loguru import logger
 from .cicd.github_actions import collect_ci_signals
 from .cicd.models import CIAnalysis
 from .complexity import indentation_complexity
+from .config import load_project_config
 from .core.models import (
     AnalysisParameters,
     AnalysisResult,
@@ -27,6 +28,7 @@ from .git.defects import bugfix_counts
 from .git.log import Commit, CommitFile, fetch_git_history
 from .git.ownership import parse_ownership_from_history
 from .git.xray import xray_file
+from .path_roles import classify_path_role
 
 
 def _canonicalize_history_paths(
@@ -153,6 +155,8 @@ def run_analysis(  # [2a] Main analysis pipeline
         | set(ensure_paths)
     )
 
+    path_role_rules = load_project_config(repo_path).path_roles
+
     # Build FileForensics for each file
     files: list[FileForensics] = []
     for path in all_paths:
@@ -162,6 +166,7 @@ def run_analysis(  # [2a] Main analysis pipeline
         files.append(
             FileForensics(
                 path=path,
+                path_role=classify_path_role(path, path_role_rules).role,
                 commits=churn.commits if churn else 0,
                 lines_changed=churn.total_lines_changed if churn else 0,
                 complexity=indentation_complexity(repo_path / path),

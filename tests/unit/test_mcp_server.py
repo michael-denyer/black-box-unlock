@@ -71,6 +71,43 @@ class TestMcpTools:
         assert hotspots[0]["hotspot_score"] == 400.0
         assert hotspots[0]["bugfix_commits"] == 3
 
+    def test_get_hotspots_roles_filter_runs_before_top_n(self, mock_analysis):
+        result = _result()
+        result.files.insert(
+            0,
+            FileForensics(
+                path="tests/test_auth.py",
+                commits=20,
+                lines_changed=900,
+                complexity=50.0,
+                authors=["a@x.com"],
+                coupled_with=[],
+            ),
+        )
+        mock_analysis.return_value = result
+
+        source = mcp_server.get_hotspots(repo_path=".", top_n=1, roles=["source"])
+        tests = mcp_server.get_hotspots(repo_path=".", roles=["test"])
+        both = mcp_server.get_hotspots(repo_path=".", roles=["test", "source"])
+        unfiltered = mcp_server.get_hotspots(repo_path=".")
+
+        assert [f["path"] for f in source] == ["src/auth.py"]
+        assert [f["path"] for f in tests] == ["tests/test_auth.py"]
+        assert tests[0]["path_role"] == "test"
+        assert len(both) == len(unfiltered) == 3
+
+    def test_get_hotspots_unknown_role_raises(self, mock_analysis):
+        mock_analysis.return_value = _result()
+
+        with pytest.raises(ToolError, match="Unknown path role"):
+            mcp_server.get_hotspots(repo_path=".", roles=["source", "scrips"])
+
+    def test_get_hotspots_empty_roles_raises(self, mock_analysis):
+        mock_analysis.return_value = _result()
+
+        with pytest.raises(ToolError, match="roles must not be empty"):
+            mcp_server.get_hotspots(repo_path=".", roles=[])
+
     def test_get_file_forensics_finds_file(self, mock_analysis):
         mock_analysis.return_value = _result()
 

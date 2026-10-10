@@ -15,7 +15,7 @@ src/black_box_unlock/
 ├── mcp_server.py           # MCP server: cached signals + fresh review
 ├── review.py               # Request resolution, changed-path identity, and bounded action policy
 ├── config.py               # .bbu.toml parsing
-├── path_roles.py           # Project and built-in path-role classifier
+├── path_roles.py           # Project and built-in path-role classifier (sets FileForensics.path_role)
 ├── guard.py                # Coupling guard: small typed cache for the edit hook
 ├── core/
 │   ├── models.py           # Pydantic models (FileForensics, AnalysisResult, ...)

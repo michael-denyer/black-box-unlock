@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Path roles recognise test naming conventions outside a `tests/` directory:
+  `_test.go`, `.test.tsx`, `.spec.ts`, `FooTest.java`, `FooSpec.scala`,
+  `FooTests.cs`, `_spec.rb`, `_test.rs`, `foo_test.py`, `conftest.py`, and
+  `__tests__/`. The `docs`, `config`, `hooks`, `.githooks`, `.github`, and
+  `.claude-plugin` directory rules now match only the first path segment, so
+  `src/hooks/useThing.ts` is `source` instead of `config`. Every file in the
+  analysis JSON and MCP output carries `path_role`, resolved with `.bbu.toml`
+  rules, and `get_hotspots` takes `roles` to keep only files with those roles.
+  Test naming applies to source extensions only, after the docs, migration,
+  generated, and config rules. `run_analysis` now reads `.bbu.toml`, so a
+  malformed file fails `analyze-repo` and the MCP read tools with a
+  `ConfigurationError`. The pydantic floor is 2.10.
 - `bbu validate` v2. The universe and its complexity are read from the tree
   at the cutoff commit instead of HEAD, history is split by ancestry of the
   cutoff commit on the committer clock that `git log --since` already

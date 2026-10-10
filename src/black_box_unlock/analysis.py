@@ -94,6 +94,7 @@ def run_analysis(  # [2a] Main analysis pipeline
     *,
     ensure_paths: frozenset[str] = frozenset(),
     path_aliases: dict[str, str] | None = None,
+    rev: str | None = None,
 ) -> AnalysisResult:
     """Run complete forensic analysis on a repository.
 
@@ -108,12 +109,13 @@ def run_analysis(  # [2a] Main analysis pipeline
         xray_top: Auto X-Ray the top N hotspot files (0 disables).
         ensure_paths: Current paths to include even when they have no history.
         path_aliases: Historical paths mapped to their current renamed path.
+        rev: Last revision whose history is analyzed (HEAD when None).
 
     Returns:
         AnalysisResult with file forensics and summary.
     """
     aliases = path_aliases or {}
-    history = _canonicalize_history_paths(fetch_git_history(repo_path, days), aliases)
+    history = _canonicalize_history_paths(fetch_git_history(repo_path, days, rev), aliases)
 
     ci_analysis = CIAnalysis(
         status=SignalStatus(state=SignalState.disabled),

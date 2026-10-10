@@ -12,6 +12,7 @@ from .config import CONFIG_FILE_NAME, load_project_config
 from .core.exceptions import ConfigurationError
 from .core.models import AnalysisResult, FileForensics, SignalStatus
 from .git.changes import (
+    BaseProvenance,
     ChangedPath,
     ChangeKind,
     ChangeProvenance,
@@ -506,6 +507,11 @@ def project_change_review(
     )
 
 
+def _history_end(provenance: ChangeProvenance) -> str | None:
+    """End base-mode history at the merge base so the branch is not its own evidence."""
+    return provenance.merge_base_oid if isinstance(provenance, BaseProvenance) else None
+
+
 def run_change_review(
     repo_path: Path,
     request: ChangeReviewRequest,
@@ -534,6 +540,7 @@ def run_change_review(
         xray_top=0,
         ensure_paths=current_paths,
         path_aliases=_history_aliases(identities),
+        rev=_history_end(change_set.provenance),
     )
     return project_change_review(
         change_set,

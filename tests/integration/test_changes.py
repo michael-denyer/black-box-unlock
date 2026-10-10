@@ -108,6 +108,25 @@ def test_rename_keeps_one_continuous_changed_path_identity(tmp_path):
     assert isinstance(result, ChangeReview)
     assert result.files[0].change.path == "new.py"
     assert result.files[0].change.previous_path == "old.py"
-    assert result.files[0].evidence.commits == 3
+    assert result.files[0].evidence.commits == 2
     assert result.files[0].evidence.bugfix_commits == 1
     assert result.files[0].evidence.complexity == 1.0
+
+
+def test_base_mode_history_excludes_the_reviewed_branch_commits(tmp_path):
+    repo = tmp_path / "branch-fixes"
+    repo.mkdir()
+    _git(repo, "init", "-b", "main")
+    (repo / "a.py").write_text("value = 0\n")
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-m", "add a")
+    _git(repo, "checkout", "-b", "feature")
+    for attempt in range(1, 4):
+        (repo / "a.py").write_text(f"value = {attempt}\n")
+        _git(repo, "commit", "-am", f"fix: attempt {attempt}")
+
+    result = run_change_review(repo, ChangeReviewRequest(selector=BaseChange(base_ref="main")))
+
+    assert isinstance(result, ChangeReview)
+    assert result.files[0].evidence.commits == 1
+    assert result.files[0].evidence.bugfix_commits == 0

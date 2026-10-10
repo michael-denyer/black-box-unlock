@@ -1,7 +1,7 @@
 """Repository analysis combining git forensics."""
 
 import json
-from collections import defaultdict
+from collections import Counter, defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -24,9 +24,65 @@ from .core.models import (
 from .git.churn import parse_history_entries
 from .git.coupling import analyze_temporal_coupling
 from .git.defects import bugfix_counts
-from .git.log import fetch_git_history
+from .git.log import Commit, CommitFile, fetch_git_history
 from .git.ownership import parse_ownership_from_history
 from .git.xray import xray_file
+
+
+def _canonicalize_history_paths(
+    commits: list[Commit],
+    path_aliases: dict[str, str],
+) -> list[Commit]:
+    """Combine renamed paths before per-file history is aggregated."""
+    if not path_aliases:
+        return commits
+
+    canonical: list[Commit] = []
+    for commit in commits:
+        files_by_path: dict[str, CommitFile] = {}
+        for file in commit.files:
+            path = path_aliases.get(file.path, file.path)
+            existing = files_by_path.get(path)
+            if existing is None:
+                files_by_path[path] = file.model_copy(update={"path": path})
+                continue
+            files_by_path[path] = existing.model_copy(
+                update={
+                    "added_lines": existing.added_lines + file.added_lines,
+                    "deleted_lines": existing.deleted_lines + file.deleted_lines,
+                }
+            )
+        canonical.append(commit.model_copy(update={"files": list(files_by_path.values())}))
+    return canonical
+
+
+def _canonicalize_ci_paths(
+    ci_analysis: CIAnalysis,
+    path_aliases: dict[str, str],
+) -> CIAnalysis:
+    """Apply the same renamed-path identity to optional CI evidence."""
+    if not path_aliases:
+        return ci_analysis
+
+    failed_runs = [
+        run.model_copy(
+            update={
+                "implicated_paths": sorted(
+                    {path_aliases.get(path, path) for path in run.implicated_paths}
+                )
+            }
+        )
+        for run in ci_analysis.failed_runs
+    ]
+    file_failures: Counter[str] = Counter()
+    for run in failed_runs:
+        file_failures.update(run.implicated_paths)
+    return ci_analysis.model_copy(
+        update={
+            "file_failures": dict(file_failures),
+            "failed_runs": failed_runs,
+        }
+    )
 
 
 def run_analysis(  # [2a] Main analysis pipeline
@@ -37,6 +93,7 @@ def run_analysis(  # [2a] Main analysis pipeline
     xray_top: int = 5,
     *,
     ensure_paths: frozenset[str] = frozenset(),
+    path_aliases: dict[str, str] | None = None,
 ) -> AnalysisResult:
     """Run complete forensic analysis on a repository.
 
@@ -50,17 +107,20 @@ def run_analysis(  # [2a] Main analysis pipeline
         include_ci: Whether to include CI/CD build failure data.
         xray_top: Auto X-Ray the top N hotspot files (0 disables).
         ensure_paths: Current paths to include even when they have no history.
+        path_aliases: Historical paths mapped to their current renamed path.
 
     Returns:
         AnalysisResult with file forensics and summary.
     """
-    history = fetch_git_history(repo_path, days)
+    aliases = path_aliases or {}
+    history = _canonicalize_history_paths(fetch_git_history(repo_path, days), aliases)
 
     ci_analysis = CIAnalysis(
         status=SignalStatus(state=SignalState.disabled),
     )
     if include_ci:
         ci_analysis = collect_ci_signals(repo_path=repo_path, limit=100)
+        ci_analysis = _canonicalize_ci_paths(ci_analysis, aliases)
         for error in ci_analysis.status.errors:
             logger.warning("CI data degraded: {}", error)
 

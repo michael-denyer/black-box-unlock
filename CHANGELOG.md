@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- `run_change_review` takes one `ChangeReviewRequest` (selector, optional
+  profile, and policy overrides) and resolves `.bbu.toml` itself.
+  `resolve_review_settings`, `ReviewOverrides`, and `ResolvedReviewSettings`
+  are removed from `black_box_unlock.config`. The `bbu review-change` command
+  and the MCP `review_change` tool keep their arguments and results
+
 ### Fixed
 
 - The `maid` prek hook now checks every Markdown file. maid validates only its
@@ -17,6 +25,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and renders the same text. In the model class diagram, relationships are
   dashed (`..>`) instead of solid (`-->`) and list types render as `list<str>`
   instead of `list[str]`
+- Change review keeps a file's history when the selected change renames it.
+  The renamed path previously reported zero commits, bug-fix commits, and
+  authors, so `focus_review` could not fire for it. Earlier churn, defects,
+  ownership, coupling, and CI evidence now follow the current path, and the
+  rename revision counts once
 
 ## [1.5.0] - 2026-10-10
 

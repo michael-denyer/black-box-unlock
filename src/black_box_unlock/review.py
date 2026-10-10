@@ -11,7 +11,6 @@ from .analysis import run_analysis
 from .config import CONFIG_FILE_NAME, load_project_config
 from .core.exceptions import ConfigurationError
 from .core.models import (
-    HIGH_RISK_AUTHOR_THRESHOLD,
     AnalysisResult,
     CouplingPolicy,
     FileForensics,
@@ -26,6 +25,7 @@ from .git.changes import (
     ChangeSet,
     collect_change_set,
 )
+from .git.ownership import OwnershipRisk, ownership_risk
 from .path_roles import (
     PathRole,
     PathRoleClassification,
@@ -130,6 +130,7 @@ class FileEvidence(BaseModel):
     complexity: float = Field(ge=0)
     bugfix_commits: int = Field(ge=0)
     author_count: int = Field(ge=0)
+    main_author_share: float = Field(default=0.0, ge=0.0, le=1.0)
     build_failures: int = Field(ge=0)
 
 
@@ -170,6 +171,7 @@ class FocusFileEvidence(BaseModel):
     path: str
     bugfix_commits: int = Field(ge=0)
     author_count: int = Field(ge=0)
+    main_author_share: float = Field(default=0.0, ge=0.0, le=1.0)
     commits: int = Field(ge=0)
     complexity: float = Field(ge=0)
 
@@ -315,6 +317,7 @@ def _file_evidence(
         complexity=forensics.complexity,
         bugfix_commits=forensics.bugfix_commits,
         author_count=forensics.author_count,
+        main_author_share=forensics.main_author_share,
         build_failures=forensics.build_failures,
     )
 
@@ -497,6 +500,7 @@ def project_change_review(
             path=file.change.path,
             bugfix_commits=file.evidence.bugfix_commits,
             author_count=file.evidence.author_count,
+            main_author_share=file.evidence.main_author_share,
             commits=file.evidence.commits,
             complexity=file.evidence.complexity,
         )
@@ -504,7 +508,7 @@ def project_change_review(
         if file.evidence.role.role in _ACTIONABLE_ROLES
         and (
             file.evidence.bugfix_commits > 0
-            or file.evidence.author_count > HIGH_RISK_AUTHOR_THRESHOLD
+            or ownership_risk(file.evidence) is OwnershipRisk.diffuse
         )
     ]
     focus.sort(

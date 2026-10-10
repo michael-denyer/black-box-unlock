@@ -205,6 +205,35 @@ class TestMcpTools:
             "steps": [],
         }
 
+    def test_get_ownership_reports_share_recency_and_risk(self, mock_analysis):
+        result = _result()
+        result.files[0] = result.files[0].model_copy(
+            update={
+                "authors": ["a@x.com", "b@x.com", "c@x.com", "d@x.com"],
+                "main_author": "a@x.com",
+                "main_author_share": 0.25,
+                "last_active": datetime(2026, 6, 1, tzinfo=timezone.utc),
+            }
+        )
+        mock_analysis.return_value = result
+
+        info = mcp_server.get_ownership("src/auth.py", repo_path=".", days=30)
+
+        assert info["main_author"] == "a@x.com"
+        assert info["main_author_share"] == 0.25
+        assert info["last_active"] == "2026-06-01T00:00:00+00:00"
+        assert info["ownership_risk"] == "diffuse"
+
+    def test_get_ownership_without_history_has_null_owner_and_owned_risk(self, mock_analysis):
+        mock_analysis.return_value = _result()
+
+        info = mcp_server.get_ownership("src/util.py", repo_path=".", days=30)
+
+        assert info["main_author"] is None
+        assert info["main_author_share"] == 0.0
+        assert info["last_active"] is None
+        assert info["ownership_risk"] == "owned"
+
     def test_get_ownership_unknown_file_raises(self, mock_analysis):
         mock_analysis.return_value = _result()
 

@@ -151,13 +151,26 @@ class TemporalCoupling(BaseModel):  # [4a.1] File pair co-change
 class FileOwnership(BaseModel):  # [4a.2] Authors per file
     """Ownership metrics for a single file.
 
-    Files with many authors (>3) are coordination risks that often correlate
-    with higher defect rates due to diffuse ownership.
+    Files with many authors (>3) and no dominant one are coordination risks
+    that often correlate with higher defect rates due to diffuse ownership.
+
+    ``commits`` counts every commit that touched the file, bots included
+    (1.5.2 behaviour). ``authors``, ``authors_by_commits``, ``main_author``,
+    ``main_author_share`` and ``last_active`` ignore bot commits.
     """
 
     path: str
     authors: list[str]
     commits: int
+    main_author: str | None = None
+    """Author with the most commits in the window. Ties go to the author with the
+    most recent commit, then to the lower name. None when there is no human author."""
+    main_author_share: float = Field(default=0.0, ge=0.0, le=1.0)
+    """Main author's commits over the file's non-bot commits; 0.0 when there are none."""
+    last_active: datetime | None = None
+    """Timestamp of the file's latest non-bot commit in the window; None when there is none."""
+    authors_by_commits: dict[str, int] = Field(default_factory=dict)
+    """Non-bot commit count per author."""
 
     @property
     def author_count(self) -> int:
@@ -295,6 +308,11 @@ class FileForensics(BaseModel):  # [4a.3] Combined forensics
     lines_changed: int
     complexity: float = 0.0
     authors: list[str]
+    main_author: str | None = None
+    main_author_share: float = Field(default=0.0, ge=0.0, le=1.0)
+    """Main author's share of the file's non-bot commits; see ``FileOwnership``."""
+    last_active: datetime | None = None
+    """Latest non-bot commit in the window; see ``FileOwnership``."""
     coupled_with: list[CouplingInfo]
     build_failures: int = 0
     bugfix_commits: int = 0

@@ -1,5 +1,6 @@
 """Unit tests for hotspot-vs-bugfix self-validation."""
 
+import hashlib
 import subprocess
 from unittest.mock import patch
 
@@ -9,6 +10,7 @@ from black_box_unlock.core.exceptions import BlackBoxUnlockError, GitToolNotFoun
 from black_box_unlock.validation import (
     _tree_contents,
     permutation_p,
+    random_draws,
     score_ranking,
     spearman_rho,
 )
@@ -51,6 +53,21 @@ class TestSpearmanRho:
 
     def test_fewer_than_two_points_returns_none(self):
         assert spearman_rho([1], [2]) is None
+
+
+class TestRandomDraws:
+    def test_seeded_draw_sequence_matches_the_stored_hash(self):
+        # The published p-values depend on these 200 orderings. A change to
+        # random.shuffle across Python versions, or to the seed or draw count,
+        # changes this hash and the docs must be re-derived.
+        paths = [f"f{i:02d}.py" for i in range(25)]
+        draws = random_draws(paths, {"f03.py": 2, "f17.py": 1})
+        digest = hashlib.sha256("\n".join(",".join(d.top_files) for d in draws).encode())
+        assert len(draws) == 200
+        assert draws[0].top_files == ["f22.py", "f00.py", "f14.py"]
+        assert digest.hexdigest() == (
+            "13756f9e397567fa7277ca5685d574a51d57e42a0ae613b28571593de85fc02c"
+        )
 
 
 class TestPermutationP:

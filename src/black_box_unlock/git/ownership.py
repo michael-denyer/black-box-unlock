@@ -9,7 +9,7 @@ _GITHUB_BOT_EMAILS = frozenset({"noreply@github.com"})
 
 
 def _is_bot_author(email: str) -> bool:
-    """Return True for automation identities such as dependabot[bot] or GitHub web-flow."""
+    """Return True for automation identities such as dependabot[bot]."""
     return "[bot]" in email or email.lower() in _GITHUB_BOT_EMAILS
 
 

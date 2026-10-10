@@ -41,3 +41,16 @@ def test_mailmap_aliases_and_bots_are_not_extra_authors(tmp_path):
     a_py = next(item for item in ownership if item.path == "a.py")
     assert a_py.authors == ["alice@work.com"]
     assert a_py.commits == 4
+
+
+def test_bot_only_file_has_no_authors_but_keeps_its_commits(tmp_path):
+    subprocess.run(["git", "init", str(tmp_path)], check=True, capture_output=True)
+    _commit(tmp_path, "dependabot[bot]", "49699333+dependabot[bot]@users.noreply.github.com", "one")
+    _commit(tmp_path, "renovate[bot]", "29139614+renovate[bot]@users.noreply.github.com", "two")
+
+    ownership = parse_ownership_from_history(fetch_git_history(tmp_path, 30))
+
+    a_py = next(item for item in ownership if item.path == "a.py")
+    assert a_py.authors == []
+    assert a_py.author_count == 0
+    assert a_py.commits == 2

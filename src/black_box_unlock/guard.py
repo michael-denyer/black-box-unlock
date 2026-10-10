@@ -25,6 +25,7 @@ from .git.run import repo_toplevel, run_git
 
 CACHE_FILENAME = "cache.json"
 HOOK_LOG_FILENAME = "hook.log"
+HOOK_LOG_MAX_LINES = 200
 CACHE_MAX_AGE_HOURS = 24
 CACHE_VERSION = 2
 CACHE_HISTORY_DAYS = 90
@@ -41,13 +42,14 @@ class CouplingSnapshot(BaseModel):
 
 
 def state_dir(repo_path: Path) -> Path:
-    """Return bbu's per-repository state directory inside the git common dir.
+    """Return bbu's state directory inside this worktree's git dir.
 
     The git dir is never populated from repository contents, so a committed
-    symlink cannot redirect writes made here.
+    symlink cannot redirect writes made here. Each linked worktree has its own
+    git dir, so worktrees on different HEADs do not evict each other's cache.
     """
-    common_dir = Path(run_git(repo_path, ["rev-parse", "--git-common-dir"]).strip())
-    return repo_path / common_dir / "bbu"
+    git_dir = Path(run_git(repo_path, ["rev-parse", "--git-dir"]).strip())
+    return repo_path / git_dir / "bbu"
 
 
 def hook_log_path(path: Path) -> Path:
@@ -56,16 +58,20 @@ def hook_log_path(path: Path) -> Path:
 
 
 def record_hook_failure(path: Path, error: Exception) -> None:
-    """Append a timestamped line for a failure the edit hook swallowed. Never raises."""
+    """Append a timestamped line for a failure the edit hook swallowed. Never raises.
+
+    The log keeps only the newest HOOK_LOG_MAX_LINES lines.
+    """
     try:
         log = hook_log_path(path)
         if log.parent.is_symlink() or log.is_symlink():
             return
         log.parent.mkdir(exist_ok=True)
-        with log.open("a") as handle:
-            stamp = datetime.now(timezone.utc).isoformat(timespec="seconds")
-            message = " ".join(str(error).split())
-            handle.write(f"{stamp} {type(error).__name__}: {message}\n")
+        stamp = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        message = " ".join(str(error).split())
+        lines = log.read_text().splitlines() if log.exists() else []
+        lines.append(f"{stamp} {type(error).__name__}: {message}")
+        log.write_text("\n".join(lines[-HOOK_LOG_MAX_LINES:]) + "\n")
     except Exception as log_error:
         logger.warning("could not record coupling guard hook failure: {}", log_error)
 

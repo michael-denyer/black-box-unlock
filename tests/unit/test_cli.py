@@ -541,3 +541,18 @@ class TestOptionBounds:
         mock_analysis.assert_not_called()
         mock_review.assert_not_called()
         mock_xray.assert_not_called()
+
+
+class TestCouplingGuardHookOutsideRepo:
+    def test_edit_outside_the_repository_is_not_a_failure(self, tmp_path):
+        repo = _coupled_repo(tmp_path / "repo")
+        outside = tmp_path / "outside.py"
+        outside.write_text("x = 1\n")
+
+        result = runner.invoke(
+            app, ["coupling-guard-hook", "--repo", str(repo)], input=_hook_payload(outside)
+        )
+
+        assert result.exit_code == 0
+        assert result.stdout == ""
+        assert not (repo / ".git" / "bbu" / "hook.log").exists()

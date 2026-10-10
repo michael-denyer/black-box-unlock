@@ -164,6 +164,8 @@ def coupling_guard_hook(
         absolute_path = (
             candidate.resolve() if candidate.is_absolute() else (repo_root / candidate).resolve()
         )
+        if not absolute_path.is_relative_to(repo_root):
+            return
         file_path = absolute_path.relative_to(repo_root).as_posix()
         warnings = coupling_warnings(file_path, repo_root)
     except Exception as error:

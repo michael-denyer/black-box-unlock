@@ -114,3 +114,27 @@ class TestCIAttributionGitFailure:
         assert result.ci_status.state is SignalState.partial
         assert any("unknown revision" in message for message in messages)
         assert "unknown revision" in result.ci_status.errors[0]
+
+
+class TestGetFilesChangedPaths:
+    def test_non_ascii_paths_are_returned_unquoted(self, tmp_path):
+        from black_box_unlock.cicd.github_actions import get_files_changed
+
+        subprocess.run(["git", "init", str(tmp_path)], check=True, capture_output=True)
+        (tmp_path / "café.py").write_text("x = 1\n")
+        env = {
+            "GIT_AUTHOR_NAME": "a",
+            "GIT_AUTHOR_EMAIL": "a@x",
+            "GIT_COMMITTER_NAME": "a",
+            "GIT_COMMITTER_EMAIL": "a@x",
+            "HOME": str(tmp_path),
+        }
+        subprocess.run(["git", "-C", str(tmp_path), "add", "."], check=True, capture_output=True)
+        subprocess.run(
+            ["git", "-C", str(tmp_path), "commit", "-m", "add"],
+            check=True,
+            capture_output=True,
+            env=env,
+        )
+
+        assert get_files_changed("HEAD", tmp_path) == ["café.py"]

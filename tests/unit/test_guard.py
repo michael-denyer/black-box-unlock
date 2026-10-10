@@ -248,3 +248,33 @@ class TestCouplingWarnings:
     def test_rejects_invalid_limits(self, threshold, top, tmp_path):
         with pytest.raises(ValueError):
             coupling_warnings("src/auth.py", tmp_path, threshold=threshold, top=top)
+
+
+class TestStateDirPerWorktree:
+    def test_linked_worktree_keeps_its_own_cache(self, tmp_path):
+        from black_box_unlock.guard import state_dir
+
+        _commit_coupled_pair(tmp_path)
+        linked = tmp_path.parent / f"{tmp_path.name}-linked"
+        _git(tmp_path, "worktree", "add", str(linked), "-b", "linked")
+
+        assert state_dir(tmp_path) != state_dir(linked)
+        assert state_dir(tmp_path).resolve() == (tmp_path / ".git" / "bbu").resolve()
+        assert (tmp_path / ".git" / "worktrees") in state_dir(linked).resolve().parents
+
+
+class TestHookLogCap:
+    def test_log_is_truncated_to_the_newest_lines(self, tmp_path):
+        from black_box_unlock.guard import HOOK_LOG_MAX_LINES, hook_log_path, record_hook_failure
+
+        _commit_coupled_pair(tmp_path)
+        log = hook_log_path(tmp_path)
+        log.parent.mkdir()
+        log.write_text("".join(f"t{i} RuntimeError: old {i}\n" for i in range(HOOK_LOG_MAX_LINES)))
+
+        record_hook_failure(tmp_path, RuntimeError("newest"))
+
+        lines = log.read_text().splitlines()
+        assert len(lines) == HOOK_LOG_MAX_LINES
+        assert lines[0].endswith("old 1")
+        assert lines[-1].endswith("RuntimeError: newest")

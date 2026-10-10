@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - The coupling guard cache moved from `.bbu/cache.json` in the working tree to
-  `bbu/cache.json` in the git common dir, and the guard refuses to write
+  `bbu/cache.json` in the worktree's git dir, and the guard refuses to write
   through a symlink. A committed `.bbu` symlink could make the edit hook
   overwrite an arbitrary file. You can delete old `.bbu/` directories
 - `bbu review-change --base` reads history only up to the merge base, so the
@@ -20,10 +20,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `HIGH_RISK_AUTHOR_THRESHOLD` instead of a literal 3
 - The edit hook no longer discards stderr. `coupling-guard-hook` finds the
   repository root with git, so it works from subdirectories, and still warns
-  when the cache write fails. Any failure appends a line to
-  `<git-common-dir>/bbu/hook.log`, which `bbu doctor` reports
-- CI attribution runs `git show` through `run_git`, and a failure's git stderr
-  now appears in the CI warning and status errors
+  when the cache write fails. Edits outside the repository are ignored. A
+  failure inside a repository appends a line to `<git-dir>/bbu/hook.log`,
+  capped at 200 lines, which `bbu doctor` reports
+- CI attribution runs `git show` through `run_git`, so non-ASCII paths come
+  back unquoted and match history paths, and a failure's git stderr now
+  appears in the CI warning and status errors
 - `--min-coupling` on `analyze-repo`, `review-change`, and `xray` must be
   between 0 and 1, and `review-change --min-shared-revisions` must be at least
   1. Out-of-range values exit 2 with a usage error instead of a traceback

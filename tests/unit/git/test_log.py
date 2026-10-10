@@ -10,16 +10,107 @@ import pytest
 from black_box_unlock.core.exceptions import GitToolNotFoundError, NotAGitRepoError
 from black_box_unlock.git.log import Commit, CommitFile, _parse_log_output, fetch_git_history
 
-# \x01 marks a commit record; fields are tab-separated: iso-date, email, subject
+# git log -z: \x01 marks a commit record whose header (iso-date, email, subject,
+# tab-separated) ends in a newline; numstat records end in NUL, commits in NUL.
 SAMPLE_LOG = (
     "\x012026-01-20T10:00:00+00:00\talice@example.com\tfeat: add auth\n"
-    "100\t20\tsrc/auth.py\n"
-    "50\t10\tsrc/user.py\n"
-    "\n"
+    "100\t20\tsrc/auth.py\0"
+    "50\t10\tsrc/user.py\0"
+    "\0"
     "\x012026-01-21T10:00:00+00:00\tbob@example.com\tfix: token bug\n"
-    "30\t5\tsrc/auth.py\n"
-    "-\t-\tassets/logo.png\n"
+    "30\t5\tsrc/auth.py\0"
+    "-\t-\tassets/logo.png\0"
 )
+
+
+def _record(day: int, *entries: str) -> str:
+    """One -z commit record; a rename entry is 'added\\tdeleted\\t\\0old\\0new'."""
+    header = f"\x012026-01-{day:02d}T10:00:00+00:00\tdev@example.com\tchange {day}\n"
+    return header + "".join(f"{entry}\0" for entry in entries) + "\0"
+
+
+def _paths(commits: list[Commit]) -> list[list[tuple[str, list[str]]]]:
+    return [[(file.path, file.former_paths) for file in commit.files] for commit in commits]
+
+
+class TestRenameFollowing:
+    def test_older_commits_report_the_renamed_files_current_path(self):
+        """History before a rename lands on the new path, with the old name kept."""
+        log = (
+            _record(3, "1\t1\tsrc/b.py")
+            + _record(2, "0\t0\t\0src/a.py\0src/b.py")
+            + _record(1, "4\t2\tsrc/a.py", "1\t0\tsrc/partner.py")
+        )
+
+        assert _paths(_parse_log_output(log)) == [
+            [("src/b.py", [])],
+            [("src/b.py", ["src/a.py"])],
+            [("src/b.py", ["src/a.py"]), ("src/partner.py", [])],
+        ]
+
+    def test_chained_renames_collapse_to_the_final_path(self):
+        log = (
+            _record(3, "0\t0\t\0b.py\0c.py")
+            + _record(2, "0\t0\t\0a.py\0b.py")
+            + _record(1, "3\t0\ta.py")
+        )
+
+        assert _paths(_parse_log_output(log)) == [
+            [("c.py", ["b.py"])],
+            [("c.py", ["a.py", "b.py"])],
+            [("c.py", ["a.py"])],
+        ]
+
+    def test_a_path_reused_after_a_rename_stays_a_separate_file(self):
+        """A new file created at the old name keeps its own history."""
+        log = (
+            _record(3, "2\t0\told.py")
+            + _record(2, "0\t0\t\0old.py\0new.py")
+            + _record(1, "5\t0\told.py")
+        )
+
+        assert _paths(_parse_log_output(log)) == [
+            [("old.py", [])],
+            [("new.py", ["old.py"])],
+            [("new.py", ["old.py"])],
+        ]
+
+    def test_a_binary_rename_still_redirects_older_history(self):
+        log = _record(2, "-\t-\t\0logo.bin\0art.bin") + _record(1, "1\t0\tlogo.bin")
+
+        assert _paths(_parse_log_output(log)) == [[], [("art.bin", ["logo.bin"])]]
+
+    def test_renames_in_one_commit_resolve_against_the_names_before_it(self):
+        """Shifting a.py to b.py and b.py to c.py in one commit keeps two files apart."""
+        log = _record(3, "0\t0\t\0b.py\0c.py", "0\t0\t\0a.py\0b.py") + _record(
+            2, "1\t1\ta.py", "2\t2\tb.py"
+        )
+
+        assert _paths(_parse_log_output(log))[1] == [("b.py", ["a.py"]), ("c.py", ["b.py"])]
+
+    def test_follows_a_real_git_mv(self, tmp_path):
+        repo = tmp_path / "repo"
+        repo.mkdir()
+
+        def git(*args: str) -> None:
+            subprocess.run(["git", "-C", str(repo), *args], check=True, capture_output=True)
+
+        git("init")
+        git("config", "user.email", "dev@example.com")
+        git("config", "user.name", "Dev")
+        (repo / "old name.py").write_text("value = 1\n")
+        git("add", ".")
+        git("commit", "-m", "add")
+        git("mv", "old name.py", "new name.py")
+        git("commit", "-m", "rename")
+
+        commits = fetch_git_history(repo, days=30)
+
+        assert _paths(commits) == [
+            [("new name.py", ["old name.py"])],
+            [("new name.py", ["old name.py"])],
+        ]
+        assert commits[0].files[0].added_lines == 0
 
 
 class TestParseLogOutput:

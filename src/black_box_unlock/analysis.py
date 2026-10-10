@@ -28,7 +28,7 @@ from .core.models import (
 from .git.churn import parse_history_entries
 from .git.coupling import analyze_temporal_coupling
 from .git.defects import bugfix_counts
-from .git.log import Commit, CommitFile, exclude_bulk, fetch_git_history
+from .git.log import Commit, CommitFile, exclude_bulk, fetch_git_history, merge_commit_files
 from .git.ownership import parse_ownership_from_history
 from .git.run import head_paths, is_shallow
 from .git.xray import xray_file
@@ -39,7 +39,7 @@ def _canonicalize_history_paths(
     commits: list[Commit],
     path_aliases: dict[str, str],
 ) -> list[Commit]:
-    """Combine renamed paths before per-file history is aggregated."""
+    """Apply caller renames on top of the renames git history already followed."""
     if not path_aliases:
         return commits
 
@@ -48,18 +48,34 @@ def _canonicalize_history_paths(
         files_by_path: dict[str, CommitFile] = {}
         for file in commit.files:
             path = path_aliases.get(file.path, file.path)
+            if path != file.path:
+                file = file.model_copy(
+                    update={"path": path, "former_paths": [file.path, *file.former_paths]}
+                )
             existing = files_by_path.get(path)
-            if existing is None:
-                files_by_path[path] = file.model_copy(update={"path": path})
-                continue
-            files_by_path[path] = existing.model_copy(
-                update={
-                    "added_lines": existing.added_lines + file.added_lines,
-                    "deleted_lines": existing.deleted_lines + file.deleted_lines,
-                }
-            )
+            files_by_path[path] = file if existing is None else merge_commit_files(existing, file)
         canonical.append(commit.model_copy(update={"files": list(files_by_path.values())}))
     return canonical
+
+
+def _former_paths_by_path(commits: list[Commit]) -> dict[str, list[str]]:
+    """Collect every earlier name each current path had across the history."""
+    former: dict[str, set[str]] = defaultdict(set)
+    for commit in commits:
+        for file in commit.files:
+            former[file.path].update(file.former_paths)
+    return {path: sorted(names - {path}) for path, names in former.items() if names - {path}}
+
+
+def _rename_aliases(commits: list[Commit], renamed_from: dict[str, list[str]]) -> dict[str, str]:
+    """Map each earlier name to its current path, skipping names a current file still uses."""
+    current_paths = {file.path for commit in commits for file in commit.files}
+    return {
+        name: path
+        for path, names in renamed_from.items()
+        for name in names
+        if name not in current_paths
+    }
 
 
 def _canonicalize_ci_paths(
@@ -128,8 +144,11 @@ def run_analysis(  # [2a] Main analysis pipeline
 ) -> AnalysisResult:
     """Run complete forensic analysis on a repository.
 
-    Complexity is measured from current file contents: files deleted or renamed
-    within the window score 0 and drop from the hotspot ranking.
+    Every path is the file's name at ``rev``: history recorded under an older
+    name within the window follows git's rename detection to the current
+    path, and ``FileForensics.renamed_from`` lists the older names. Complexity
+    is measured from current file contents, so files deleted within the window
+    score 0 and drop from the hotspot ranking.
 
     Bulk commits (more than ``policy.max_changeset_size`` files) are excluded
     from churn, ownership, defects, and coupling. Auto X-Ray reads each file's
@@ -147,7 +166,9 @@ def run_analysis(  # [2a] Main analysis pipeline
         xray_top: Auto X-Ray the top N hotspot files (0 disables).
         policy: Coupling and bulk-commit policy; None reads ``.bbu.toml``.
         ensure_paths: Current paths to include even when they have no history.
-        path_aliases: Historical paths mapped to their current renamed path.
+        path_aliases: Renames git history cannot see yet (a reviewed change's
+            own), mapping a path at ``rev`` to its new path. Applied on top of
+            the renames history already follows.
         rev: Last revision whose history is analyzed (HEAD when None).
 
     Returns:
@@ -155,10 +176,10 @@ def run_analysis(  # [2a] Main analysis pipeline
     """
     policy = policy if policy is not None else resolve_coupling_policy(repo_path)
     aliases = path_aliases or {}
-    history, bulk_commits = exclude_bulk(
-        _canonicalize_history_paths(fetch_git_history(repo_path, days, rev), aliases),
-        policy.max_changeset_size,
-    )
+    full_history = _canonicalize_history_paths(fetch_git_history(repo_path, days, rev), aliases)
+    renamed_from = _former_paths_by_path(full_history)
+    ci_aliases = _rename_aliases(full_history, renamed_from) | aliases
+    history, bulk_commits = exclude_bulk(full_history, policy.max_changeset_size)
     live_paths = (
         head_paths(repo_path, rev or "HEAD") | ensure_paths | frozenset(aliases.values())
         if policy.require_live_partner and history
@@ -170,7 +191,7 @@ def run_analysis(  # [2a] Main analysis pipeline
     )
     if include_ci:
         ci_analysis = collect_ci_signals(repo_path=repo_path, limit=100, days=days)
-        ci_analysis = _canonicalize_ci_paths(ci_analysis, aliases)
+        ci_analysis = _canonicalize_ci_paths(ci_analysis, ci_aliases)
         for error in ci_analysis.status.errors:
             logger.warning("CI data degraded: {}", error)
 
@@ -225,6 +246,7 @@ def run_analysis(  # [2a] Main analysis pipeline
                 coupled_with=coupling_by_file.get(path, []),
                 build_failures=ci_analysis.file_failures.get(path, 0),
                 bugfix_commits=defect_counts.get(path, 0),
+                renamed_from=renamed_from.get(path, []),
             )
         )
 

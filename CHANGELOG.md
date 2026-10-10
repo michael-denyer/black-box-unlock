@@ -76,6 +76,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `confidence_lower_bound` are computed fields and now appear in JSON.
   `CouplingAnalysis.dropped_deleted_partners` replaces its
   `ignored_large_changesets`.
+- History follows renames everywhere, not only in `review-change`.
+  `analyze-repo`, the MCP tools, the edit hook, and X-Ray report a renamed
+  file's earlier commits, bug fixes, owners, and partners under its current
+  path. `FileForensics.renamed_from` lists the older names. Detection uses
+  git's default 50% similarity, and `--find-renames` is not exposed. A path
+  reused after a rename stays a separate file. A rename commit counts once
+  and adds no churn when the content is unchanged, so commit and line counts
+  shift for renamed files. X-Ray runs `git log --follow` instead of
+  `--no-renames`. `CommitFile.former_paths` is new. `ChangedPathIdentity` is
+  removed from `review.py`.
 
 ### Removed
 

@@ -255,35 +255,12 @@ ChangeReviewResult = Annotated[
 _ACTIONABLE_ROLES = frozenset({PathRole.source, PathRole.migration, PathRole.config})
 
 
-@dataclass(frozen=True)
-class ChangedPathIdentity:
-    """Current path and every historical path that represents the same rename."""
-
-    current_path: str
-    historical_paths: tuple[str, ...]
-
-    @classmethod
-    def from_change(cls, change: ChangedPath) -> "ChangedPathIdentity":
-        historical_paths = (change.path,)
-        if change.kind is ChangeKind.renamed and change.previous_path is not None:
-            historical_paths = (change.path, change.previous_path)
-        return cls(current_path=change.path, historical_paths=historical_paths)
-
-
-def _changed_path_identities(change_set: ChangeSet) -> dict[str, ChangedPathIdentity]:
-    identities: dict[str, ChangedPathIdentity] = {}
-    for change in change_set.paths:
-        identity = ChangedPathIdentity.from_change(change)
-        for path in identity.historical_paths:
-            identities[path] = identity
-    return identities
-
-
-def _history_aliases(identities: dict[str, ChangedPathIdentity]) -> dict[str, str]:
+def _change_renames(change_set: ChangeSet) -> dict[str, str]:
+    """Map each rename the change itself makes, which history cannot see yet, to its new path."""
     return {
-        path: identity.current_path
-        for path, identity in identities.items()
-        if path != identity.current_path
+        change.previous_path: change.path
+        for change in change_set.paths
+        if change.kind is ChangeKind.renamed and change.previous_path is not None
     }
 
 
@@ -295,17 +272,6 @@ def _empty_forensics(path: str) -> FileForensics:
         authors=[],
         coupled_with=[],
     )
-
-
-def _forensics_for_change(
-    change: ChangedPath,
-    identities: dict[str, ChangedPathIdentity],
-    by_path: dict[str, FileForensics],
-) -> FileForensics:
-    for path in identities[change.path].historical_paths:
-        if path in by_path:
-            return by_path[path]
-    return _empty_forensics(change.path)
 
 
 def _file_evidence(
@@ -330,26 +296,24 @@ def _coupling_evidence(
     analysis: AnalysisResult,
     parameters: ReviewParameters,
     path_role_rules: tuple[PathRoleRule, ...],
-    identities: dict[str, ChangedPathIdentity],
 ) -> list[CouplingEvidence]:
     """Orient each pair from the changed path and keep partners it usually moves with.
 
-    The analysis already applied the support floor and live-partner rule. The
-    ratio floor applies to the directional rate shared / changed-path revisions.
+    The analysis already applied the support floor and live-partner rule and
+    reports every path under its current name. The ratio floor applies to the
+    directional rate shared / changed-path revisions.
     """
     selected_paths = {change.path for change in change_set.paths}
 
     evidence: dict[tuple[str, str], CouplingEvidence] = {}
     for coupling in analysis.couplings:
-        a_identity = identities.get(coupling.file_a)
-        b_identity = identities.get(coupling.file_b)
-        if a_identity is not None:
-            changed_path = a_identity.current_path
-            coupled_path = b_identity.current_path if b_identity is not None else coupling.file_b
+        if coupling.file_a in selected_paths:
+            changed_path = coupling.file_a
+            coupled_path = coupling.file_b
             changed_revisions = coupling.commits_a
             coupled_revisions = coupling.commits_b
-        elif b_identity is not None:
-            changed_path = b_identity.current_path
+        elif coupling.file_b in selected_paths:
+            changed_path = coupling.file_b
             coupled_path = coupling.file_a
             changed_revisions = coupling.commits_b
             coupled_revisions = coupling.commits_a
@@ -390,13 +354,11 @@ def _coupling_evidence(
 
 def _ci_failure_evidence(
     analysis: AnalysisResult,
-    identities: dict[str, ChangedPathIdentity],
+    selected_paths: set[str],
 ) -> list[CIFailureEvidence]:
     evidence: list[CIFailureEvidence] = []
     for run in analysis.failed_ci_runs:
-        matched_paths = sorted(
-            {identities[path].current_path for path in run.implicated_paths if path in identities}
-        )
+        matched_paths = sorted(set(run.implicated_paths) & selected_paths)
         if not matched_paths:
             continue
         evidence.append(
@@ -430,14 +392,13 @@ def project_change_review(
             ci_status=analysis.ci_status,
         )
 
-    identities = _changed_path_identities(change_set)
     by_path = {file.path: file for file in analysis.files}
     files = [
         ChangedFileReview(
             change=change,
             evidence=_file_evidence(
                 change.path,
-                _forensics_for_change(change, identities, by_path),
+                by_path.get(change.path) or _empty_forensics(change.path),
                 path_role_rules,
             ),
         )
@@ -448,7 +409,6 @@ def project_change_review(
         analysis,
         parameters,
         path_role_rules,
-        identities,
     )
     actions: list[ReviewAction] = []
 
@@ -487,7 +447,11 @@ def project_change_review(
             )
         )
 
-    ci_failures = _ci_failure_evidence(analysis, identities) if parameters.include_ci else []
+    ci_failures = (
+        _ci_failure_evidence(analysis, {change.path for change in change_set.paths})
+        if parameters.include_ci
+        else []
+    )
     if ci_failures:
         actions.append(
             InspectCIFailuresAction(
@@ -571,7 +535,6 @@ def run_change_review(
     current_paths = frozenset(
         change.path for change in change_set.paths if change.kind is not ChangeKind.deleted
     )
-    identities = _changed_path_identities(change_set)
     analysis = run_analysis(
         repo_path,
         days=policy.days,
@@ -579,7 +542,7 @@ def run_change_review(
         xray_top=0,
         policy=policy.coupling,
         ensure_paths=current_paths,
-        path_aliases=_history_aliases(identities),
+        path_aliases=_change_renames(change_set),
         rev=_history_end(change_set.provenance),
     )
     return project_change_review(

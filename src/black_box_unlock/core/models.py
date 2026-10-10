@@ -316,6 +316,8 @@ class FileForensics(BaseModel):  # [4a.3] Combined forensics
     coupled_with: list[CouplingInfo]
     build_failures: int = 0
     bugfix_commits: int = 0
+    renamed_from: list[str] = Field(default_factory=list)
+    """Earlier names whose history within the window is merged into this path."""
     functions: list[FunctionChurn] = Field(default_factory=list)
     xray_skipped: str | None = None
     """Reason X-Ray was not attempted (e.g. "unsupported language"); None otherwise."""

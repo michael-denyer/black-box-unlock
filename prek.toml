@@ -56,11 +56,23 @@ hooks = [{ id = "actionlint" }]
 
 [[repos]]
 repo = "https://github.com/lycheeverse/lychee"
-rev = "lychee-v0.24.2"
+# Pinned to the unreleased upstream fix for lycheeverse/lychee#2292: the hook
+# script in lychee-v0.24.2 inherits GIT_DIR from git in a linked worktree and
+# reads this repository's tags instead of its own, so every commit from a
+# worktree fails with exit 100. A commit rev carries no version, hence
+# LYCHEE_VERSION. Return to a release tag once one newer than 0.24.2 ships.
+rev = "81cb43e138041299105cdeb84c70e66a137fa1bf"
 hooks = [
   {
     id = "lychee",
-    args = ["--no-progress", "--max-retries", "3", "--timeout", "20"],
+    args = [
+      "LYCHEE_VERSION=0.24.2",
+      "--no-progress",
+      "--max-retries",
+      "3",
+      "--timeout",
+      "20"
+    ],
     types = ["markdown"]
   }
 ]

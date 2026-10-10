@@ -18,6 +18,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   unchanged; tool errors are raised as `ToolError` so clients still see the
   message
 
+### Fixed
+
+- The `lychee` prek hook no longer fails with exit 100 on every commit made
+  from a linked git worktree. It is pinned to the upstream fix for
+  lycheeverse/lychee#2292 and still installs lychee 0.24.2
+
 ### Security
 
 - Updated locked PyJWT (2.13.0 to 2.15.1), anyio (4.13.0 to 4.15.1), and

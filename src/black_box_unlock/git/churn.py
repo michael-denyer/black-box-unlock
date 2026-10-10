@@ -1,11 +1,10 @@
 """File churn extraction from git history."""
 
 from collections import defaultdict
-from pathlib import Path
 from typing import Any
 
 from ..core.models import FileChurn
-from .log import Commit, fetch_git_history
+from .log import Commit
 
 
 def parse_history_entries(commits: list[Commit]) -> list[FileChurn]:  # [3a]
@@ -33,13 +32,3 @@ def parse_history_entries(commits: list[Commit]) -> list[FileChurn]:  # [3a]
         )
         for path, stats in file_stats.items()
     ]
-
-
-def extract_file_churn(repo_path: Path, since_days: int = 30) -> list[FileChurn]:  # [3a.1]
-    """Extract file churn metrics from git history.
-
-    Raises:
-        NotAGitRepoError: If repo_path is not a git repository.
-        GitToolNotFoundError: If git is not installed.
-    """
-    return parse_history_entries(fetch_git_history(repo_path, since_days))

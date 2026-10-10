@@ -601,14 +601,6 @@ class TestCouplingGuardHookCommand:
 
 
 class TestDoctorCommand:
-    def test_reports_that_jq_is_not_required(self, tmp_path):
-        (tmp_path / ".git").mkdir()
-
-        result = runner.invoke(app, ["doctor", "--repo", str(tmp_path)])
-
-        assert result.exit_code == 0
-        assert json.loads(result.stdout)["checks"]["jq_required"] is False
-
     def test_reports_the_hook_log_and_its_last_line(self, tmp_path):
         repo = _coupled_repo(tmp_path / "repo")
         log = repo / ".git" / "bbu" / "hook.log"

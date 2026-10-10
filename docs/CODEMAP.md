@@ -57,7 +57,6 @@ Domain logic for extracting forensic signals from git history.
 | ID | Component | Description | File:Line |
 |----|-----------|-------------|-----------|
 | 3a | parse_history_entries | Parse git log dict to FileChurn list | [churn.py:11](../src/black_box_unlock/git/churn.py#L11) |
-| 3a.1 | extract_file_churn | Extract churn from git repo | [churn.py:38](../src/black_box_unlock/git/churn.py#L38) |
 | 3b | analyze_temporal_coupling | Find co-changing files and count ignored bulk changesets | [coupling.py:19](../src/black_box_unlock/git/coupling.py#L19) |
 | 3c | parse_ownership_from_history | Parse authors per file from git log | [ownership.py:9](../src/black_box_unlock/git/ownership.py#L9) |
 

@@ -309,7 +309,6 @@ def doctor(
         "bbu": shutil.which("bbu") is not None,
         "bbu_mcp": shutil.which("bbu-mcp") is not None,
         "gh_optional": shutil.which("gh") is not None,
-        "jq_required": False,
         "config": config is not None,
     }
     print(

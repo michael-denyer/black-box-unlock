@@ -20,11 +20,6 @@ class WorkflowRun(BaseModel):
     run_attempt: int = Field(default=1, ge=1)
 
     @property
-    def is_failure(self) -> bool:
-        """Whether the run contributes build-failure attribution."""
-        return self.failure_conclusion is not None
-
-    @property
     def failure_conclusion(self) -> Literal["failure", "timed_out"] | None:
         """Narrow a raw GitHub conclusion to the two failure variants."""
         if self.conclusion == "failure":

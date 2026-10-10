@@ -77,6 +77,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- Unused code: `extract_file_churn`, `WorkflowRun.is_failure`, the
+  `cache_used` field on each change-review provenance (always false), and the
+  `jq_required` key in `bbu doctor` output (always false).
 - `detect_temporal_coupling` and `DEFAULT_MAX_COUPLED_FILES_PER_COMMIT`.
   Call `analyze_temporal_coupling` with a `CouplingPolicy`.
 - Path roles recognise test naming conventions outside a `tests/` directory:

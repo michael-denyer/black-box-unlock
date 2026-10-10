@@ -31,11 +31,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the step executed. Before, it divided recoveries by attempt observations of
   flaky runs only, so retries inflated it and stable runs never counted. The
   step output gains `runs` and `flaky_runs`. The rate covers only the re-run
-  runs examined, since jobs are fetched only for those
+  runs examined, since jobs are fetched only for those. `total_attempts`,
+  `failures`, `first_seen`, and `last_seen` now include stable re-run runs too
 - `gh api` calls time out after 60 seconds and report the timeout in
   `ci_status.errors`. Workflow runs are fetched across up to 10 pages of 100
-  instead of the first page, and only runs created within the analysis `--days`
-  window count. `get_ci_failures` and `get_flaky_steps` cover the last 30 days
+  instead of the first page, runs repeated across pages count once, a full
+  tenth page marks the result partial, and only runs created within the
+  analysis `--days` window count. `get_ci_failures` and `get_flaky_steps` cover
+  the last 30 days
 - Flaky detection stays within one workflow run, so a failure on one commit
   followed by a pass on another is not flaky
 

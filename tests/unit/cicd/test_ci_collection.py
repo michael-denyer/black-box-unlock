@@ -39,7 +39,7 @@ class TestCollectCISignals:
         mock_jobs,
         tmp_path,
     ):
-        mock_runs.return_value = [_run(1, run_attempt=2)]
+        mock_runs.return_value = ([_run(1, run_attempt=2)], False)
         mock_files.return_value = ["src/a.py"]
         mock_jobs.return_value = []
 
@@ -56,7 +56,7 @@ class TestCollectCISignals:
     @patch("black_box_unlock.cicd.github_actions.get_files_changed")
     @patch("black_box_unlock.cicd.github_actions.fetch_workflow_runs")
     def test_one_bad_run_keeps_successful_attribution(self, mock_runs, mock_files, tmp_path):
-        mock_runs.return_value = [_run(1), _run(2)]
+        mock_runs.return_value = ([_run(1), _run(2)], False)
         mock_files.side_effect = [
             ["src/a.py"],
             subprocess.CalledProcessError(128, ["git", "show"]),
@@ -87,7 +87,7 @@ class TestCollectCISignals:
 
     @patch("black_box_unlock.cicd.github_actions.fetch_workflow_runs")
     def test_days_bounds_the_run_window(self, mock_runs, tmp_path):
-        mock_runs.return_value = []
+        mock_runs.return_value = ([], False)
         before = datetime.now(timezone.utc)
 
         collect_ci_signals(tmp_path, days=30)
@@ -109,7 +109,7 @@ class TestCollectCISignals:
     @patch("black_box_unlock.cicd.github_actions.fetch_jobs_for_run")
     @patch("black_box_unlock.cicd.github_actions.fetch_workflow_runs")
     def test_gh_timeout_on_one_jobs_fetch_is_partial(self, mock_runs, mock_jobs, tmp_path):
-        mock_runs.return_value = [_run(1, conclusion="success", run_attempt=2)]
+        mock_runs.return_value = ([_run(1, conclusion="success", run_attempt=2)], False)
         mock_jobs.side_effect = subprocess.TimeoutExpired(["gh", "api"], 60)
 
         result = collect_ci_signals(tmp_path)
@@ -125,7 +125,7 @@ class TestCollectCISignals:
     ):
         failing_commit = _run(1, conclusion="failure", run_attempt=2)
         fixed_commit = _run(2, conclusion="success", run_attempt=2)
-        mock_runs.return_value = [failing_commit, fixed_commit]
+        mock_runs.return_value = ([failing_commit, fixed_commit], False)
         mock_jobs.side_effect = lambda run_id, repo_path: [
             WorkflowJob.model_validate(
                 {
@@ -149,7 +149,7 @@ class TestCollectCISignals:
 
     @patch("black_box_unlock.cicd.github_actions.fetch_workflow_runs")
     def test_empty_successful_snapshot_is_available(self, mock_runs, tmp_path):
-        mock_runs.return_value = []
+        mock_runs.return_value = ([], False)
 
         result = collect_ci_signals(Path(tmp_path))
 
@@ -165,7 +165,7 @@ class TestCIAttributionGitFailure:
         from black_box_unlock.analysis import run_analysis
 
         subprocess.run(["git", "init", str(tmp_path)], check=True, capture_output=True)
-        mock_runs.return_value = [_run(1)]
+        mock_runs.return_value = ([_run(1)], False)
         messages: list[str] = []
         sink = logger.add(messages.append, level="WARNING")
         try:
@@ -240,3 +240,18 @@ class TestGetFilesChangedMergeCommit:
         merge_sha = _git(tmp_path, "rev-parse", "HEAD")
 
         assert get_files_changed(merge_sha, tmp_path) == ["feature.py"]
+
+
+class TestRunSnapshotTruncation:
+    @patch("black_box_unlock.cicd.github_actions.fetch_jobs_for_run")
+    @patch("black_box_unlock.cicd.github_actions.get_files_changed")
+    @patch("black_box_unlock.cicd.github_actions.fetch_workflow_runs")
+    def test_a_full_last_page_marks_the_result_partial(self, mock_runs, mock_files, mock_jobs):
+        mock_runs.return_value = ([_run(1)], True)
+        mock_files.return_value = []
+        mock_jobs.return_value = []
+
+        analysis = collect_ci_signals(repo_path=Path("."))
+
+        assert analysis.status.state == SignalState.partial
+        assert any("truncated" in error for error in analysis.status.errors)

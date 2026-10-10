@@ -41,7 +41,7 @@ Orchestrates forensic analysis by combining data from multiple sources.
 | ID | Component | Description | File:Line |
 |----|-----------|-------------|-----------|
 | 2a | run_analysis | Main analysis pipeline | [analysis.py:88](../src/black_box_unlock/analysis.py#L88) |
-| 2a.1 | collect_ci_signals | Collect failure and flaky-step data from one typed run snapshot | [github_actions.py:154](../src/black_box_unlock/cicd/github_actions.py#L154) |
+| 2a.1 | collect_ci_signals | Collect failure and flaky-step data from one typed run snapshot | [github_actions.py:217](../src/black_box_unlock/cicd/github_actions.py#L217) |
 | 2b | export_to_json | Serialize result to JSON | [analysis.py:221](../src/black_box_unlock/analysis.py#L221) |
 
 #### Analysis Pipeline [2a]

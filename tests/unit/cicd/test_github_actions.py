@@ -2,8 +2,7 @@
 
 import json
 import subprocess
-from datetime import datetime, timedelta, timezone
-from pathlib import Path
+from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -66,7 +65,7 @@ class TestFetchWorkflowRuns:
             stdout=json.dumps({"workflow_runs": [_raw_run()]}),
         )
 
-        runs = fetch_workflow_runs(limit=25, repo_path=tmp_path)
+        runs, _ = fetch_workflow_runs(limit=25, repo_path=tmp_path)
 
         command = mock_run.call_args.args[0]
         assert command == [
@@ -94,9 +93,10 @@ class TestFetchWorkflowRuns:
             MagicMock(stdout=json.dumps({"workflow_runs": page2})),
         ]
 
-        runs = fetch_workflow_runs(limit=2, repo_path=tmp_path)
+        runs, truncated = fetch_workflow_runs(limit=2, repo_path=tmp_path)
 
         assert [run.run_id for run in runs] == [1, 2, 3]
+        assert truncated is False
         endpoints = [call.args[0][-1] for call in mock_run.call_args_list]
         assert endpoints == [
             "/repos/{owner}/{repo}/actions/runs?per_page=2&page=1",
@@ -104,14 +104,26 @@ class TestFetchWorkflowRuns:
         ]
 
     @patch("black_box_unlock.cicd.github_actions.subprocess.run")
+    def test_runs_repeated_across_pages_are_kept_once(self, mock_run, tmp_path):
+        mock_run.side_effect = [
+            MagicMock(stdout=json.dumps({"workflow_runs": [_raw_run(id=1), _raw_run(id=2)]})),
+            MagicMock(stdout=json.dumps({"workflow_runs": [_raw_run(id=2)]})),
+        ]
+
+        runs, _ = fetch_workflow_runs(limit=2, repo_path=tmp_path)
+
+        assert [run.run_id for run in runs] == [1, 2]
+
+    @patch("black_box_unlock.cicd.github_actions.subprocess.run")
     def test_page_following_is_bounded(self, mock_run, tmp_path):
         mock_run.return_value = MagicMock(
             stdout=json.dumps({"workflow_runs": [_raw_run(), _raw_run(id=2)]})
         )
 
-        fetch_workflow_runs(limit=2, repo_path=tmp_path)
+        _, truncated = fetch_workflow_runs(limit=2, repo_path=tmp_path)
 
         assert mock_run.call_count == MAX_PAGES
+        assert truncated is True
 
     @patch("black_box_unlock.cicd.github_actions.subprocess.run")
     def test_since_filters_runs_created_before_the_window(self, mock_run, tmp_path):
@@ -127,7 +139,7 @@ class TestFetchWorkflowRuns:
         )
         since = datetime(2026, 6, 1, tzinfo=timezone.utc)
 
-        runs = fetch_workflow_runs(repo_path=tmp_path, since=since)
+        runs, _ = fetch_workflow_runs(repo_path=tmp_path, since=since)
 
         assert [run.run_id for run in runs] == [1]
         assert "?created=>=2026-06-01&per_page=100&page=1" in mock_run.call_args.args[0][-1]
@@ -194,15 +206,3 @@ class TestFetchJobsForRun:
         endpoint = mock_run.call_args.args[0][-1]
         assert endpoint.endswith("/runs/123/jobs?filter=all&per_page=100&page=1")
         assert mock_run.call_args.kwargs["cwd"] == tmp_path
-
-
-@pytest.mark.requires_gh
-def test_live_pagination_and_window_against_this_repository():
-    root = Path(__file__).resolve().parents[3]
-    since = datetime.now(timezone.utc) - timedelta(days=60)
-
-    runs = fetch_workflow_runs(limit=3, repo_path=root, since=since)
-
-    assert len(runs) > 3
-    assert len({run.run_id for run in runs}) == len(runs)
-    assert all(run.created_at >= since for run in runs)

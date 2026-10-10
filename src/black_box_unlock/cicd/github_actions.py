@@ -15,11 +15,15 @@ GH_TIMEOUT_SECONDS = 60
 MAX_PAGES = 10
 
 
-def _gh_api_pages(endpoint: str, key: str, per_page: int, repo_path: Path) -> list[dict]:
+def _gh_api_pages(
+    endpoint: str, key: str, per_page: int, repo_path: Path
+) -> tuple[list[dict], bool]:
     """Collect list items from consecutive gh api pages, bounded by MAX_PAGES.
 
-    Stops at the first short page. Each call is bounded by GH_TIMEOUT_SECONDS
-    and raises subprocess.TimeoutExpired when gh hangs.
+    Stops at the first short page. The flag is True when the last page fetched
+    was still full, meaning items beyond MAX_PAGES were left behind. Each call
+    is bounded by GH_TIMEOUT_SECONDS and raises subprocess.TimeoutExpired when
+    gh hangs.
     """
     separator = "&" if "?" in endpoint else "?"
     items: list[dict] = []
@@ -36,8 +40,8 @@ def _gh_api_pages(endpoint: str, key: str, per_page: int, repo_path: Path) -> li
         batch = json.loads(result.stdout)[key]
         items.extend(batch)
         if len(batch) < per_page:
-            break
-    return items
+            return items, False
+    return items, True
 
 
 def parse_workflow_runs(gh_json: list[dict]) -> list[WorkflowRun]:
@@ -58,17 +62,27 @@ def parse_workflow_runs(gh_json: list[dict]) -> list[WorkflowRun]:
 
 def fetch_workflow_runs(
     limit: int = 100, repo_path: Path = Path("."), since: datetime | None = None
-) -> list[WorkflowRun]:
+) -> tuple[list[WorkflowRun], bool]:
     """Fetch typed workflow runs through the GitHub REST API, following pages.
 
     limit is the page size. since drops runs created before it, on the server
-    by date and again here by exact timestamp.
+    by date and again here by exact timestamp. Runs sharing a created_at can
+    shift between pages, so a run seen twice is kept once; a run that shifted
+    out of view is lost. The flag is True when MAX_PAGES was reached with a
+    full page, so older runs were not fetched.
     """
     endpoint = "/repos/{owner}/{repo}/actions/runs"
     if since is not None:
         endpoint += f"?created=>={since.astimezone(timezone.utc).date().isoformat()}"
-    runs = parse_workflow_runs(_gh_api_pages(endpoint, "workflow_runs", limit, repo_path))
-    return [run for run in runs if since is None or run.created_at >= since]
+    items, truncated = _gh_api_pages(endpoint, "workflow_runs", limit, repo_path)
+    seen: set[int] = set()
+    runs = []
+    for run in parse_workflow_runs(items):
+        if run.run_id in seen or (since is not None and run.created_at < since):
+            continue
+        seen.add(run.run_id)
+        runs.append(run)
+    return runs, truncated
 
 
 def get_files_changed(commit_sha: str, repo_path: Path = Path(".")) -> list[str]:
@@ -76,6 +90,7 @@ def get_files_changed(commit_sha: str, repo_path: Path = Path(".")) -> list[str]
 
     A merge commit lists the files it brought in relative to its first parent,
     so a CI failure on a merge or merge-queue commit still implicates paths.
+    For a "merge main into feature" commit that is everything main brought in.
     """
     output = run_git(
         repo_path, ["show", "--name-only", "--format=", "-m", "--first-parent", commit_sha]
@@ -86,9 +101,8 @@ def get_files_changed(commit_sha: str, repo_path: Path = Path(".")) -> list[str]
 def fetch_jobs_for_run(run_id: int, repo_path: Path = Path(".")) -> list[WorkflowJob]:
     """Fetch all jobs and retry attempts for one workflow run, following pages."""
     endpoint = f"/repos/{{owner}}/{{repo}}/actions/runs/{run_id}/jobs?filter=all"
-    return [
-        WorkflowJob.model_validate(item) for item in _gh_api_pages(endpoint, "jobs", 100, repo_path)
-    ]
+    items, _ = _gh_api_pages(endpoint, "jobs", 100, repo_path)
+    return [WorkflowJob.model_validate(item) for item in items]
 
 
 @dataclass
@@ -212,7 +226,7 @@ def collect_ci_signals(
     """
     try:
         since = datetime.now(timezone.utc) - timedelta(days=days) if days is not None else None
-        runs = fetch_workflow_runs(limit=limit, repo_path=repo_path, since=since)
+        runs, truncated = fetch_workflow_runs(limit=limit, repo_path=repo_path, since=since)
     except Exception as error:
         return CIAnalysis(
             status=SignalStatus(
@@ -225,6 +239,8 @@ def collect_ci_signals(
     failed_runs: list[FailedWorkflowRun] = []
     flaky_observations: list[FlakyStep] = []
     errors: list[str] = []
+    if truncated:
+        errors.append(f"run list truncated at {MAX_PAGES * limit} runs; older runs not examined")
     for run in runs:
         failure_conclusion = run.failure_conclusion
         if failure_conclusion is not None:

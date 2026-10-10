@@ -106,3 +106,19 @@ class TestCutoffUniverse:
 
         assert report.methods["hotspot"].top_files == ["hot.py"]
         assert len(report.cutoff_sha) == 40
+
+
+class TestOneClock:
+    def test_rebased_fix_lands_on_the_committer_date_side(self, scratch: ScratchRepo):
+        # Authored before the cutoff, committed (rebased) after it. The committer
+        # clock orders history, so the fix belongs to the test half.
+        _seed_train_half(scratch)
+        scratch.commit(
+            "fix: crash", {"hot.py": INDENTED + "Z = 5\n"}, days_ago=10, author_days_ago=85
+        )
+
+        report = validate_repo(scratch.path, days=100, split=0.5)
+
+        assert report.clock == "committer"
+        assert report.test_bugfix_commits == 1
+        assert report.methods["hotspot"].top_decile_share == pytest.approx(1.0)

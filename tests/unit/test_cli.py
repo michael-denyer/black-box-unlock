@@ -23,6 +23,7 @@ def _validation_result(repo: str = "demo", spearman: float | None = 0.62) -> Val
         split=0.5,
         cutoff=datetime(2025, 6, 12, tzinfo=timezone.utc),
         cutoff_sha="0123456789abcdef0123456789abcdef01234567",
+        clock="committer",
         universe_size=120,
         train_commits=300,
         test_commits=280,

@@ -16,10 +16,13 @@ from .complexity import indentation_complexity_text
 from .core.exceptions import InsufficientHistoryError
 from .git.churn import parse_history_entries
 from .git.defects import bugfix_counts, is_bugfix_message
-from .git.log import Commit, fetch_git_history
+from .git.log import Clock, Commit, fetch_git_history
 from .git.run import run_git
 
 TOP_DECILE = 0.10
+# The committer date orders history and is what `git log --since` filters on,
+# so the window, the split, and the cutoff commit all read the same clock.
+CLOCK: Clock = "committer"
 
 
 class MethodScore(BaseModel):
@@ -38,6 +41,7 @@ class ValidationReport(BaseModel):
     split: float
     cutoff: datetime
     cutoff_sha: str
+    clock: Clock
     universe_size: int
     train_commits: int
     test_commits: int
@@ -211,7 +215,7 @@ def validate_repo(repo_path: Path, days: int = 730, split: float = 0.5) -> Valid
         InsufficientHistoryError: If either half contains no commits, or no
             train-half file exists in the cutoff tree.
     """
-    history = fetch_git_history(repo_path, days)
+    history = fetch_git_history(repo_path, days, clock=CLOCK)
     cutoff = datetime.now(timezone.utc) - timedelta(days=days * (1 - split))
     train, test = split_history(history, cutoff)
     cutoff_sha = _cutoff_commit(repo_path, cutoff)
@@ -238,6 +242,7 @@ def validate_repo(repo_path: Path, days: int = 730, split: float = 0.5) -> Valid
         split=split,
         cutoff=cutoff,
         cutoff_sha=cutoff_sha,
+        clock=CLOCK,
         universe_size=len(universe),
         train_commits=len(train),
         test_commits=len(test),

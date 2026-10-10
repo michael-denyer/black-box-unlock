@@ -12,6 +12,26 @@ from ..core.exceptions import GitToolNotFoundError, NotAGitRepoError
 _UNBORN_HEAD_MARKERS = ("does not have any commits", "bad default revision")
 
 
+def repo_toplevel(path: Path) -> Path:
+    """Return the working-tree root that contains path, asking git rather than looking for .git.
+
+    Works from subdirectories and linked worktrees, where run_git's
+    ``.git`` check does not hold.
+
+    Raises:
+        NotAGitRepoError: If path is not inside a git working tree.
+        GitToolNotFoundError: If the git binary is not installed.
+    """
+    cmd = ["git", "-C", str(path), "rev-parse", "--show-toplevel"]
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+    except FileNotFoundError as e:
+        raise GitToolNotFoundError("git not found on PATH") from e
+    except subprocess.CalledProcessError as e:
+        raise NotAGitRepoError(f"Not a git repository: {path}: {e.stderr.strip()}") from e
+    return Path(result.stdout.strip())
+
+
 def run_git(
     repo_path: Path,
     args: list[str],

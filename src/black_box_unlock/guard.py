@@ -21,9 +21,10 @@ from .core.exceptions import BlackBoxUnlockError
 from .core.models import CouplingInfo, coupling_info_for, coupling_info_sort_key
 from .git.coupling import analyze_temporal_coupling
 from .git.log import fetch_git_history
-from .git.run import run_git
+from .git.run import repo_toplevel, run_git
 
 CACHE_FILENAME = "cache.json"
+HOOK_LOG_FILENAME = "hook.log"
 CACHE_MAX_AGE_HOURS = 24
 CACHE_VERSION = 2
 CACHE_HISTORY_DAYS = 90
@@ -47,6 +48,26 @@ def state_dir(repo_path: Path) -> Path:
     """
     common_dir = Path(run_git(repo_path, ["rev-parse", "--git-common-dir"]).strip())
     return repo_path / common_dir / "bbu"
+
+
+def hook_log_path(path: Path) -> Path:
+    """Return the edit hook's failure log for the repository containing path."""
+    return state_dir(repo_toplevel(path)) / HOOK_LOG_FILENAME
+
+
+def record_hook_failure(path: Path, error: Exception) -> None:
+    """Append a timestamped line for a failure the edit hook swallowed. Never raises."""
+    try:
+        log = hook_log_path(path)
+        if log.parent.is_symlink() or log.is_symlink():
+            return
+        log.parent.mkdir(exist_ok=True)
+        with log.open("a") as handle:
+            stamp = datetime.now(timezone.utc).isoformat(timespec="seconds")
+            message = " ".join(str(error).split())
+            handle.write(f"{stamp} {type(error).__name__}: {message}\n")
+    except Exception as log_error:
+        logger.warning("could not record coupling guard hook failure: {}", log_error)
 
 
 def _head_oid(repo_path: Path) -> str:
@@ -120,7 +141,10 @@ def _load_or_build_cache(repo_path: Path) -> CouplingSnapshot:
     if snapshot is not None:
         return snapshot
     snapshot = _build_snapshot(repo_path, head_oid)
-    _write_snapshot(cache, snapshot)
+    try:
+        _write_snapshot(cache, snapshot)
+    except OSError as error:
+        logger.warning("could not write coupling cache at {}: {}", cache, error)
     return snapshot
 
 

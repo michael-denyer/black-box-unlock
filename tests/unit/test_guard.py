@@ -104,6 +104,21 @@ class TestCacheSymlinkSafety:
         assert list(victim_dir.iterdir()) == []
 
 
+class TestCacheWriteFailure:
+    def test_unwritable_state_dir_still_returns_warnings(self, tmp_path):
+        _commit_coupled_pair(tmp_path)
+        state = _cache_file(tmp_path).parent
+        state.mkdir()
+        state.chmod(0o500)
+        try:
+            warnings = coupling_warnings("a.py", tmp_path)
+        finally:
+            state.chmod(0o700)
+
+        assert "b.py" in warnings[0]
+        assert not _cache_file(tmp_path).exists()
+
+
 class TestCouplingWarnings:
     def test_warns_above_threshold_only(self, tmp_path):
         _write_cache(tmp_path, _cache_payload())

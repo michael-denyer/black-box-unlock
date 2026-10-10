@@ -92,10 +92,15 @@ def _compile_path_glob(pattern: str) -> re.Pattern[str]:
 
 
 _TEST_SEGMENTS = frozenset({"test", "tests", "spec", "specs", "__tests__"})
-_DOC_SEGMENTS = frozenset({"doc", "docs", "documentation"})
+_TOP_LEVEL_DOC_DIRS = frozenset({"doc", "docs", "documentation"})
 _MIGRATION_SEGMENTS = frozenset({"migration", "migrations"})
 _GENERATED_SEGMENTS = frozenset({"generated", "vendor", "node_modules"})
-_CONFIG_SEGMENTS = frozenset({"config", "hooks", ".claude-plugin", ".github"})
+_TOP_LEVEL_CONFIG_DIRS = frozenset({"config", "hooks", ".githooks", ".claude-plugin", ".github"})
+_TEST_NAMES = frozenset({"conftest.py"})
+_TEST_NAME_PATTERN = re.compile(r".*[_.](?:test|tests|spec)\.[^.]+")
+_TEST_CLASS_PATTERN = re.compile(
+    r".+(?:Test|Tests)\.(?:java|kt|scala|cs|php|swift)|.+Spec\.(?:scala|kt|swift)"
+)
 _DOC_SUFFIXES = frozenset({".md", ".mdx", ".rst", ".adoc"})
 _CONFIG_SUFFIXES = frozenset({".toml", ".yaml", ".yml", ".ini", ".cfg"})
 _SOURCE_SUFFIXES = frozenset(
@@ -140,11 +145,18 @@ def classify_path_role(
     candidate = PurePosixPath(path)
     lowered_parts = {part.lower() for part in candidate.parts}
     name = candidate.name.lower()
+    top_level_dir = candidate.parts[0].lower() if len(candidate.parts) > 1 else ""
     suffix = candidate.suffix.lower()
 
-    if lowered_parts & _TEST_SEGMENTS or name.startswith(("test_", "test.", "spec_")):
+    if (
+        lowered_parts & _TEST_SEGMENTS
+        or name.startswith(("test_", "test.", "spec_"))
+        or name in _TEST_NAMES
+        or _TEST_NAME_PATTERN.fullmatch(name)
+        or _TEST_CLASS_PATTERN.fullmatch(candidate.name)
+    ):
         return PathRoleClassification(role=PathRole.test, rule="test-path")
-    if lowered_parts & _DOC_SEGMENTS or suffix in _DOC_SUFFIXES:
+    if top_level_dir in _TOP_LEVEL_DOC_DIRS or suffix in _DOC_SUFFIXES:
         return PathRoleClassification(role=PathRole.docs, rule="docs-path")
     if lowered_parts & _MIGRATION_SEGMENTS:
         return PathRoleClassification(role=PathRole.migration, rule="migration-path")
@@ -155,7 +167,7 @@ def classify_path_role(
     ):
         return PathRoleClassification(role=PathRole.generated, rule="generated-path")
     if (
-        lowered_parts & _CONFIG_SEGMENTS
+        top_level_dir in _TOP_LEVEL_CONFIG_DIRS
         or suffix in _CONFIG_SUFFIXES
         or name in {"dockerfile", "makefile", "pyproject.toml", "package.json"}
     ):

@@ -70,3 +70,65 @@ def test_product_assets_are_source_files(path):
 def test_invalid_or_unsupported_patterns_fail_at_the_config_boundary(pattern):
     with pytest.raises(ValidationError):
         PathRoleRule(pattern=pattern, role=PathRole.source)
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "pkg/foo_test.go",
+        "web/Foo.test.tsx",
+        "web/foo.spec.ts",
+        "web/foo.spec.js",
+        "web/foo.test.js",
+        "src/main/FooTest.java",
+        "src/main/FooTests.kt",
+        "src/FooSpec.scala",
+        "src/FooTests.cs",
+        "lib/foo_test.py",
+        "lib/test_foo.py",
+        "lib/conftest.py",
+        "conftest.py",
+        "app/foo_spec.rb",
+        "src/foo_test.rs",
+        "web/__tests__/foo.js",
+        "src/test/java/Foo.java",
+    ],
+)
+def test_test_conventions_outside_a_tests_directory_are_test(path):
+    assert classify_path_role(path).role is PathRole.test
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "src/contest.py",
+        "src/latest.py",
+        "src/protest/runner.py",
+        "src/Latest.java",
+        "src/Contest.java",
+        "src/attest.go",
+        "src/testing.py",
+    ],
+)
+def test_names_that_merely_contain_test_are_not_test(path):
+    assert classify_path_role(path).role is not PathRole.test
+
+
+@pytest.mark.parametrize(
+    ("path", "role"),
+    [
+        ("src/hooks/useThing.ts", PathRole.source),
+        ("web/src/hooks/useThing.tsx", PathRole.source),
+        ("hooks/guard.sh", PathRole.config),
+        (".githooks/pre-commit", PathRole.config),
+        (".github/workflows/ci.yml", PathRole.config),
+        ("packages/app/.github/note.txt", PathRole.other),
+        ("docs/guide.html", PathRole.docs),
+        ("src/docs/render.py", PathRole.source),
+        ("src/config/loader.py", PathRole.source),
+        ("config/settings.py", PathRole.config),
+        (".claude-plugin/plugin.json", PathRole.config),
+    ],
+)
+def test_directory_rules_apply_only_at_the_repository_root(path, role):
+    assert classify_path_role(path).role is role

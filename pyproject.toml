@@ -8,7 +8,15 @@ requires-python = ">=3.10"
 authors = [
     { name = "Michael Denyer", email = "michael@denyer.dev" }
 ]
-keywords = ["code-forensics", "git-analysis", "technical-debt", "hotspots"]
+keywords = [
+    "code-forensics",
+    "git-analysis",
+    "technical-debt",
+    "hotspots",
+    "code-review",
+    "code-insights",
+    "clean-code",
+]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Environment :: Console",

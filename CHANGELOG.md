@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- A shallow clone says so. `provenance.warnings` names the truncated history,
+  and `analyze-repo` and `review-change` print the same line to stderr. Counts
+  from a shallow clone are lower bounds.
 - Ownership now says who owns a file, not only how many people touched it.
   `FileOwnership` and `FileForensics` gain `main_author`,
   `main_author_share` (the main author's commits over non-bot commits), and

@@ -470,6 +470,7 @@ class Provenance(BaseModel):
     shallow_clone: bool
     bbu_version: str
     cached: bool = False
+    warnings: list[str] = Field(default_factory=list)
 
 
 class AnalysisResult(BaseModel):  # [4a.4] Complete analysis output

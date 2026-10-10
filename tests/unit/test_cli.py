@@ -150,7 +150,10 @@ class TestAnalyzeRepoCommand:
         from black_box_unlock.core.models import CouplingPolicy
 
         (tmp_path / ".bbu.toml").write_text("[coupling]\nrequire_live_partner = false\n")
-        with patch("black_box_unlock.cli.run_analysis") as mock_analysis:
+        with (
+            patch("black_box_unlock.cli.run_analysis") as mock_analysis,
+            patch("black_box_unlock.cli.is_shallow", return_value=False),
+        ):
             mock_analysis.return_value = MagicMock()
             with patch("black_box_unlock.cli.export_to_json", return_value="{}"):
                 result = runner.invoke(
@@ -440,7 +443,10 @@ include_ci = true
 """.strip()
             + "\n"
         )
-        with patch("black_box_unlock.cli.run_change_review") as mock_review:
+        with (
+            patch("black_box_unlock.cli.run_change_review") as mock_review,
+            patch("black_box_unlock.cli.is_shallow", return_value=False),
+        ):
             mock_review.return_value.model_dump.return_value = {"kind": "no_changes"}
             result = runner.invoke(
                 app,

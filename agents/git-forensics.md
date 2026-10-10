@@ -12,7 +12,7 @@ Always get your data from the bbu tool - never hand-roll git statistics:
   `--working-tree`; add `--profile NAME` for project policy
 - MCP tools (if the black-box-unlock server is connected): get_hotspots,
   get_file_forensics, get_coupled_files, get_ownership, get_ci_failures,
-  get_flaky_steps, review_change.
+  get_flaky_steps, xray_file, review_change.
 
 Interpretation rules:
 - hotspot_score = commits x indentation complexity. High score = unstable

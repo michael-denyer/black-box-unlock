@@ -11,22 +11,27 @@ from typer.testing import CliRunner
 
 from black_box_unlock.cli import app
 from black_box_unlock.core.exceptions import InsufficientHistoryError
-from black_box_unlock.validation import ValidationResult
+from black_box_unlock.validation import MethodScore, ValidationReport
 
 runner = CliRunner()
 
 
-def _validation_result(repo: str = "demo", spearman: float | None = 0.62) -> ValidationResult:
-    return ValidationResult(
+def _validation_result(repo: str = "demo", spearman: float | None = 0.62) -> ValidationReport:
+    return ValidationReport(
         repo=repo,
         days=730,
         split=0.5,
         cutoff=datetime(2025, 6, 12, tzinfo=timezone.utc),
-        file_count=120,
-        spearman=spearman,
-        top_decile_share=0.45,
-        bugfix_coverage=0.88,
+        cutoff_sha="0123456789abcdef0123456789abcdef01234567",
+        universe_size=120,
+        train_commits=300,
+        test_commits=280,
+        test_bugfix_commits=90,
         test_bugfix_touches=200,
+        bugfix_coverage=0.88,
+        methods={
+            "hotspot": MethodScore(spearman=spearman, top_decile_share=0.45, top_files=["a.py"])
+        },
     )
 
 
@@ -176,7 +181,7 @@ class TestValidateCommand:
             result = runner.invoke(app, ["validate", "--repo", ".", "--json"])
         assert result.exit_code == 0
         parsed = json.loads(result.stdout)
-        assert parsed[0]["spearman"] == 0.62
+        assert parsed[0]["methods"]["hotspot"]["spearman"] == 0.62
 
     def test_median_rho_for_multiple_repos(self):
         results = [

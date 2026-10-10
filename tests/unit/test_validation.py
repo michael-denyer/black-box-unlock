@@ -1,21 +1,12 @@
 """Unit tests for hotspot-vs-bugfix self-validation."""
 
-from datetime import datetime, timezone
-
 import pytest
 
-from black_box_unlock.git.log import Commit
 from black_box_unlock.validation import (
     permutation_p,
     score_ranking,
     spearman_rho,
-    split_history,
 )
-from tests.factories import make_commit
-
-
-def _entry(timestamp: str, message: str = "feat: x", paths: list[str] | None = None) -> Commit:
-    return make_commit(paths or ["a.py"], timestamp=timestamp, message=message)
 
 
 class TestSpearmanRho:
@@ -39,37 +30,6 @@ class TestSpearmanRho:
 
     def test_fewer_than_two_points_returns_none(self):
         assert spearman_rho([1], [2]) is None
-
-
-class TestSplitHistory:
-    CUTOFF = datetime(2026, 3, 1, tzinfo=timezone.utc)
-
-    def test_partitions_entries_at_cutoff(self):
-        history = [
-            _entry("2026-05-01T10:00:00+00:00"),
-            _entry("2026-01-01T10:00:00+00:00"),
-        ]
-        train, test = split_history(history, self.CUTOFF)
-        assert [c.timestamp for c in train] == [datetime(2026, 1, 1, 10, 0, tzinfo=timezone.utc)]
-        assert [c.timestamp for c in test] == [datetime(2026, 5, 1, 10, 0, tzinfo=timezone.utc)]
-
-    def test_entry_exactly_at_cutoff_goes_to_test(self):
-        history = [_entry("2026-03-01T00:00:00+00:00")]
-        train, test = split_history(history, self.CUTOFF)
-        assert train == []
-        assert len(test) == 1
-
-    def test_zulu_suffix_timestamps_parse(self):
-        # git %aI emits +00:00 offsets but fixtures and other tools use Z
-        history = [_entry("2026-01-01T10:00:00Z")]
-        train, test = split_history(history, self.CUTOFF)
-        assert len(train) == 1
-        assert test == []
-
-    def test_empty_history(self):
-        train, test = split_history([], self.CUTOFF)
-        assert train == []
-        assert test == []
 
 
 class TestPermutationP:

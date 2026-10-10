@@ -83,19 +83,6 @@ class CutoffFile(BaseModel):
     lines: int
 
 
-def split_history(commits: list[Commit], cutoff: datetime) -> tuple[list[Commit], list[Commit]]:
-    """Partition commits into (train, test) halves at the cutoff.
-
-    Commits strictly before the cutoff form the train half; the rest form
-    the test half.
-    """
-    train: list[Commit] = []
-    test: list[Commit] = []
-    for commit in commits:
-        (train if commit.timestamp < cutoff else test).append(commit)
-    return train, test
-
-
 def _average_ranks(values: list[float]) -> list[float]:
     """1-based ranks, ties receive the average of their positions."""
     order = sorted(range(len(values)), key=lambda i: values[i])
@@ -306,20 +293,27 @@ def validate_repo(repo_path: Path, days: int = 730, split: float = 0.5) -> Valid
     indentation complexity at the cutoff, the shipped formula) and scores it
     against bug-fix commits after the cutoff.
 
+    The halves are split by ancestry, not by timestamp: train is every
+    windowed commit reachable from the cutoff commit, test is everything
+    reachable from HEAD but not from the cutoff commit. A side-branch commit
+    merged after the cutoff is therefore test, matching the cutoff tree.
+
     Raises:
         InsufficientHistoryError: If either half contains no commits, or no
             train-half file exists in the cutoff tree.
     """
-    history = fetch_git_history(repo_path, days, clock=CLOCK)
     cutoff = datetime.now(timezone.utc) - timedelta(days=days * (1 - split))
-    train, test = split_history(history, cutoff)
     cutoff_sha = _cutoff_commit(repo_path, cutoff)
-    if not train or not test or cutoff_sha is None:
-        raise InsufficientHistoryError(
-            f"Need commits on both sides of {cutoff:%Y-%m-%d} "
-            f"(train: {len(train)}, test: {len(test)}); "
-            "adjust --days/--split so the cutoff falls inside the repo's history"
-        )
+    no_history = (
+        f"Need commits on both sides of {cutoff:%Y-%m-%d}; "
+        "adjust --days/--split so the cutoff falls inside the repo's history"
+    )
+    if cutoff_sha is None:
+        raise InsufficientHistoryError(no_history)
+    train = fetch_git_history(repo_path, days, cutoff_sha, clock=CLOCK)
+    test = fetch_git_history(repo_path, days, f"{cutoff_sha}..HEAD", clock=CLOCK)
+    if not train or not test:
+        raise InsufficientHistoryError(f"{no_history} (train: {len(train)}, test: {len(test)})")
 
     universe = cutoff_universe(repo_path, cutoff_sha, train)
     if not universe:

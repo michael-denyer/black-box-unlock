@@ -47,7 +47,8 @@ def fetch_git_history(
 ) -> list[Commit]:
     """Fetch commit history with per-file line stats as typed Commit models.
 
-    History ends at rev when given, otherwise at HEAD.
+    History ends at rev when given, otherwise at HEAD. A range such as
+    `a..b` is accepted as rev.
 
     `--since` always filters on committer date. `clock` picks which date each
     Commit's timestamp records: author (the default, what the forensics show)

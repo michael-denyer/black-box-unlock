@@ -76,6 +76,16 @@ class TestFetchGitHistory:
         assert "--numstat" in cmd
         assert len(commits) == 2
 
+    @patch("black_box_unlock.git.run.subprocess.run")
+    def test_rev_ends_history_at_that_revision(self, mock_run, tmp_path):
+        (tmp_path / ".git").mkdir()
+        mock_run.return_value.stdout = SAMPLE_LOG
+
+        fetch_git_history(tmp_path, days=45, rev="abc123..HEAD")
+
+        cmd = mock_run.call_args[0][0]
+        assert cmd[-1] == "abc123..HEAD"
+
     def test_unicode_paths_are_preserved(self, tmp_path):
         """Git core.quotePath=true would mangle non-ASCII paths; we must pass -c core.quotePath=false."""
         git_env = {

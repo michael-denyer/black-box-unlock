@@ -124,6 +124,27 @@ class TestCutoffUniverse:
         assert len(report.cutoff_sha) == 40
 
 
+class TestAncestrySplit:
+    def test_side_branch_commit_merged_after_the_cutoff_is_test_half(self, scratch: ScratchRepo):
+        # The fix is committed before the cutoff date but is not an ancestor of
+        # the cutoff commit, so the cutoff tree never saw it: it belongs to the
+        # test half, and x.py is not in the universe.
+        scratch.commit("init", {"a.py": INDENTED}, days_ago=300)
+        scratch.branch("side")
+        scratch.commit("fix: x crash", {"x.py": FLAT}, days_ago=250)
+        scratch.switch("main")
+        scratch.commit("tweak a", {"a.py": INDENTED + "Z = 1\n"}, days_ago=220)
+        scratch.merge("side", "Merge branch 'side'", days_ago=100)
+
+        report = validate_repo(scratch.path, days=400, split=0.5)
+
+        assert report.train_commits == 2
+        assert report.test_commits == 2
+        assert report.test_bugfix_commits == 1
+        assert report.methods["churn"].top_files == ["a.py"]
+        assert report.universe_size == 1
+
+
 class TestOneClock:
     def test_rebased_fix_lands_on_the_committer_date_side(self, scratch: ScratchRepo):
         # Authored before the cutoff, committed (rebased) after it. The committer

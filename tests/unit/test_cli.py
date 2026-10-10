@@ -505,7 +505,7 @@ def test_review_change_announces_omitted_actions_on_stderr(tmp_path, omitted, an
         result = runner.invoke(app, ["review-change", "--repo", str(tmp_path)])
 
     assert result.exit_code == 0, result.stderr
-    assert ("1 more actions omitted (max_actions=3)" in result.stderr) is announced
+    assert ("1 more action(s) omitted (max_actions=3)" in result.stderr) is announced
 
 
 def _git(repo, *args: str) -> None:

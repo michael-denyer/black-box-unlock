@@ -1,5 +1,6 @@
 """Shallow clones report truncated history in provenance and on stderr."""
 
+import json
 import os
 import subprocess
 from pathlib import Path
@@ -92,3 +93,19 @@ def test_review_change_is_silent_for_a_full_clone(full_clone):
 
     assert result.exit_code == 0, result.stderr
     assert SHALLOW_CLONE_WARNING not in result.stderr
+
+
+def test_review_change_json_carries_the_warning_for_a_shallow_clone(shallow_clone):
+    (shallow_clone / "main.py").write_text("print('changed')\n")
+    result = runner.invoke(app, ["review-change", "--repo", str(shallow_clone)])
+
+    assert result.exit_code == 0, result.stderr
+    assert json.loads(result.stdout)["warnings"] == [SHALLOW_CLONE_WARNING]
+
+
+def test_review_change_json_has_no_warning_for_a_full_clone(full_clone):
+    (full_clone / "main.py").write_text("print('changed')\n")
+    result = runner.invoke(app, ["review-change", "--repo", str(full_clone)])
+
+    assert result.exit_code == 0, result.stderr
+    assert json.loads(result.stdout)["warnings"] == []

@@ -9,9 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- A shallow clone says so. `provenance.warnings` names the truncated history,
-  and `analyze-repo` and `review-change` print the same line to stderr. Counts
-  from a shallow clone are lower bounds.
+- A shallow clone says so. MCP tool results carry `provenance.warnings`, the
+  `review_change` tool and `review-change` JSON carry `warnings`, and
+  `analyze-repo` and `review-change` print the same line to stderr (the CLI
+  `analyze-repo` JSON leaves `provenance` null). Counts from a shallow clone
+  are lower bounds.
 - Review reports `omitted_actions`, the number of candidate actions that
   `max_actions` cut. `review-change` prints `N more actions omitted
   (max_actions=M)` to stderr when the count is non-zero. Before, a dropped

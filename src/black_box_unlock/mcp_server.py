@@ -170,8 +170,8 @@ def get_hotspots(
 
     Returns {"hotspots": [...], "provenance": {...}}. ``provenance`` names the
     HEAD oid analysed, when, the window, whether the repo is a shallow clone
-    (history is truncated), the bbu version, and whether this call hit the
-    cache. The cache follows HEAD, so a new commit is reflected. Per-function
+    (history is truncated), the bbu version, whether this call hit the
+    cache, and any warnings. The cache follows HEAD, so a new commit is reflected. Per-function
     X-Ray is not included here; call xray_file for it.
 
     Set include_ci=True to include CI build-failure counts; slower, needs gh.
@@ -199,7 +199,7 @@ def get_file_forensics(
     file_path may be repo-relative or an absolute path inside the repo. Errors
     distinguish a path outside the repo, a path not in the tree, and a path
     with no history in the window. The result has a ``provenance`` object (HEAD
-    oid, time, window, shallow-clone flag, cache hit). Functions are not
+    oid, time, window, shallow-clone flag, cache hit, warnings). Functions are not
     included; call xray_file.
 
     Set include_ci=True to include CI build-failure counts; slower, needs gh.

@@ -7,7 +7,7 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field
 
-from .analysis import run_analysis
+from .analysis import SHALLOW_CLONE_WARNING, run_analysis
 from .config import CONFIG_FILE_NAME, load_project_config
 from .core.exceptions import ConfigurationError
 from .core.models import (
@@ -26,6 +26,7 @@ from .git.changes import (
     collect_change_set,
 )
 from .git.ownership import OwnershipRisk, ownership_risk
+from .git.run import is_shallow
 from .path_roles import (
     PathRole,
     PathRoleClassification,
@@ -231,6 +232,7 @@ class ChangeReview(BaseModel):
     couplings: list[CouplingEvidence] = Field(max_length=MAX_REVIEW_COUPLINGS)
     actions: list[ReviewAction] = Field(max_length=3)
     omitted_actions: int = Field(default=0, ge=0)
+    warnings: list[str] = Field(default_factory=list)
     ci_status: SignalStatus
 
 
@@ -416,6 +418,7 @@ def project_change_review(
     analysis: AnalysisResult,
     parameters: ReviewParameters,
     path_role_rules: tuple[PathRoleRule, ...] = (),
+    warnings: list[str] | None = None,
 ) -> ChangeReviewResult:
     """Purely join selected paths, repository facts, and bounded action policy."""
     if not change_set.paths:
@@ -539,6 +542,7 @@ def project_change_review(
         couplings=couplings[:MAX_REVIEW_COUPLINGS],
         actions=kept_actions,
         omitted_actions=len(actions) - len(kept_actions),
+        warnings=warnings or [],
         ci_status=analysis.ci_status,
     )
 
@@ -583,4 +587,5 @@ def run_change_review(
         analysis,
         policy,
         path_role_rules=settings.path_roles,
+        warnings=[SHALLOW_CLONE_WARNING] if is_shallow(repo_path) else [],
     )

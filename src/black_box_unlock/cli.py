@@ -274,7 +274,7 @@ def review_change_command(
         raise typer.Exit(code=1) from error
     if isinstance(result, ChangeReview) and result.omitted_actions:
         logger.warning(
-            "{} more actions omitted (max_actions={})",
+            "{} more action(s) omitted (max_actions={})",
             result.omitted_actions,
             result.parameters.max_actions,
         )

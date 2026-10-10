@@ -130,10 +130,10 @@ def get_ownership(
 def get_ci_failures(repo_path: str = ".") -> dict:
     """Failed CI runs and implicated files, with most-failing files first.
 
-    Scans the repository's last 100 workflow runs (not limited by a day window).
+    Scans workflow runs created in the last 30 days (at most 10 pages of 100).
     Changed paths are correlated with the failed run, not proven causal.
     """
-    # days=30: canonical window for cache reuse; CI signals are run-count-based, not day-based
+    # days=30: canonical window for cache reuse; CI runs are bounded to the same window
     result = _safe_analysis(repo_path, 30, include_ci=True)
     failing = [f for f in result.files if f.build_failures > 0]
     failing.sort(key=lambda f: f.build_failures, reverse=True)
@@ -149,9 +149,9 @@ def get_ci_failures(repo_path: str = ".") -> dict:
 def get_flaky_steps(repo_path: str = ".") -> dict:
     """CI steps that failed then passed on re-run (unreliable tests/infra).
 
-    Scans the repository's last 100 workflow runs (not limited by a day window).
+    Scans workflow runs created in the last 30 days (at most 10 pages of 100).
     """
-    # days=30: canonical window for cache reuse; CI signals are run-count-based, not day-based
+    # days=30: canonical window for cache reuse; CI runs are bounded to the same window
     result = _safe_analysis(repo_path, 30, include_ci=True)
     return {
         "status": result.ci_status.state.value,

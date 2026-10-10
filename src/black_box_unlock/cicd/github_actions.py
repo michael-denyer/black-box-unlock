@@ -4,12 +4,40 @@ import json
 import subprocess
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from ..core.models import FailedWorkflowRun, FlakyStepSummary, SignalState, SignalStatus
 from ..git.run import run_git
 from .models import CIAnalysis, FlakyStep, WorkflowJob, WorkflowRun
+
+GH_TIMEOUT_SECONDS = 60
+MAX_PAGES = 10
+
+
+def _gh_api_pages(endpoint: str, key: str, per_page: int, repo_path: Path) -> list[dict]:
+    """Collect list items from consecutive gh api pages, bounded by MAX_PAGES.
+
+    Stops at the first short page. Each call is bounded by GH_TIMEOUT_SECONDS
+    and raises subprocess.TimeoutExpired when gh hangs.
+    """
+    separator = "&" if "?" in endpoint else "?"
+    items: list[dict] = []
+    for page in range(1, MAX_PAGES + 1):
+        cmd = ["gh", "api", f"{endpoint}{separator}per_page={per_page}&page={page}"]
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            check=True,
+            cwd=repo_path,
+            timeout=GH_TIMEOUT_SECONDS,
+        )
+        batch = json.loads(result.stdout)[key]
+        items.extend(batch)
+        if len(batch) < per_page:
+            break
+    return items
 
 
 def parse_workflow_runs(gh_json: list[dict]) -> list[WorkflowRun]:
@@ -28,15 +56,19 @@ def parse_workflow_runs(gh_json: list[dict]) -> list[WorkflowRun]:
     ]
 
 
-def fetch_workflow_runs(limit: int = 100, repo_path: Path = Path(".")) -> list[WorkflowRun]:
-    """Fetch one typed workflow-run snapshot through the GitHub REST API."""
-    cmd = [
-        "gh",
-        "api",
-        f"/repos/{{owner}}/{{repo}}/actions/runs?per_page={limit}",
-    ]
-    result = subprocess.run(cmd, capture_output=True, text=True, check=True, cwd=repo_path)
-    return parse_workflow_runs(json.loads(result.stdout)["workflow_runs"])
+def fetch_workflow_runs(
+    limit: int = 100, repo_path: Path = Path("."), since: datetime | None = None
+) -> list[WorkflowRun]:
+    """Fetch typed workflow runs through the GitHub REST API, following pages.
+
+    limit is the page size. since drops runs created before it, on the server
+    by date and again here by exact timestamp.
+    """
+    endpoint = "/repos/{owner}/{repo}/actions/runs"
+    if since is not None:
+        endpoint += f"?created=>={since.astimezone(timezone.utc).date().isoformat()}"
+    runs = parse_workflow_runs(_gh_api_pages(endpoint, "workflow_runs", limit, repo_path))
+    return [run for run in runs if since is None or run.created_at >= since]
 
 
 def get_files_changed(commit_sha: str, repo_path: Path = Path(".")) -> list[str]:
@@ -52,14 +84,11 @@ def get_files_changed(commit_sha: str, repo_path: Path = Path(".")) -> list[str]
 
 
 def fetch_jobs_for_run(run_id: int, repo_path: Path = Path(".")) -> list[WorkflowJob]:
-    """Fetch all jobs and retry attempts for one workflow run."""
-    cmd = [
-        "gh",
-        "api",
-        f"/repos/{{owner}}/{{repo}}/actions/runs/{run_id}/jobs?filter=all&per_page=100",
+    """Fetch all jobs and retry attempts for one workflow run, following pages."""
+    endpoint = f"/repos/{{owner}}/{{repo}}/actions/runs/{run_id}/jobs?filter=all"
+    return [
+        WorkflowJob.model_validate(item) for item in _gh_api_pages(endpoint, "jobs", 100, repo_path)
     ]
-    result = subprocess.run(cmd, capture_output=True, text=True, check=True, cwd=repo_path)
-    return [WorkflowJob.model_validate(item) for item in json.loads(result.stdout)["jobs"]]
 
 
 @dataclass
@@ -170,14 +199,20 @@ def _error_message(context: str, error: Exception) -> str:
     return f"{context}: {detail}"
 
 
-def collect_ci_signals(repo_path: Path = Path("."), limit: int = 100) -> CIAnalysis:
+def collect_ci_signals(
+    repo_path: Path = Path("."), limit: int = 100, days: int | None = None
+) -> CIAnalysis:
     """Collect build failures and flaky steps from one workflow-run snapshot.
+
+    days bounds the snapshot to runs created within that many days, matching
+    the git history window. None keeps every fetched run.
 
     A run-specific failure produces a partial result and preserves other runs.
     Failure to acquire the run snapshot produces an explicit unavailable result.
     """
     try:
-        runs = fetch_workflow_runs(limit=limit, repo_path=repo_path)
+        since = datetime.now(timezone.utc) - timedelta(days=days) if days is not None else None
+        runs = fetch_workflow_runs(limit=limit, repo_path=repo_path, since=since)
     except Exception as error:
         return CIAnalysis(
             status=SignalStatus(

@@ -58,6 +58,7 @@ src/black_box_unlock/
 - git missing -> `GitToolNotFoundError`, same handling
 - gh missing/unauthenticated -> `ci_status.state` is `unavailable`, errors are reported, analysis continues
 - one failed CI detail request -> `ci_status.state` is `partial`; successful run data is preserved
+- a `gh api` call that runs past 60 seconds -> treated as a failed request; run pages are followed up to 10 pages of 100, and only runs created within the analysis `--days` window count
 - missing review base -> `InvalidRevisionError`, CLI prints a clean error
 - unresolved merge conflict -> `ChangeSelectionError`; no misleading actions are returned
 - invalid `.bbu.toml` or unknown profile -> `ConfigurationError`; no review runs

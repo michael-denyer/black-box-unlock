@@ -397,6 +397,7 @@ class TestCIInPipeline:
 
         result = run_analysis(Path("/fake/repo"), days=30, include_ci=True)
 
+        assert mock_ci.call_args.kwargs["days"] == 30
         main_file = next(file for file in result.files if file.path == "src/main.py")
         assert main_file.build_failures == 2
         assert result.flaky_steps[0].step_name == "Run tests"
@@ -439,7 +440,7 @@ class TestCIInPipeline:
 
         result = run_analysis(Path("/fake/repo"))
 
-        mock_ci.assert_called_once_with(repo_path=Path("/fake/repo"), limit=100)
+        mock_ci.assert_called_once_with(repo_path=Path("/fake/repo"), limit=100, days=30)
         assert result.ci_status.state is SignalState.unavailable
         assert result.ci_status.errors == ["gh unavailable"]
 

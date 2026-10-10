@@ -2,12 +2,12 @@
 
 import os
 import subprocess
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import patch
 
 from black_box_unlock.cicd.github_actions import collect_ci_signals
-from black_box_unlock.cicd.models import WorkflowRun
+from black_box_unlock.cicd.models import WorkflowJob, WorkflowRun
 from black_box_unlock.core.models import SignalState
 
 
@@ -45,7 +45,7 @@ class TestCollectCISignals:
 
         result = collect_ci_signals(tmp_path, limit=25)
 
-        mock_runs.assert_called_once_with(limit=25, repo_path=tmp_path)
+        mock_runs.assert_called_once_with(limit=25, repo_path=tmp_path, since=None)
         mock_files.assert_called_once_with("sha-1", repo_path=tmp_path)
         mock_jobs.assert_called_once_with(1, repo_path=tmp_path)
         assert result.status.state is SignalState.available
@@ -84,6 +84,68 @@ class TestCollectCISignals:
         assert result.failed_runs == []
         assert result.flaky_steps == []
         assert result.status.errors == ["gh not found"]
+
+    @patch("black_box_unlock.cicd.github_actions.fetch_workflow_runs")
+    def test_days_bounds_the_run_window(self, mock_runs, tmp_path):
+        mock_runs.return_value = []
+        before = datetime.now(timezone.utc)
+
+        collect_ci_signals(tmp_path, days=30)
+
+        since = mock_runs.call_args.kwargs["since"]
+        assert (
+            before - timedelta(days=30) <= since <= datetime.now(timezone.utc) - timedelta(days=30)
+        )
+
+    @patch("black_box_unlock.cicd.github_actions.subprocess.run")
+    def test_gh_timeout_on_the_run_fetch_is_unavailable_with_the_reason(self, mock_gh, tmp_path):
+        mock_gh.side_effect = subprocess.TimeoutExpired(["gh", "api"], 60)
+
+        result = collect_ci_signals(tmp_path)
+
+        assert result.status.state is SignalState.unavailable
+        assert "timed out after 60" in result.status.errors[0]
+
+    @patch("black_box_unlock.cicd.github_actions.fetch_jobs_for_run")
+    @patch("black_box_unlock.cicd.github_actions.fetch_workflow_runs")
+    def test_gh_timeout_on_one_jobs_fetch_is_partial(self, mock_runs, mock_jobs, tmp_path):
+        mock_runs.return_value = [_run(1, conclusion="success", run_attempt=2)]
+        mock_jobs.side_effect = subprocess.TimeoutExpired(["gh", "api"], 60)
+
+        result = collect_ci_signals(tmp_path)
+
+        assert result.status.state is SignalState.partial
+        assert "jobs for run 1" in result.status.errors[0]
+        assert "timed out" in result.status.errors[0]
+
+    @patch("black_box_unlock.cicd.github_actions.fetch_jobs_for_run")
+    @patch("black_box_unlock.cicd.github_actions.fetch_workflow_runs")
+    def test_failure_on_one_commit_then_pass_on_another_is_not_flaky(
+        self, mock_runs, mock_jobs, tmp_path
+    ):
+        failing_commit = _run(1, conclusion="failure", run_attempt=2)
+        fixed_commit = _run(2, conclusion="success", run_attempt=2)
+        mock_runs.return_value = [failing_commit, fixed_commit]
+        mock_jobs.side_effect = lambda run_id, repo_path: [
+            WorkflowJob.model_validate(
+                {
+                    "name": "test",
+                    "run_attempt": 1 if run_id == 1 else 2,
+                    "steps": [
+                        {
+                            "name": "Run tests",
+                            "conclusion": "failure" if run_id == 1 else "success",
+                            "completed_at": "2026-06-02T10:00:00Z",
+                        }
+                    ],
+                }
+            )
+        ]
+
+        with patch("black_box_unlock.cicd.github_actions.get_files_changed", return_value=[]):
+            result = collect_ci_signals(tmp_path)
+
+        assert result.flaky_steps == []
 
     @patch("black_box_unlock.cicd.github_actions.fetch_workflow_runs")
     def test_empty_successful_snapshot_is_available(self, mock_runs, tmp_path):

@@ -240,9 +240,18 @@ def render_report(report: ValidationReport) -> str:
         f"top-10% share={_pct(rnd.top_decile_share_mean)}{sd}  "
         f"mean of {rnd.draws} draws, seed {rnd.seed}"
     )
-    p = f"{report.p_value:.3f}" if report.p_value is not None else "n/a"
-    lines.append(f"  hotspot share vs random: one-sided permutation p={p}")
+    lines.append(f"  hotspot share vs random: one-sided permutation {_p_label(report)}")
     return "\n".join(lines)
+
+
+def _p_label(report: ValidationReport) -> str:
+    """`p=0.025`, or a bound when no draw reached the observed share."""
+    if report.p_value is None:
+        return "p=n/a"
+    floor = 1 / (report.random.draws + 1)
+    if report.p_value <= floor:
+        return f"p<{floor:.3f} (no draw reached it)"
+    return f"p={report.p_value:.3f}"
 
 
 def _cutoff_commit(repo_path: Path, cutoff: datetime) -> str | None:

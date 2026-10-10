@@ -205,6 +205,14 @@ class TestValidateCommand:
         assert result.exit_code == 1
         assert "no repo met the sample floor" in result.stdout
 
+    def test_p_at_the_permutation_floor_prints_as_a_bound(self):
+        # zero of 200 draws reached the share: (0 + 1) / 201 is a ceiling, not a measurement
+        report = _validation_result().model_copy(update={"p_value": 1 / 201})
+        with patch("black_box_unlock.validation.validate_repo") as mock_validate:
+            mock_validate.return_value = report
+            result = runner.invoke(app, ["validate", "--repo", "."])
+        assert "p<0.005 (no draw reached it)" in result.stdout
+
     def test_report_lines_are_not_wrapped_at_80_columns(self):
         with patch("black_box_unlock.validation.validate_repo") as mock_validate:
             mock_validate.return_value = _validation_result()

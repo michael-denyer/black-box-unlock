@@ -72,7 +72,9 @@ def _review_selector(
 def analyze_repo(  # [1a.1] Main analysis command
     days: int = typer.Option(30, help="Days of git history to analyze"),
     output: OutputFormat = typer.Option(OutputFormat.json, help="Output format: json, html"),
-    min_coupling: float = typer.Option(0.3, help="Minimum coupling ratio to include"),
+    min_coupling: float = typer.Option(
+        0.3, min=0.0, max=1.0, help="Minimum coupling ratio to include"
+    ),
     no_ci: bool = typer.Option(False, "--no-ci", help="Skip CI failure analysis"),
     repo: Path = typer.Option(Path("."), "--repo", help="Path to the git repository to analyze"),
     xray_top: int = typer.Option(
@@ -208,11 +210,14 @@ def review_change_command(
     min_coupling: float | None = typer.Option(
         None,
         "--min-coupling",
+        min=0.0,
+        max=1.0,
         help="Override the profile's minimum observed coupling ratio",
     ),
     min_shared_revisions: int | None = typer.Option(
         None,
         "--min-shared-revisions",
+        min=1,
         help="Override the profile's support floor",
     ),
     include_ci: bool | None = typer.Option(
@@ -342,7 +347,11 @@ def xray(
     days: int = typer.Option(365, help="Days of history to analyze"),
     cap: int = typer.Option(200, "--cap", help="Maximum revisions to analyze"),
     min_coupling: float = typer.Option(
-        0.3, "--min-coupling", help="Minimum function-pair coupling ratio to report"
+        0.3,
+        "--min-coupling",
+        min=0.0,
+        max=1.0,
+        help="Minimum function-pair coupling ratio to report",
     ),
 ) -> None:
     """Per-function churn for one file (Tornhill's X-Ray).

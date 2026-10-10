@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
 from typer.testing import CliRunner
 
 from black_box_unlock.cli import app
@@ -514,3 +515,29 @@ class TestXrayMinCoupling:
             result = runner.invoke(app, ["xray", "mod.py", "--min-coupling", "0.5"])
         assert result.exit_code == 0
         assert mock_xray.call_args[1]["min_coupling"] == 0.5
+
+
+class TestOptionBounds:
+    @pytest.mark.parametrize(
+        "args",
+        [
+            ["analyze-repo", "--min-coupling", "1.5"],
+            ["analyze-repo", "--min-coupling", "-1"],
+            ["review-change", "--min-coupling", "1.5"],
+            ["review-change", "--min-shared-revisions", "0"],
+            ["xray", "mod.py", "--min-coupling", "1.5"],
+        ],
+    )
+    def test_out_of_range_values_are_rejected_before_analysis(self, args):
+        with (
+            patch("black_box_unlock.cli.run_analysis") as mock_analysis,
+            patch("black_box_unlock.cli.run_change_review") as mock_review,
+            patch("black_box_unlock.git.xray.xray_file") as mock_xray,
+        ):
+            result = runner.invoke(app, args)
+
+        assert result.exit_code == 2
+        assert "Invalid value" in result.output
+        mock_analysis.assert_not_called()
+        mock_review.assert_not_called()
+        mock_xray.assert_not_called()

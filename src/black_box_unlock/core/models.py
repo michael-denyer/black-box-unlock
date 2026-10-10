@@ -7,6 +7,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, computed_field, field_validator, model_validator
 
+from ..path_roles import PathRole, classify_path_role
+
 HIGH_RISK_AUTHOR_THRESHOLD = 3
 """Files with more than this many authors are considered coordination risks."""
 
@@ -243,6 +245,11 @@ class FileForensics(BaseModel):  # [4a.3] Combined forensics
     """Combined forensics for a single file."""
 
     path: str
+    path_role: PathRole = Field(
+        default_factory=lambda data: classify_path_role(data.get("path", "")).role
+    )
+    """Role of the path. Defaults to the built-in classification; analysis passes
+    the role resolved with the project's ``.bbu.toml`` rules."""
     commits: int
     lines_changed: int
     complexity: float = 0.0

@@ -459,6 +459,40 @@ class TestCIInPipeline:
         auth = next(file for file in result.files if file.path == "src/auth.py")
         assert auth.bugfix_commits == 1
 
+    def test_path_role_uses_builtin_classifier(self):
+        history = [
+            make_commit(
+                author_email="a@x.com",
+                files=[
+                    {"path": "src/hooks/useThing.ts", "added_lines": 1, "deleted_lines": 0},
+                    {"path": "pkg/foo_test.go", "added_lines": 1, "deleted_lines": 0},
+                ],
+            )
+        ]
+
+        with patch("black_box_unlock.analysis.fetch_git_history", return_value=history):
+            result = run_analysis(Path("/fake/repo"), days=30, include_ci=False)
+
+        roles = {file.path: file.path_role for file in result.files}
+        assert roles == {"src/hooks/useThing.ts": "source", "pkg/foo_test.go": "test"}
+        assert json.loads(export_to_json(result))["files"][0]["path_role"] in {"source", "test"}
+
+    def test_path_role_honours_project_rules(self, tmp_path):
+        (tmp_path / ".bbu.toml").write_text(
+            '[[path_roles]]\npattern = "snapshots/**"\nrole = "generated"\n'
+        )
+        history = [
+            make_commit(
+                author_email="a@x.com",
+                files=[{"path": "snapshots/a.py", "added_lines": 1, "deleted_lines": 0}],
+            )
+        ]
+
+        with patch("black_box_unlock.analysis.fetch_git_history", return_value=history):
+            result = run_analysis(tmp_path, days=30, include_ci=False)
+
+        assert result.files[0].path_role == "generated"
+
 
 class TestAutoXray:
     def _history(self):

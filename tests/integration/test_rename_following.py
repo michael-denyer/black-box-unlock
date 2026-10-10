@@ -92,3 +92,25 @@ def test_xray_reads_the_parent_under_its_old_name_when_a_rename_also_edits(tmp_p
 
     assert result.revisions_analyzed == 2
     assert {f.name: f.revisions for f in result.functions} == {"alpha": 1, "beta": 1}
+
+
+def test_xray_does_not_follow_a_reused_path_into_another_files_history(tmp_path: Path):
+    """a.py becomes b.py, a new a.py appears, then a.py becomes c.py. c.py owns only its own two commits."""
+    repo = tmp_path / "reuse"
+    repo.mkdir()
+    _git(repo, "init", "-b", "main")
+    _git(repo, "config", "user.email", "dev@example.com")
+    _git(repo, "config", "user.name", "Dev")
+    for value in range(3):
+        _commit(repo, f"feat: old a {value}", {"a.py": _module(value)})
+    _git(repo, "mv", "a.py", "b.py")
+    _git(repo, "commit", "-m", "refactor: a to b")
+    _commit(repo, "feat: new a", {"a.py": "def gamma():\n    return 1\n"})
+    _commit(repo, "feat: new a again", {"a.py": "def gamma():\n    return 2\n"})
+    _git(repo, "mv", "a.py", "c.py")
+    _git(repo, "commit", "-m", "refactor: a to c")
+
+    result = xray_file(repo, "c.py", days=365)
+
+    assert result.revisions_analyzed == 2
+    assert [(f.name, f.revisions) for f in result.functions] == [("gamma", 2)]

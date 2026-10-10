@@ -93,11 +93,28 @@ class CommitPatch:
     hunks: list[Hunk] = field(default_factory=list)
     old_path: str | None = None  # file's name in the parent; None when the patch omits it
     new_path: str | None = None  # file's name at sha; differs from the X-Rayed path before a rename
+    created: bool = (
+        False  # the patch adds the file; --follow keeps walking past this into a reused name
+    )
 
 
 def _attributes_content() -> str:
     """Build gitattributes content mapping known extensions to built-in diff drivers."""
     return "\n".join(f"*{ext} diff={drv}" for ext, drv in sorted(DIFF_DRIVERS.items())) + "\n"
+
+
+def _until_creation(commits: list[CommitPatch]) -> list[CommitPatch]:
+    """Cut a newest-first patch log at the commit that created the file.
+
+    ``git log --follow`` keeps the old pathspec after a rename chain reaches
+    the file's creation, so a name reused by an unrelated earlier file would
+    leak that file's history in. File-level history keeps the two apart, and
+    X-Ray must agree with it.
+    """
+    for index, commit in enumerate(commits):
+        if commit.created:
+            return commits[: index + 1]
+    return commits
 
 
 def parse_patch_log(output: str) -> list[CommitPatch]:
@@ -113,6 +130,8 @@ def parse_patch_log(output: str) -> list[CommitPatch]:
         if line.startswith(_COMMIT_MARKER):
             current = CommitPatch(sha=line[1:].strip())
             commits.append(current)
+        elif current is not None and not current.hunks and line.startswith("--- /dev/null"):
+            current.created = True
         elif current is not None and not current.hunks and line.startswith(("--- a/", "+++ b/")):
             path = line[len("--- a/") :].rstrip("\t")
             if line.startswith("-"):
@@ -311,7 +330,7 @@ def xray_file(
             functions=[],
             skipped=UNSUPPORTED_LANGUAGE,
         )
-    commits = parse_patch_log(_git_patch_log(repo_path, file_path, days))
+    commits = _until_creation(parse_patch_log(_git_patch_log(repo_path, file_path, days)))
     cap_hit = len(commits) > rev_cap
     commits = commits[:rev_cap]  # git log emits newest first
     is_python = file_path.endswith(".py")

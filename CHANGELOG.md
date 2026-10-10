@@ -81,7 +81,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   file's earlier commits, bug fixes, owners, and partners under its current
   path. `FileForensics.renamed_from` lists the older names. Detection uses
   git's default 50% similarity, and `--find-renames` is not exposed. A path
-  reused after a rename stays a separate file. A rename commit counts once
+  reused after a rename stays a separate file, in X-Ray too, which stops at
+  the file's creation instead of following `--follow` into the older file. The
+  edit-hook cache moves to version 4 and rebuilds once, because the same HEAD
+  now yields canonical partners. `bbu validate` attributes a test-half fix on
+  a file renamed after the cutoff to the file's cutoff name. A rename commit counts once
   and adds no churn when the content is unchanged, so commit and line counts
   shift for renamed files. X-Ray runs `git log --follow` instead of
   `--no-renames`. `CommitFile.former_paths` is new. `ChangedPathIdentity` is

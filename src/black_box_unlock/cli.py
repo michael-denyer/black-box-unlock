@@ -233,7 +233,7 @@ def review_change_command(
         "--min-coupling",
         min=0.0,
         max=1.0,
-        help="Override the profile's minimum observed coupling ratio",
+        help="Override the profile's minimum share of a changed file's revisions a partner must have",
     ),
     min_shared_revisions: int | None = typer.Option(
         None,

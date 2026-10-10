@@ -131,7 +131,9 @@ def run_analysis(  # [2a] Main analysis pipeline
     own history and keeps them. A file's ``coupled_with`` lists a partner only
     when the share of the file's revisions that touched it reaches
     ``policy.min_ratio``. With ``policy.require_live_partner``, pairs whose
-    side is absent from HEAD (and not in ensure_paths) are dropped.
+    side is absent from the tree at ``rev`` (and not in ensure_paths) are
+    dropped, so a base-mode review still sees partners of a file the branch
+    deletes.
 
     Args:
         repo_path: Path to git repository.
@@ -153,7 +155,7 @@ def run_analysis(  # [2a] Main analysis pipeline
         policy.max_changeset_size,
     )
     live_paths = (
-        head_paths(repo_path) | ensure_paths | frozenset(aliases.values())
+        head_paths(repo_path, rev or "HEAD") | ensure_paths | frozenset(aliases.values())
         if policy.require_live_partner and history
         else None
     )

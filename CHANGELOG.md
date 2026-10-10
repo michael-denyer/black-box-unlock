@@ -30,15 +30,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Commits touching more than `max_changeset_size` files are excluded from
   churn, ownership, bug-fix, and coupling counts, not only from pair
   generation. `summary.ignored_large_changesets` counts them. X-Ray keeps
-  them because it reads one file's history.
+  them because it reads one file's history. `bbu validate` excludes them from
+  both halves so it validates the ranking `analyze-repo` produces.
+- A partner's `confidence_lower_bound` in `coupled_with`, hook warnings, and
+  review evidence is the Wilson bound of the oriented rate (shared over the
+  edited file's revisions), so it never exceeds the rate shown beside it. The
+  symmetric bound still orders pairs in `couplings`.
+- Live partners are judged against the tree at the analysed revision, so a
+  `review-change --base` of a branch that deletes a file still reports that
+  file's partners. The frozen HTML report lists partners from `couplings` and
+  so still shows a leaf beside a hub that the tools omit.
 - JSON and API shape. `parameters.coupling` replaces
   `parameters.min_coupling` and `parameters.max_coupled_files_per_commit`.
   Review `parameters.min_coupling` and `parameters.min_shared_revisions`
   move under `parameters.coupling`. The edit-hook cache moves to version 3
   and rebuilds once. `run_analysis` takes `policy=` instead of
   `min_coupling=`. `coupling_warnings` takes `policy=` instead of
-  `threshold=` and `min_shared_revisions=`. `detect_temporal_coupling` is
-  removed.
+  `threshold=` and `min_shared_revisions=`. `analyze_temporal_coupling` takes
+  `(commits, policy, live_paths)`. `TemporalCoupling.coupling_ratio` and
+  `confidence_lower_bound` are computed fields and now appear in JSON.
+  `CouplingAnalysis.dropped_deleted_partners` replaces its
+  `ignored_large_changesets`.
+
+### Removed
+
+- `detect_temporal_coupling` and `DEFAULT_MAX_COUPLED_FILES_PER_COMMIT`.
+  Call `analyze_temporal_coupling` with a `CouplingPolicy`.
 - Path roles recognise test naming conventions outside a `tests/` directory:
   `_test.go`, `.test.tsx`, `.spec.ts`, `FooTest.java`, `FooSpec.scala`,
   `FooTests.cs`, `_spec.rb`, `_test.rs`, `foo_test.py`, `conftest.py`, and

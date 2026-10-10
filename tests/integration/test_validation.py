@@ -247,3 +247,15 @@ class TestSignificance:
 
         assert report.methods["hotspot"].top_decile_share == pytest.approx(1.0)
         assert 0.15 < report.p_value < 0.35
+
+
+class TestBulkCommits:
+    def test_bulk_commit_is_not_validation_evidence(self, scratch: ScratchRepo):
+        _seed_train_half(scratch)
+        bulk = {f"gen/file_{i}.py": "x = 1\n" for i in range(60)}
+        scratch.commit("fix: regenerate everything", {**bulk, "cold.py": INDENTED}, days_ago=5)
+        scratch.commit("fix: crash", {"hot.py": INDENTED + "Z = 5\n"}, days_ago=4)
+
+        report = validate_repo(scratch.path, days=100, split=0.5)
+
+        assert report.test_bugfix_commits == 1

@@ -215,7 +215,7 @@ def coupling_info_for(coupling: TemporalCoupling, file_path: str) -> CouplingInf
         shared_revisions=coupling.co_change_count,
         file_revisions=file_revisions,
         coupled_file_revisions=partner_revisions,
-        confidence_lower_bound=coupling.confidence_lower_bound,
+        confidence_lower_bound=wilson_lower_bound(coupling.co_change_count, file_revisions),
     )
 
 

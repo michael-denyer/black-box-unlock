@@ -15,10 +15,11 @@ from pathlib import Path
 from pydantic import BaseModel
 
 from .complexity import indentation_complexity_text
+from .config import resolve_coupling_policy
 from .core.exceptions import BlackBoxUnlockError, GitToolNotFoundError, InsufficientHistoryError
 from .git.churn import parse_history_entries
 from .git.defects import bugfix_counts, is_bugfix_message
-from .git.log import Clock, Commit, fetch_git_history
+from .git.log import Clock, Commit, exclude_bulk, fetch_git_history
 from .git.run import run_git
 
 TOP_DECILE = 0.10
@@ -347,8 +348,14 @@ def validate_repo(repo_path: Path, days: int = 730, split: float = 0.5) -> Valid
     )
     if cutoff_sha is None:
         raise InsufficientHistoryError(no_history)
-    train = fetch_git_history(repo_path, days, cutoff_sha, clock=CLOCK)
-    test = fetch_git_history(repo_path, days, f"{cutoff_sha}..HEAD", clock=CLOCK)
+    max_changeset_size = resolve_coupling_policy(repo_path).max_changeset_size
+    train, _ = exclude_bulk(
+        fetch_git_history(repo_path, days, cutoff_sha, clock=CLOCK), max_changeset_size
+    )
+    test, _ = exclude_bulk(
+        fetch_git_history(repo_path, days, f"{cutoff_sha}..HEAD", clock=CLOCK),
+        max_changeset_size,
+    )
     if not train or not test:
         raise InsufficientHistoryError(f"{no_history} (train: {len(train)}, test: {len(test)})")
 

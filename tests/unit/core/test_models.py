@@ -326,3 +326,23 @@ class TestFunctionCoupling:
             path="a.py", days=365, revisions_analyzed=1, revision_cap_hit=False, functions=[]
         )
         assert xr.coupling == []
+
+
+class TestCouplingInfoConfidence:
+    def test_lower_bound_describes_the_oriented_rate(self):
+        from black_box_unlock.core.models import (
+            TemporalCoupling,
+            coupling_info_for,
+            wilson_lower_bound,
+        )
+
+        pair = TemporalCoupling(
+            file_a="hub.py", file_b="leaf.py", co_change_count=4, commits_a=10, commits_b=4
+        )
+
+        hub = coupling_info_for(pair, "hub.py")
+        leaf = coupling_info_for(pair, "leaf.py")
+
+        assert hub.confidence_lower_bound == wilson_lower_bound(4, 10)
+        assert hub.confidence_lower_bound < hub.rate_to_partner
+        assert leaf.confidence_lower_bound == wilson_lower_bound(4, 4)

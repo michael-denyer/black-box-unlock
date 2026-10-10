@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- A `LICENSE` file with the MIT text that `pyproject.toml` and the README
+  already declare, so GitHub and built distributions carry the licence
+
 ### Changed
 
 - Updated locked dependencies: mcp 1.29.0 to 2.2.0, typer 0.27.0 to 0.27.2,

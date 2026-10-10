@@ -84,7 +84,6 @@ class BaseProvenance(BaseModel):
         "untracked",
     )
     observed_at: datetime
-    cache_used: Literal[False] = False
 
 
 class StagedProvenance(BaseModel):
@@ -94,7 +93,6 @@ class StagedProvenance(BaseModel):
     head_oid: str | None
     layers: tuple[Literal["staged"]] = ("staged",)
     observed_at: datetime
-    cache_used: Literal[False] = False
 
 
 class WorkingTreeProvenance(BaseModel):
@@ -107,7 +105,6 @@ class WorkingTreeProvenance(BaseModel):
         "untracked",
     )
     observed_at: datetime
-    cache_used: Literal[False] = False
 
 
 ChangeProvenance = Annotated[

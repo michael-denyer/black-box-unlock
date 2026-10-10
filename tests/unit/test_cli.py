@@ -11,6 +11,9 @@ from typer.testing import CliRunner
 
 from black_box_unlock.cli import app
 from black_box_unlock.core.exceptions import InsufficientHistoryError
+from black_box_unlock.core.models import SignalStatus
+from black_box_unlock.git.changes import WorkingTreeProvenance
+from black_box_unlock.review import ChangeReview, ReviewParameters
 from black_box_unlock.validation import MethodScore, RandomBaseline, ValidationReport
 
 runner = CliRunner()
@@ -150,7 +153,10 @@ class TestAnalyzeRepoCommand:
         from black_box_unlock.core.models import CouplingPolicy
 
         (tmp_path / ".bbu.toml").write_text("[coupling]\nrequire_live_partner = false\n")
-        with patch("black_box_unlock.cli.run_analysis") as mock_analysis:
+        with (
+            patch("black_box_unlock.cli.run_analysis") as mock_analysis,
+            patch("black_box_unlock.cli.is_shallow", return_value=False),
+        ):
             mock_analysis.return_value = MagicMock()
             with patch("black_box_unlock.cli.export_to_json", return_value="{}"):
                 result = runner.invoke(
@@ -440,7 +446,10 @@ include_ci = true
 """.strip()
             + "\n"
         )
-        with patch("black_box_unlock.cli.run_change_review") as mock_review:
+        with (
+            patch("black_box_unlock.cli.run_change_review") as mock_review,
+            patch("black_box_unlock.cli.is_shallow", return_value=False),
+        ):
             mock_review.return_value.model_dump.return_value = {"kind": "no_changes"}
             result = runner.invoke(
                 app,
@@ -472,6 +481,31 @@ include_ci = true
         assert result.exit_code == 1
         assert "Invalid .bbu.toml" in result.stdout
         assert "Traceback" not in result.stdout
+
+
+@pytest.mark.parametrize(("omitted", "announced"), [(1, True), (0, False)])
+def test_review_change_announces_omitted_actions_on_stderr(tmp_path, omitted, announced):
+    when = datetime(2026, 7, 30, tzinfo=timezone.utc)
+    review = ChangeReview(
+        repo="demo",
+        generated_at=when,
+        provenance=WorkingTreeProvenance(head_oid="abc123", observed_at=when),
+        parameters=ReviewParameters(max_actions=3),
+        files=[],
+        couplings=[],
+        actions=[],
+        omitted_actions=omitted,
+        ci_status=SignalStatus(),
+    )
+
+    with (
+        patch("black_box_unlock.cli.run_change_review", return_value=review),
+        patch("black_box_unlock.cli.is_shallow", return_value=False),
+    ):
+        result = runner.invoke(app, ["review-change", "--repo", str(tmp_path)])
+
+    assert result.exit_code == 0, result.stderr
+    assert ("1 more action(s) omitted (max_actions=3)" in result.stderr) is announced
 
 
 def _git(repo, *args: str) -> None:
@@ -567,14 +601,6 @@ class TestCouplingGuardHookCommand:
 
 
 class TestDoctorCommand:
-    def test_reports_that_jq_is_not_required(self, tmp_path):
-        (tmp_path / ".git").mkdir()
-
-        result = runner.invoke(app, ["doctor", "--repo", str(tmp_path)])
-
-        assert result.exit_code == 0
-        assert json.loads(result.stdout)["checks"]["jq_required"] is False
-
     def test_reports_the_hook_log_and_its_last_line(self, tmp_path):
         repo = _coupled_repo(tmp_path / "repo")
         log = repo / ".git" / "bbu" / "hook.log"

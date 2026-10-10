@@ -91,6 +91,9 @@ def _canonicalize_ci_paths(
     )
 
 
+SHALLOW_CLONE_WARNING = "history is truncated: shallow clone; counts are lower bounds"
+
+
 def build_provenance(
     repo_path: Path,
     days: int,
@@ -100,13 +103,15 @@ def build_provenance(
     analysed_at: datetime | None = None,
 ) -> Provenance:
     """Describe the repository state an analysis reads (oid is its HEAD)."""
+    shallow = is_shallow(repo_path)
     return Provenance(
         head_oid=oid,
         analysed_at=analysed_at or datetime.now(timezone.utc),
         days=days,
         include_ci=include_ci,
-        shallow_clone=is_shallow(repo_path),
+        shallow_clone=shallow,
         bbu_version=__version__,
+        warnings=[SHALLOW_CLONE_WARNING] if shallow else [],
     )
 
 

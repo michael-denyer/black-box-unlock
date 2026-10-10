@@ -3,12 +3,10 @@
 import json
 from datetime import datetime
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 
-from black_box_unlock.core.exceptions import NotAGitRepoError
-from black_box_unlock.git.churn import extract_file_churn, parse_history_entries
+from black_box_unlock.git.churn import parse_history_entries
 from black_box_unlock.git.log import Commit
 
 
@@ -50,32 +48,3 @@ class TestParseHistoryEntries:
     def test_returns_empty_list_for_no_entries(self):
         """Returns empty list when no commits."""
         assert parse_history_entries([]) == []
-
-
-class TestExtractFileChurn:
-    """Tests for extract_file_churn function."""
-
-    def test_calls_git_with_correct_args(self, tmp_path):
-        """Calls git log with repo path and since flag."""
-        # Create fake git repo
-        (tmp_path / ".git").mkdir()
-
-        with patch("black_box_unlock.git.run.subprocess.run") as mock_run:
-            mock_run.return_value.stdout = ""
-            mock_run.return_value.returncode = 0
-
-            extract_file_churn(tmp_path, since_days=30)
-
-            mock_run.assert_called_once()
-            call_args = mock_run.call_args[0][0]
-            assert "git" in call_args
-            assert str(tmp_path) in call_args
-            assert "--since=30 days ago" in call_args
-
-    def test_raises_not_a_git_repo_error(self, tmp_path):
-        """Raises NotAGitRepoError when path is not a git repo."""
-        # tmp_path has no .git directory
-        with pytest.raises(NotAGitRepoError) as exc_info:
-            extract_file_churn(tmp_path)
-
-        assert str(tmp_path) in str(exc_info.value)

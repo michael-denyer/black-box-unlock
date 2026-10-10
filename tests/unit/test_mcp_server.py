@@ -528,6 +528,7 @@ class TestProvenance:
                 "shallow_clone",
                 "bbu_version",
                 "cached",
+                "warnings",
             }
             assert len(prov["head_oid"]) == 40
             assert prov["shallow_clone"] is False

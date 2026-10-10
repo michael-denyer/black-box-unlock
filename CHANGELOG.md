@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- A shallow clone says so. MCP tool results carry `provenance.warnings`, the
+  `review_change` tool and `review-change` JSON carry `warnings`, and
+  `analyze-repo` and `review-change` print the same line to stderr (the CLI
+  `analyze-repo` JSON leaves `provenance` null). Counts from a shallow clone
+  are lower bounds.
+- Review reports `omitted_actions`, the number of candidate actions that
+  `max_actions` cut. `review-change` prints `N more actions omitted
+  (max_actions=M)` to stderr when the count is non-zero. Before, a dropped
+  action left no trace.
 - Ownership now says who owns a file, not only how many people touched it.
   `FileOwnership` and `FileForensics` gain `main_author`,
   `main_author_share` (the main author's commits over non-bot commits), and
@@ -70,6 +79,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- Unused code: `extract_file_churn`, `WorkflowRun.is_failure`, the
+  `cache_used` field on each change-review provenance (always false), and the
+  `jq_required` key in `bbu doctor` output (always false).
 - `detect_temporal_coupling` and `DEFAULT_MAX_COUPLED_FILES_PER_COMMIT`.
   Call `analyze_temporal_coupling` with a `CouplingPolicy`.
 - Path roles recognise test naming conventions outside a `tests/` directory:

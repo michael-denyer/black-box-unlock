@@ -11,12 +11,13 @@ import typer
 from loguru import logger
 from rich.console import Console
 
-from black_box_unlock.analysis import export_to_json, run_analysis
+from black_box_unlock.analysis import SHALLOW_CLONE_WARNING, export_to_json, run_analysis
 from black_box_unlock.config import load_project_config, resolve_coupling_policy
 from black_box_unlock.core.exceptions import BlackBoxUnlockError
 from black_box_unlock.core.logging import configure_logging
 from black_box_unlock.git.changes import BaseChange, StagedChange, WorkingTreeChange
-from black_box_unlock.review import ChangeReviewRequest, run_change_review
+from black_box_unlock.git.run import is_shallow
+from black_box_unlock.review import ChangeReview, ChangeReviewRequest, run_change_review
 from black_box_unlock.visualization.html import generate_html_report
 
 
@@ -68,6 +69,11 @@ def _review_selector(
     return WorkingTreeChange()
 
 
+def _warn_if_shallow(repo_path: Path) -> None:
+    if is_shallow(repo_path):
+        logger.warning(SHALLOW_CLONE_WARNING)
+
+
 @app.command()
 def analyze_repo(  # [1a.1] Main analysis command
     days: int = typer.Option(30, help="Days of git history to analyze"),
@@ -108,6 +114,7 @@ def analyze_repo(  # [1a.1] Main analysis command
                 max_changeset_size=max_changeset_size,
             ),
         )
+        _warn_if_shallow(repo_path)
     except BlackBoxUnlockError as e:
         console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(code=1) from e
@@ -261,9 +268,16 @@ def review_change_command(
                 include_ci=include_ci,
             ),
         )
+        _warn_if_shallow(repo)
     except BlackBoxUnlockError as error:
         console.print(f"[red]Error:[/red] {error}")
         raise typer.Exit(code=1) from error
+    if isinstance(result, ChangeReview) and result.omitted_actions:
+        logger.warning(
+            "{} more action(s) omitted (max_actions={})",
+            result.omitted_actions,
+            result.parameters.max_actions,
+        )
     print(json.dumps(result.model_dump(mode="json"), indent=2))
 
 
@@ -295,7 +309,6 @@ def doctor(
         "bbu": shutil.which("bbu") is not None,
         "bbu_mcp": shutil.which("bbu-mcp") is not None,
         "gh_optional": shutil.which("gh") is not None,
-        "jq_required": False,
         "config": config is not None,
     }
     print(

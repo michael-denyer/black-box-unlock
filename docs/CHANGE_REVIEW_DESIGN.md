@@ -120,6 +120,8 @@ Each action embeds the typed evidence that caused it. Empty action lists are
 valid. A separate `no_changes` result distinguishes no selected change from a
 change for which no evidence met the action floor. Both variants report CI
 status.
+`omitted_actions` counts the candidate actions that `max_actions` cut. The CLI
+reports a non-zero count on stderr, so a dropped action is never silent.
 The supporting coupling list is capped at the strongest 20 relationships so a
 large change cannot turn the primary result into an unbounded metrics dump.
 
@@ -127,8 +129,8 @@ large change cannot turn the primary result into an unbounded metrics dump.
 
 Every review collects the change and history during the request. MCP review
 bypasses the existing process cache, and the result records resolved object
-IDs, included change layers, observation time, parameters, and
-`cache_used=false`. CI is disabled by default.
+IDs, included change layers, observation time, and parameters. CI is
+disabled by default.
 
 The existing ambient coupling guard remains intentionally small. Its hook
 adapter parses Claude hook JSON in Python, so the plugin no longer depends on

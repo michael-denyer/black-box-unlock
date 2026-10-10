@@ -52,7 +52,7 @@ class TestParseWorkflowRuns:
         run = parse_workflow_runs([_raw_run(conclusion=None)])[0]
 
         assert run.conclusion == "unknown"
-        assert run.is_failure is False
+        assert run.failure_conclusion is None
 
     def test_empty_list_returns_empty(self):
         assert parse_workflow_runs([]) == []

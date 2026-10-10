@@ -219,6 +219,35 @@ def test_missing_repeated_companion_is_the_first_action():
     assert evidence.changed_path_revisions == 13
 
 
+def test_actions_beyond_max_actions_are_counted_as_omitted():
+    analysis = _analysis()
+    analysis.failed_ci_runs.append(
+        FailedWorkflowRun(
+            run_id=7,
+            workflow_name="CI",
+            run_url="https://github.com/example/repo/actions/runs/7",
+            commit_sha="def456",
+            conclusion="failure",
+            created_at=datetime(2026, 7, 29, tzinfo=timezone.utc),
+            implicated_paths=["src/a.py"],
+        )
+    )
+
+    result = project_change_review(
+        _change_set("src/a.py"),
+        analysis,
+        ReviewParameters(include_ci=True, max_actions=3),
+    )
+
+    assert isinstance(result, ChangeReview)
+    assert [action.kind for action in result.actions] == [
+        "check_coupled_paths",
+        "add_or_update_tests",
+        "inspect_ci_failures",
+    ]
+    assert result.omitted_actions == 1
+
+
 def test_changed_companion_is_covered_not_recommended():
     result = project_change_review(
         _change_set("src/a.py", "tests/test_a.py"),

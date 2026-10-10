@@ -19,9 +19,9 @@ class TestWorkflowRun:
             "created_at": datetime(2026, 1, 26, tzinfo=timezone.utc),
         }
 
-        assert WorkflowRun(**common, conclusion="failure").is_failure is True
-        assert WorkflowRun(**common, conclusion="timed_out").is_failure is True
-        assert WorkflowRun(**common, conclusion="success").is_failure is False
+        assert WorkflowRun(**common, conclusion="failure").failure_conclusion == "failure"
+        assert WorkflowRun(**common, conclusion="timed_out").failure_conclusion == "timed_out"
+        assert WorkflowRun(**common, conclusion="success").failure_conclusion is None
 
     def test_attempt_must_be_positive(self):
         with pytest.raises(ValidationError):

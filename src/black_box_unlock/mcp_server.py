@@ -92,7 +92,10 @@ def _parse_roles(roles: list[str] | None) -> set[PathRole] | None:
 
 
 def _file_dict(f: FileForensics) -> dict:
-    return f.model_dump(mode="json")
+    """Dump a file for a tool result; the MCP analysis never runs X-Ray, so say so."""
+    data = f.model_dump(mode="json", exclude={"functions", "xray_failed"})
+    data["xray_skipped"] = "not requested"
+    return data
 
 
 def _provenance(result: AnalysisResult) -> dict | None:

@@ -41,7 +41,7 @@
 <path d="M735 561H765V373" fill="none" stroke="#47e4ef" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
 <path d="M320 261H350" fill="none" stroke="#47e4ef" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
 <path d="M60 365H305L320 380V475L305 490H60L45 475V380Z" fill="#0c2136" stroke="#ffca58" stroke-width="2"/>
-<text x="69" y="404" fill="#f4f8ff" font-family="DejaVu Sans, Arial, sans-serif" font-size="19" font-weight="700" text-anchor="start">Review rename aliases</text>
+<text x="69" y="404" fill="#f4f8ff" font-family="DejaVu Sans, Arial, sans-serif" font-size="19" font-weight="700" text-anchor="start">Follow renames</text>
 <text x="69" y="443" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="17" font-weight="400" text-anchor="start">Old paths → current path</text>
 <text x="69" y="470" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="17" font-weight="400" text-anchor="start">Merge before parsing</text>
 <path d="M182 365V329" fill="none" stroke="#ffca58" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#amber-arrow)"/>

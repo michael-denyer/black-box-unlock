@@ -71,7 +71,7 @@
 <path d="M465 830H1315L1330 845V1045L1315 1060H465L450 1045V845Z" fill="#0c2136" stroke="#ffca58" stroke-width="2"/>
 <text x="474" y="869" fill="#f4f8ff" font-family="DejaVu Sans Mono, monospace" font-size="27" font-weight="700" text-anchor="start">run_change_review(repo, request)</text>
 <text x="474" y="910" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="21" font-weight="400" text-anchor="start">Resolve settings; collect the selected change</text>
-<text x="474" y="958" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="21" font-weight="400" text-anchor="start">Map renamed paths before fresh history + CI aggregation</text>
+<text x="474" y="958" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="21" font-weight="400" text-anchor="start">Add the change's own renames before fresh history + CI aggregation</text>
 <text x="474" y="1006" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="21" font-weight="400" text-anchor="start">project_change_review() returns 0–3 typed actions</text>
 <path d="M370 875H410V895H448" fill="none" stroke="#ffca58" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#amber-arrow)"/>
 <path d="M370 1015H410V1010H448" fill="none" stroke="#ffca58" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#amber-arrow)"/>

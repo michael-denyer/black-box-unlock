@@ -30,14 +30,14 @@ Coding agents ask `bbu-mcp` for forensic evidence before they inspect or edit
 code. Ranked hotspots and coupled files guide their focus, the edit hook warns
 about companion files, and a fresh change review returns up to three checks.
 
-![A coding agent calls bbu-mcp to read Git history, current code, and optional CI evidence. Hotspots, coupling, ownership, bug-fix history, and function X-Ray guide file inspection. The edit hook warns about coupled files; fresh review returns up to three checks and retains rename history. CLI JSON, the Claude Code plugin, and offline HTML are also available.](assets/overview.png)
+![A coding agent calls bbu-mcp to read Git history, current code, and optional CI evidence. Hotspots, coupling, ownership, bug-fix history, and function X-Ray guide file inspection. Every signal follows renames. The edit hook warns about coupled files; fresh review returns up to three checks. CLI JSON, the Claude Code plugin, and offline HTML are also available.](assets/overview.png)
 
 ## For agents (MCP + plugin)
 
 The agent calls `bbu-mcp` before it reads or edits code, and uses the ranked
 evidence to decide which files to inspect first.
 
-![The coding agent queries bbu-mcp for ranked repository evidence, then inspects and edits files. The PostToolUse coupling guard warns about companion files. Explicit review_change queries return fresh, rename-aware checks.](assets/diagrams/agent-flow.svg)
+![The coding agent queries bbu-mcp for ranked repository evidence, then inspects and edits files. The PostToolUse coupling guard warns about companion files. Explicit review_change queries return fresh checks; all history follows renames.](assets/diagrams/agent-flow.svg)
 
 ```bash
 uv tool install black-box-unlock   # provides bbu and bbu-mcp

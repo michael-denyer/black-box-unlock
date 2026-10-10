@@ -126,7 +126,7 @@
     const badges = document.getElementById("selected-badges");
     clear(badges);
     addBadge(badges, file.path_role, "green");
-    if (file.is_high_risk) addBadge(badges, "diffuse ownership", "red");
+    if (file.is_high_risk) addBadge(badges, "diffuse ownership (>3 authors, no one holds half)", "red");
     if (file.build_failures) addBadge(badges, `${file.build_failures} build failures`, "red");
     if (file.bugfix_commits) addBadge(badges, `${file.bugfix_commits} bug-fix revisions`, "amber");
     if (file.xray_failed) addBadge(badges, "X-Ray failed", "red");

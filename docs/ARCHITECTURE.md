@@ -71,7 +71,7 @@ change makes, which history cannot see yet.
 
 ## Data flow
 
-![Three paths serve the coding agent. MCP signal tools cache repository analysis; the edit hook reads its independent coupling snapshot; fresh change review resolves the request and profile, preserves rename history, and returns zero to three actions through CLI, MCP, or the plugin.](../assets/diagrams/architecture.svg)
+![Three paths serve the coding agent. MCP signal tools cache repository analysis; the edit hook reads its independent coupling snapshot; every signal follows renames; fresh change review resolves the request and profile, adds the change's own renames, and returns zero to three actions through CLI, MCP, or the plugin.](../assets/diagrams/architecture.svg)
 
 ## Degraded modes
 

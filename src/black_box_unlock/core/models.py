@@ -19,6 +19,14 @@ from ..path_roles import PathRole, classify_path_role
 HIGH_RISK_AUTHOR_THRESHOLD = 3
 """Above this many authors a file is shared or diffuse; see ``ownership_risk``."""
 
+DOMINANT_AUTHOR_SHARE = 0.5
+"""A main author holding at least this share of non-bot commits keeps a many-author file out of diffuse."""
+
+
+def is_diffuse(author_count: int, main_author_share: float) -> bool:
+    """The one rule behind ``is_high_risk``, the HTML badge, and ``ownership_risk``."""
+    return author_count > HIGH_RISK_AUTHOR_THRESHOLD and main_author_share < DOMINANT_AUTHOR_SHARE
+
 
 class CouplingPolicy(BaseModel):
     """The one definition of which history counts as temporal-coupling evidence.
@@ -179,8 +187,8 @@ class FileOwnership(BaseModel):  # [4a.2] Authors per file
 
     @property
     def is_high_risk(self) -> bool:
-        """Files with >3 authors are coordination risks."""
-        return self.author_count > HIGH_RISK_AUTHOR_THRESHOLD
+        """Diffuse ownership: more than the threshold of authors and no one holds half the commits."""
+        return is_diffuse(self.author_count, self.main_author_share)
 
     @field_validator("path")
     @classmethod
@@ -350,8 +358,8 @@ class FileForensics(BaseModel):  # [4a.3] Combined forensics
     @computed_field
     @property
     def is_high_risk(self) -> bool:
-        """Files with >3 authors are coordination risks."""
-        return self.author_count > HIGH_RISK_AUTHOR_THRESHOLD
+        """Diffuse ownership: more than the threshold of authors and no one holds half the commits."""
+        return is_diffuse(self.author_count, self.main_author_share)
 
 
 class AnalysisSummary(BaseModel):

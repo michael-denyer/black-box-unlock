@@ -49,5 +49,5 @@
 <text x="377.5" y="1007" fill="#ffca58" font-family="DejaVu Sans Mono, monospace" font-size="19" font-weight="400" text-anchor="middle">review_change()</text>
 <path d="M565 1090H190" fill="none" stroke="#ffca58" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#amber-arrow)" stroke-dasharray="7 7"/>
 <text x="377.5" y="1077" fill="#ffca58" font-family="DejaVu Sans Mono, monospace" font-size="16" font-weight="400" text-anchor="middle">Fresh review: 0–3 checks + raw evidence</text>
-<text x="60" y="1138" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="19" font-weight="400" text-anchor="start">Review resolves .bbu.toml, selects the change, and maps rename history before fresh analysis. CI is opt-in.</text>
+<text x="60" y="1138" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="19" font-weight="400" text-anchor="start">Review resolves .bbu.toml, selects the change, and adds its own renames to the rename-following history before fresh analysis. CI is opt-in.</text>
 </svg>

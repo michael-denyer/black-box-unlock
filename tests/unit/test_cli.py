@@ -489,7 +489,7 @@ def test_review_change_announces_omitted_actions_on_stderr(tmp_path, omitted, an
     review = ChangeReview(
         repo="demo",
         generated_at=when,
-        provenance=WorkingTreeProvenance(head_oid="abc123", observed_at=when),
+        provenance=WorkingTreeProvenance(head_oid="abc123", analysed_at=when),
         parameters=ReviewParameters(max_actions=3),
         files=[],
         couplings=[],

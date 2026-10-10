@@ -26,11 +26,11 @@ Agent-facing MCP tools and edit hook, and user-facing commands via Typer CLI.
 | 1a | CLI App | Typer application with `bbu` command | [cli.py:43](../src/black_box_unlock/cli.py#L43) |
 | 1a.1 | analyze_repo | Main analysis command | [cli.py:78](../src/black_box_unlock/cli.py#L78) |
 | 1a.2 | version | Version info command | [cli.py:407](../src/black_box_unlock/cli.py#L407) |
-| 1b | MCP Server | `bbu-mcp` server exposing forensic signals as agent tools | [mcp_server.py:31](../src/black_box_unlock/mcp_server.py#L31) |
-| 1b.1 | get_hotspots | First of six tools that read the cached analysis | [mcp_server.py:158](../src/black_box_unlock/mcp_server.py#L158) |
-| 1b.2 | xray_file | Per-function churn for one file, computed on each call | [mcp_server.py:301](../src/black_box_unlock/mcp_server.py#L301) |
-| 1b.3 | review_change | Fresh, uncached review of the selected change | [mcp_server.py:342](../src/black_box_unlock/mcp_server.py#L342) |
-| 1c | coupling_warnings | Coupling guard behind the `PostToolUse` edit hook | [guard.py:114](../src/black_box_unlock/guard.py#L114) |
+| 1b | MCP Server | `bbu-mcp` server exposing forensic signals as agent tools | [mcp_server.py:32](../src/black_box_unlock/mcp_server.py#L32) |
+| 1b.1 | get_hotspots | First of the tools that read the cached analysis | [mcp_server.py:159](../src/black_box_unlock/mcp_server.py#L159) |
+| 1b.2 | xray_file | Per-function churn for one file, computed on each call | [mcp_server.py:328](../src/black_box_unlock/mcp_server.py#L328) |
+| 1b.3 | review_change | Fresh, uncached review of the selected change | [mcp_server.py:369](../src/black_box_unlock/mcp_server.py#L369) |
+| 1c | coupling_warnings | Coupling guard behind the `PostToolUse` edit hook | [guard.py:184](../src/black_box_unlock/guard.py#L184) |
 
 ---
 
@@ -41,7 +41,7 @@ Orchestrates forensic analysis by combining data from multiple sources.
 | ID | Component | Description | File:Line |
 |----|-----------|-------------|-----------|
 | 2a | run_analysis | Main analysis pipeline | [analysis.py:118](../src/black_box_unlock/analysis.py#L118) |
-| 2a.1 | collect_ci_signals | Collect failure and flaky-step data from one typed run snapshot | [github_actions.py:217](../src/black_box_unlock/cicd/github_actions.py#L217) |
+| 2a.1 | collect_ci_signals | Collect failure and flaky-step data from one typed run snapshot | [github_actions.py:216](../src/black_box_unlock/cicd/github_actions.py#L216) |
 | 2b | export_to_json | Serialize result to JSON | [analysis.py:280](../src/black_box_unlock/analysis.py#L280) |
 
 #### Analysis Pipeline [2a]
@@ -58,7 +58,7 @@ Domain logic for extracting forensic signals from git history.
 |----|-----------|-------------|-----------|
 | 3a | parse_history_entries | Parse git log dict to FileChurn list | [churn.py:10](../src/black_box_unlock/git/churn.py#L10) |
 | 3b | analyze_temporal_coupling | Find co-changing files and count ignored bulk changesets | [coupling.py:19](../src/black_box_unlock/git/coupling.py#L19) |
-| 3c | parse_ownership_from_history | Parse authors per file from git log | [ownership.py:9](../src/black_box_unlock/git/ownership.py#L9) |
+| 3c | parse_ownership_from_history | Parse authors per file from git log | [ownership.py:58](../src/black_box_unlock/git/ownership.py#L58) |
 
 #### Coupling Detection Formula [3b]
 

@@ -6,6 +6,7 @@ ownership, defect, CI, or X-Ray analysis.
 """
 
 import os
+import subprocess
 import tempfile
 import time
 from collections import defaultdict
@@ -22,7 +23,7 @@ from .git.coupling import analyze_temporal_coupling
 from .git.log import fetch_git_history
 from .git.run import run_git
 
-CACHE_RELPATH = Path(".bbu") / "cache.json"
+CACHE_FILENAME = "cache.json"
 CACHE_MAX_AGE_HOURS = 24
 CACHE_VERSION = 2
 CACHE_HISTORY_DAYS = 90
@@ -38,6 +39,16 @@ class CouplingSnapshot(BaseModel):
     ignored_large_changesets: int = Field(default=0, ge=0)
 
 
+def state_dir(repo_path: Path) -> Path:
+    """Return bbu's per-repository state directory inside the git common dir.
+
+    The git dir is never populated from repository contents, so a committed
+    symlink cannot redirect writes made here.
+    """
+    common_dir = Path(run_git(repo_path, ["rev-parse", "--git-common-dir"]).strip())
+    return repo_path / common_dir / "bbu"
+
+
 def _head_oid(repo_path: Path) -> str:
     try:
         return run_git(
@@ -45,7 +56,7 @@ def _head_oid(repo_path: Path) -> str:
             ["rev-parse", "--verify", "HEAD^{commit}"],
             tolerate_unborn=True,
         ).strip()
-    except BlackBoxUnlockError:
+    except (BlackBoxUnlockError, subprocess.CalledProcessError):
         return "unknown"
 
 
@@ -81,8 +92,10 @@ def _read_fresh_snapshot(cache: Path, head_oid: str) -> CouplingSnapshot | None:
 
 
 def _write_snapshot(cache: Path, snapshot: CouplingSnapshot) -> None:
+    if cache.parent.is_symlink() or cache.is_symlink():
+        logger.warning("refusing to write coupling cache through a symlink at {}", cache)
+        return
     cache.parent.mkdir(exist_ok=True)
-    (cache.parent / ".gitignore").write_text("*\n")
     temporary_path: Path | None = None
     try:
         with tempfile.NamedTemporaryFile(
@@ -101,7 +114,7 @@ def _write_snapshot(cache: Path, snapshot: CouplingSnapshot) -> None:
 
 
 def _load_or_build_cache(repo_path: Path) -> CouplingSnapshot:
-    cache = repo_path / CACHE_RELPATH
+    cache = state_dir(repo_path) / CACHE_FILENAME
     head_oid = _head_oid(repo_path)
     snapshot = _read_fresh_snapshot(cache, head_oid)
     if snapshot is not None:

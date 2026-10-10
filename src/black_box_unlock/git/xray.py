@@ -135,30 +135,32 @@ def _header_name(header: str) -> str | None:
 
 
 def _attribute_hunk(
-    hunk: Hunk, new_spans: list[FunctionSpan], old_spans: list[FunctionSpan]
+    hunk: Hunk, new_spans: list[FunctionSpan] | None, old_spans: list[FunctionSpan] | None
 ) -> dict[str, list[int]]:
     """Map function name -> [added, deleted] for one hunk.
 
-    With spans (Python): each added line goes to the innermost span containing
-    it in the post-image (new_spans); each deleted line goes to the innermost
-    span containing it in the pre-image (old_spans), so a function removed by
-    the commit still receives its deletions. Without spans on either side: the
-    hunk-header name takes everything.
+    Each added line goes to the innermost span containing it in the post-image
+    (new_spans); each deleted line goes to the innermost span containing it in
+    the pre-image (old_spans), so a function removed by the commit still
+    receives its deletions. A side whose spans are None (no snapshot, or one
+    that could not be parsed) falls back to the hunk-header name for that
+    side's lines; an empty list means the snapshot parsed and owns no lines.
     """
     out: dict[str, list[int]] = {}
-    if not new_spans and not old_spans:
-        name = _header_name(hunk.header)
-        if name:
-            out[name] = [hunk.new_count, hunk.old_count]
-        return out
-    for line in range(hunk.new_start, hunk.new_start + hunk.new_count):
-        span = span_at(new_spans, line)
-        if span:
-            out.setdefault(span.name, [0, 0])[0] += 1
-    for line in range(hunk.old_start, hunk.old_start + hunk.old_count):
-        span = span_at(old_spans, line)
-        if span:
-            out.setdefault(span.name, [0, 0])[1] += 1
+    header = _header_name(hunk.header)
+    sides = (
+        (new_spans, hunk.new_start, hunk.new_count, 0),
+        (old_spans, hunk.old_start, hunk.old_count, 1),
+    )
+    for spans, start, count, slot in sides:
+        if spans is None:
+            if header and count:
+                out.setdefault(header, [0, 0])[slot] += count
+            continue
+        for line in range(start, start + count):
+            span = span_at(spans, line)
+            if span:
+                out.setdefault(span.name, [0, 0])[slot] += 1
     return out
 
 
@@ -210,7 +212,7 @@ def _show(repo_path: Path, sha: str, file_path: str) -> str | None:
         return None
 
 
-def _spans_for(source: str) -> list[FunctionSpan] | None:
+def _spans_for(source: str, where: str = "current snapshot") -> list[FunctionSpan] | None:
     """Spans for one snapshot; None when the source is too deeply nested to parse.
 
     Pathological (usually generated) source makes ast recurse past the
@@ -222,14 +224,16 @@ def _spans_for(source: str) -> list[FunctionSpan] | None:
     except SyntaxError:
         return indentation_spans(source)
     except RecursionError:
-        logger.warning("X-Ray: snapshot too deeply nested to parse; skipping its spans")
+        logger.warning("X-Ray: {} too deeply nested to parse; skipping its spans", where)
         return None
 
 
-def _spans_at(repo_path: Path, rev: str, file_path: str) -> list[FunctionSpan]:
-    """Function spans of the file at a revision; empty if the path is absent there."""
+def _spans_at(repo_path: Path, rev: str, file_path: str) -> list[FunctionSpan] | None:
+    """Function spans of the file at a revision; None if absent or unparseable there."""
     content = _show(repo_path, rev, file_path)
-    return (_spans_for(content) or []) if content is not None else []
+    if content is None:
+        return None
+    return _spans_for(content, f"{rev}:{file_path}")
 
 
 def _function_coupling(
@@ -299,8 +303,8 @@ def xray_file(
     tallies: dict[str, list[int]] = defaultdict(lambda: [0, 0])  # name -> [added, deleted]
     touched: dict[str, set[str]] = defaultdict(set)  # name -> commit shas
     for commit in commits:
-        new_spans: list[FunctionSpan] = []
-        old_spans: list[FunctionSpan] = []
+        new_spans: list[FunctionSpan] | None = None
+        old_spans: list[FunctionSpan] | None = None
         if is_python:
             new_spans = _spans_at(repo_path, commit.sha, file_path)
             if any(h.old_count for h in commit.hunks):

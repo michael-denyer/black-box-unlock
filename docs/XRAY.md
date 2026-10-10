@@ -30,8 +30,11 @@ still wins) so hunk headers carry real function context.
   commit's own snapshot and deleted lines through its parent's snapshot, so removed
   code lands on the function that held it. Revisions that don't parse
   (e.g. Python 2 history) fall back to indentation-based boundary detection.
-  Snapshots that hit the interpreter recursion limit are treated as unparseable and
-  the analysis continues with header-name attribution for that revision.
+  A snapshot that hits the interpreter recursion limit is treated as unparseable, and
+  the lines on that side of the diff (added lines for the commit's snapshot, deleted
+  lines for the parent's) fall back to header-name attribution. When the current
+  snapshot is unparseable, every tallied name is listed, including functions that no
+  longer exist, because there is no current span list to filter against.
 - **Other languages** (~27 covered by git's drivers): attribution uses the hunk-header
   function name. Boundaries and complexity are unknown there, so those functions rank
   by revisions with `complexity: 0.0`.
@@ -90,8 +93,8 @@ Measured on this repository (230 commits in the 365-day window, `--no-ci`, five
 alternating runs after a warm-up, wall time including `uv run` start-up):
 
 ```bash
-bbu analyze-repo --repo . --days 365 --no-ci --xray-top 0   # 0.32-0.33 s
-bbu analyze-repo --repo . --days 365 --no-ci --xray-top 5   # 1.88-2.14 s
+uv run bbu analyze-repo --repo . --days 365 --no-ci --xray-top 0   # 0.32-0.33 s
+uv run bbu analyze-repo --repo . --days 365 --no-ci --xray-top 5   # 1.88-2.14 s
 ```
 
 The top-5 pass adds about 1.6 s here, roughly six times the base run. The cost is the

@@ -174,7 +174,9 @@ def xray_file(
     instability - the highest-scoring functions are the precise refactoring
     and review targets. The coupling list shows function pairs that change
     together (>= min_coupling ratio): edit one, check its partners. Python
-    files get exact attribution; other languages are ranked by revisions only.
+    files get exact attribution; other languages with a git diff driver are
+    ranked by revisions only; extensions without one return no functions and
+    "skipped": "unsupported language".
     """
     try:
         result = _xray_file(

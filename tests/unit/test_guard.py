@@ -2,6 +2,7 @@
 
 import json
 import os
+import subprocess
 import time
 from unittest.mock import patch
 
@@ -42,10 +43,80 @@ def _cache_payload(files: dict | None = None) -> dict:
     }
 
 
+def _git(repo, *args: str) -> None:
+    subprocess.run(["git", "-C", str(repo), *args], check=True, capture_output=True)
+
+
+@pytest.fixture
+def tmp_path(tmp_path):
+    """Make every guard test directory a git repository; the cache lives in its git dir."""
+    _git(tmp_path, "init", "-b", "main")
+    return tmp_path
+
+
+def _cache_file(repo):
+    return repo / ".git" / "bbu" / "cache.json"
+
+
 def _write_cache(repo, payload) -> None:
-    cache = repo / ".bbu" / "cache.json"
+    cache = _cache_file(repo)
     cache.parent.mkdir()
     cache.write_text(payload if isinstance(payload, str) else json.dumps(payload))
+
+
+def _commit_coupled_pair(repo) -> None:
+    _git(repo, "config", "user.email", "dev@example.com")
+    _git(repo, "config", "user.name", "Dev")
+    for revision in ("1", "2"):
+        (repo / "a.py").write_text(revision)
+        (repo / "b.py").write_text(revision)
+        _git(repo, "add", ".")
+        _git(repo, "commit", "-m", f"change {revision}")
+
+
+class TestCacheSymlinkSafety:
+    def test_committed_bbu_symlink_target_is_untouched(self, tmp_path):
+        victim_dir = tmp_path.parent / f"{tmp_path.name}-victim"
+        victim_dir.mkdir()
+        (victim_dir / "cache.json").write_text("VICTIM")
+        _commit_coupled_pair(tmp_path)
+        (tmp_path / ".bbu").symlink_to(victim_dir)
+        _git(tmp_path, "add", ".bbu")
+        _git(tmp_path, "commit", "-m", "add symlink")
+
+        first = coupling_warnings("a.py", tmp_path)
+        second = coupling_warnings("a.py", tmp_path)
+
+        assert "b.py" in first[0]
+        assert second == first
+        assert (victim_dir / "cache.json").read_text() == "VICTIM"
+        assert sorted(p.name for p in victim_dir.iterdir()) == ["cache.json"]
+
+    def test_symlinked_state_dir_is_not_written_through(self, tmp_path):
+        victim_dir = tmp_path.parent / f"{tmp_path.name}-victim"
+        victim_dir.mkdir()
+        _commit_coupled_pair(tmp_path)
+        _cache_file(tmp_path).parent.symlink_to(victim_dir)
+
+        warnings = coupling_warnings("a.py", tmp_path)
+
+        assert "b.py" in warnings[0]
+        assert list(victim_dir.iterdir()) == []
+
+
+class TestCacheWriteFailure:
+    def test_unwritable_state_dir_still_returns_warnings(self, tmp_path):
+        _commit_coupled_pair(tmp_path)
+        state = _cache_file(tmp_path).parent
+        state.mkdir()
+        state.chmod(0o500)
+        try:
+            warnings = coupling_warnings("a.py", tmp_path)
+        finally:
+            state.chmod(0o700)
+
+        assert "b.py" in warnings[0]
+        assert not _cache_file(tmp_path).exists()
 
 
 class TestCouplingWarnings:
@@ -96,7 +167,7 @@ class TestCouplingWarnings:
 
         mock_history.assert_called_once_with(tmp_path, 90)
         assert "src/token.py" in warnings[0]
-        payload = json.loads((tmp_path / ".bbu" / "cache.json").read_text())
+        payload = json.loads(_cache_file(tmp_path).read_text())
         assert set(payload) == {
             "version",
             "generated_at",
@@ -104,7 +175,6 @@ class TestCouplingWarnings:
             "files",
             "ignored_large_changesets",
         }
-        assert (tmp_path / ".bbu" / ".gitignore").read_text() == "*\n"
 
     @pytest.mark.parametrize(
         "payload",
@@ -123,14 +193,14 @@ class TestCouplingWarnings:
         assert coupling_warnings("src/auth.py", tmp_path) == []
 
         mock_history.assert_called_once_with(tmp_path, 90)
-        rebuilt = json.loads((tmp_path / ".bbu" / "cache.json").read_text())
+        rebuilt = json.loads(_cache_file(tmp_path).read_text())
         assert rebuilt["version"] == 2
         assert rebuilt["files"] == {}
 
     @patch("black_box_unlock.guard.fetch_git_history")
     def test_stale_cache_is_rebuilt(self, mock_history, tmp_path):
         _write_cache(tmp_path, _cache_payload())
-        cache = tmp_path / ".bbu" / "cache.json"
+        cache = _cache_file(tmp_path)
         old = time.time() - 25 * 3600
         os.utime(cache, (old, old))
         mock_history.return_value = []
@@ -178,3 +248,33 @@ class TestCouplingWarnings:
     def test_rejects_invalid_limits(self, threshold, top, tmp_path):
         with pytest.raises(ValueError):
             coupling_warnings("src/auth.py", tmp_path, threshold=threshold, top=top)
+
+
+class TestStateDirPerWorktree:
+    def test_linked_worktree_keeps_its_own_cache(self, tmp_path):
+        from black_box_unlock.guard import state_dir
+
+        _commit_coupled_pair(tmp_path)
+        linked = tmp_path.parent / f"{tmp_path.name}-linked"
+        _git(tmp_path, "worktree", "add", str(linked), "-b", "linked")
+
+        assert state_dir(tmp_path) != state_dir(linked)
+        assert state_dir(tmp_path).resolve() == (tmp_path / ".git" / "bbu").resolve()
+        assert (tmp_path / ".git" / "worktrees") in state_dir(linked).resolve().parents
+
+
+class TestHookLogCap:
+    def test_log_is_truncated_to_the_newest_lines(self, tmp_path):
+        from black_box_unlock.guard import HOOK_LOG_MAX_LINES, hook_log_path, record_hook_failure
+
+        _commit_coupled_pair(tmp_path)
+        log = hook_log_path(tmp_path)
+        log.parent.mkdir()
+        log.write_text("".join(f"t{i} RuntimeError: old {i}\n" for i in range(HOOK_LOG_MAX_LINES)))
+
+        record_hook_failure(tmp_path, RuntimeError("newest"))
+
+        lines = log.read_text().splitlines()
+        assert len(lines) == HOOK_LOG_MAX_LINES
+        assert lines[0].endswith("old 1")
+        assert lines[-1].endswith("RuntimeError: newest")

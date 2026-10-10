@@ -1,10 +1,12 @@
 """Unit tests for CLI commands."""
 
 import json
+import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
 from typer.testing import CliRunner
 
 from black_box_unlock.cli import app
@@ -381,10 +383,32 @@ include_ci = true
         assert "Traceback" not in result.stdout
 
 
+def _git(repo, *args: str) -> None:
+    subprocess.run(["git", "-C", str(repo), *args], check=True, capture_output=True)
+
+
+def _coupled_repo(repo: Path) -> Path:
+    repo.mkdir()
+    _git(repo, "init", "-b", "main")
+    _git(repo, "config", "user.email", "dev@example.com")
+    _git(repo, "config", "user.name", "Dev")
+    for revision in ("1", "2"):
+        (repo / "a.py").write_text(revision)
+        (repo / "b.py").write_text(revision)
+        _git(repo, "add", ".")
+        _git(repo, "commit", "-m", f"change {revision}")
+    return repo
+
+
+def _hook_payload(path: Path) -> str:
+    return json.dumps({"tool_input": {"file_path": str(path)}})
+
+
 class TestCouplingGuardHookCommand:
     def test_reads_claude_payload_without_jq(self, tmp_path):
         repo = tmp_path / "repo"
         repo.mkdir()
+        _git(repo, "init")
         edited = repo / "src" / "a.py"
         edited.parent.mkdir()
         edited.write_text("x = 1\n")
@@ -402,6 +426,48 @@ class TestCouplingGuardHookCommand:
         assert json.loads(result.stdout)["hookSpecificOutput"]["additionalContext"]
         mock_warnings.assert_called_once_with("src/a.py", repo.resolve())
 
+    def test_subdirectory_resolves_the_repository_root(self, tmp_path):
+        repo = _coupled_repo(tmp_path / "repo")
+        (repo / "sub").mkdir()
+
+        result = runner.invoke(
+            app,
+            ["coupling-guard-hook", "--repo", str(repo / "sub")],
+            input=_hook_payload(repo / "a.py"),
+        )
+
+        assert result.exit_code == 0
+        assert "b.py" in json.loads(result.stdout)["hookSpecificOutput"]["additionalContext"]
+
+    def test_unexpected_error_exits_zero_and_appends_to_the_hook_log(self, tmp_path):
+        repo = _coupled_repo(tmp_path / "repo")
+
+        with patch(
+            "black_box_unlock.guard.coupling_warnings",
+            side_effect=[RuntimeError("first boom"), RuntimeError("second boom")],
+        ):
+            results = [
+                runner.invoke(
+                    app,
+                    ["coupling-guard-hook", "--repo", str(repo)],
+                    input=_hook_payload(repo / "a.py"),
+                )
+                for _ in range(2)
+            ]
+
+        assert [result.exit_code for result in results] == [0, 0]
+        lines = (repo / ".git" / "bbu" / "hook.log").read_text().splitlines()
+        assert len(lines) == 2
+        assert "RuntimeError: first boom" in lines[0]
+        assert "RuntimeError: second boom" in lines[1]
+
+    def test_hook_declaration_keeps_stderr_visible(self, repo_root):
+        hooks = json.loads((repo_root / "hooks" / "hooks.json").read_text())
+        command = hooks["hooks"]["PostToolUse"][0]["hooks"][0]["command"]
+
+        assert "2>/dev/null" not in command
+        assert command.endswith("|| true")
+
     def test_hooks_declaration_has_no_jq_dependency(self, repo_root):
         hooks = (repo_root / "hooks" / "hooks.json").read_text()
 
@@ -417,6 +483,18 @@ class TestDoctorCommand:
 
         assert result.exit_code == 0
         assert json.loads(result.stdout)["checks"]["jq_required"] is False
+
+    def test_reports_the_hook_log_and_its_last_line(self, tmp_path):
+        repo = _coupled_repo(tmp_path / "repo")
+        log = repo / ".git" / "bbu" / "hook.log"
+        log.parent.mkdir()
+        log.write_text("t1 RuntimeError: old\nt2 RuntimeError: newest\n")
+
+        result = runner.invoke(app, ["doctor", "--repo", str(repo)])
+
+        hook_log = json.loads(result.stdout)["hook_log"]
+        assert hook_log["path"] == str(log.resolve())
+        assert hook_log["last_line"] == "t2 RuntimeError: newest"
 
     def test_invalid_config_makes_doctor_fail_honestly(self, tmp_path):
         (tmp_path / ".git").mkdir()
@@ -437,3 +515,44 @@ class TestXrayMinCoupling:
             result = runner.invoke(app, ["xray", "mod.py", "--min-coupling", "0.5"])
         assert result.exit_code == 0
         assert mock_xray.call_args[1]["min_coupling"] == 0.5
+
+
+class TestOptionBounds:
+    @pytest.mark.parametrize(
+        "args",
+        [
+            ["analyze-repo", "--min-coupling", "1.5"],
+            ["analyze-repo", "--min-coupling", "-1"],
+            ["review-change", "--min-coupling", "1.5"],
+            ["review-change", "--min-shared-revisions", "0"],
+            ["xray", "mod.py", "--min-coupling", "1.5"],
+        ],
+    )
+    def test_out_of_range_values_are_rejected_before_analysis(self, args):
+        with (
+            patch("black_box_unlock.cli.run_analysis") as mock_analysis,
+            patch("black_box_unlock.cli.run_change_review") as mock_review,
+            patch("black_box_unlock.git.xray.xray_file") as mock_xray,
+        ):
+            result = runner.invoke(app, args)
+
+        assert result.exit_code == 2
+        assert "Invalid value" in result.output
+        mock_analysis.assert_not_called()
+        mock_review.assert_not_called()
+        mock_xray.assert_not_called()
+
+
+class TestCouplingGuardHookOutsideRepo:
+    def test_edit_outside_the_repository_is_not_a_failure(self, tmp_path):
+        repo = _coupled_repo(tmp_path / "repo")
+        outside = tmp_path / "outside.py"
+        outside.write_text("x = 1\n")
+
+        result = runner.invoke(
+            app, ["coupling-guard-hook", "--repo", str(repo)], input=_hook_payload(outside)
+        )
+
+        assert result.exit_code == 0
+        assert result.stdout == ""
+        assert not (repo / ".git" / "bbu" / "hook.log").exists()

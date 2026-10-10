@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bbu coupling-guard-hook 2>/dev/null || true",
+            "command": "bbu coupling-guard-hook || true",
             "timeout": 15
           }
         ]

@@ -166,8 +166,9 @@ format and glob rules are in
 Measured with `bbu validate` (split-history: rank hotspots on the older half,
 count bug-fix commits in the newer half): median Spearman rho **0.46** across
 six real repos (click, flask, pydantic, rich, fastapi, httpx); the top 10% of
-ranked files attracted a median **46%** of subsequent bug-fix touches; uniform
-would be 10%. Method, per-repo numbers, and limitations:
+ranked files attracted a median **46%** of subsequent bug-fix touches in the
+four repos with enough bug-fix signal (39.5% across all six); uniform would be
+10%. Method, per-repo numbers, and limitations:
 [docs/VALIDATION.md](docs/VALIDATION.md).
 
 ```bash

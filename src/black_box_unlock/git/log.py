@@ -15,7 +15,8 @@ from .run import run_git
 # \x01 marks the start of a commit record so we never collide with file content.
 _COMMIT_MARKER = "\x01"
 # %x09 is a git-side tab — the field separator _parse_log_output splits on.
-_PRETTY_FORMAT = f"{_COMMIT_MARKER}%aI%x09%ae%x09%s"
+# %aE applies .mailmap so one person with several emails counts once.
+_PRETTY_FORMAT = f"{_COMMIT_MARKER}%aI%x09%aE%x09%s"
 
 
 class CommitFile(BaseModel):
@@ -35,8 +36,10 @@ class Commit(BaseModel):
     files: list[CommitFile] = []
 
 
-def fetch_git_history(repo_path: Path, days: int) -> list[Commit]:
+def fetch_git_history(repo_path: Path, days: int, rev: str | None = None) -> list[Commit]:
     """Fetch commit history with per-file line stats as typed Commit models.
+
+    History ends at rev when given, otherwise at HEAD.
 
     An empty repo (unborn HEAD) returns an empty list.
 
@@ -52,6 +55,7 @@ def fetch_git_history(repo_path: Path, days: int) -> list[Commit]:
             "--numstat",
             "--no-renames",
             f"--pretty=format:{_PRETTY_FORMAT}",
+            *([rev] if rev is not None else []),
         ],
         tolerate_unborn=True,
     )

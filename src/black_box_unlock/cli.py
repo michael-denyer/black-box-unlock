@@ -2,6 +2,7 @@
 
 import json
 import shutil
+import subprocess
 import sys
 from enum import Enum
 from pathlib import Path
@@ -71,7 +72,9 @@ def _review_selector(
 def analyze_repo(  # [1a.1] Main analysis command
     days: int = typer.Option(30, help="Days of git history to analyze"),
     output: OutputFormat = typer.Option(OutputFormat.json, help="Output format: json, html"),
-    min_coupling: float = typer.Option(0.3, help="Minimum coupling ratio to include"),
+    min_coupling: float = typer.Option(
+        0.3, min=0.0, max=1.0, help="Minimum coupling ratio to include"
+    ),
     no_ci: bool = typer.Option(False, "--no-ci", help="Skip CI failure analysis"),
     repo: Path = typer.Option(Path("."), "--repo", help="Path to the git repository to analyze"),
     xray_top: int = typer.Option(
@@ -144,23 +147,30 @@ def coupling_guard(
 def coupling_guard_hook(
     repo: Path = typer.Option(Path("."), "--repo", help="Repository root"),
 ) -> None:
-    """Parse a Claude PostToolUse payload and emit a quiet coupling warning."""
-    from black_box_unlock.guard import coupling_warnings
+    """Parse a Claude PostToolUse payload and emit a quiet coupling warning.
+
+    Failures exit 0 and append one line to the repository's hook log.
+    """
+    from black_box_unlock.git.run import repo_toplevel
+    from black_box_unlock.guard import coupling_warnings, record_hook_failure
 
     try:
         payload = json.loads(sys.stdin.read())
         raw_path = payload.get("tool_input", {}).get("file_path")
         if not isinstance(raw_path, str) or not raw_path:
             return
-        repo_root = repo.resolve()
+        repo_root = repo_toplevel(repo.resolve())
         candidate = Path(raw_path)
         absolute_path = (
             candidate.resolve() if candidate.is_absolute() else (repo_root / candidate).resolve()
         )
+        if not absolute_path.is_relative_to(repo_root):
+            return
         file_path = absolute_path.relative_to(repo_root).as_posix()
         warnings = coupling_warnings(file_path, repo_root)
     except Exception as error:
         logger.warning("coupling guard hook skipped: {}", error)
+        record_hook_failure(repo, error)
         return
     if warnings:
         print(
@@ -202,11 +212,14 @@ def review_change_command(
     min_coupling: float | None = typer.Option(
         None,
         "--min-coupling",
+        min=0.0,
+        max=1.0,
         help="Override the profile's minimum observed coupling ratio",
     ),
     min_shared_revisions: int | None = typer.Option(
         None,
         "--min-shared-revisions",
+        min=1,
         help="Override the profile's support floor",
     ),
     include_ci: bool | None = typer.Option(
@@ -240,7 +253,17 @@ def doctor(
     repo: Path = typer.Option(Path("."), "--repo", help="Repository root"),
 ) -> None:
     """Report whether local review dependencies are available."""
+    from black_box_unlock.guard import hook_log_path
+
     resolved = repo.resolve()
+    hook_log: Path | None = None
+    hook_log_last_line: str | None = None
+    try:
+        hook_log = hook_log_path(resolved)
+        if hook_log.is_file():
+            hook_log_last_line = next(iter(reversed(hook_log.read_text().splitlines())), None)
+    except (BlackBoxUnlockError, OSError, subprocess.CalledProcessError):
+        pass
     config_error: str | None = None
     try:
         config = load_project_config(resolved)
@@ -265,6 +288,10 @@ def doctor(
                     "profiles": sorted(config.profiles) if config is not None else [],
                     "path_role_rules": len(config.path_roles) if config is not None else 0,
                     "error": config_error,
+                },
+                "hook_log": {
+                    "path": str(hook_log) if hook_log is not None else None,
+                    "last_line": hook_log_last_line,
                 },
             },
             indent=2,
@@ -322,7 +349,11 @@ def xray(
     days: int = typer.Option(365, help="Days of history to analyze"),
     cap: int = typer.Option(200, "--cap", help="Maximum revisions to analyze"),
     min_coupling: float = typer.Option(
-        0.3, "--min-coupling", help="Minimum function-pair coupling ratio to report"
+        0.3,
+        "--min-coupling",
+        min=0.0,
+        max=1.0,
+        help="Minimum function-pair coupling ratio to report",
     ),
 ) -> None:
     """Per-function churn for one file (Tornhill's X-Ray).

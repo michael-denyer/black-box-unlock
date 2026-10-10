@@ -69,3 +69,20 @@ def run_git(
             return ""
         raise
     return result.stdout
+
+
+def head_oid(repo_path: Path, rev: str = "HEAD") -> str | None:
+    """Return the full oid of rev (HEAD by default), or None when rev names no commit.
+
+    An unborn HEAD makes git say "unknown revision", which is not one of the
+    unborn markers run_git tolerates, so the verify failure is caught here.
+    """
+    try:
+        return run_git(repo_path, ["rev-parse", "--verify", f"{rev}^{{commit}}"]).strip() or None
+    except subprocess.CalledProcessError:
+        return None
+
+
+def is_shallow(repo_path: Path) -> bool:
+    """Return True when the repository is a shallow clone."""
+    return run_git(repo_path, ["rev-parse", "--is-shallow-repository"]).strip() == "true"

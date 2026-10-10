@@ -83,7 +83,7 @@ class BaseProvenance(BaseModel):
         "unstaged",
         "untracked",
     )
-    observed_at: datetime
+    analysed_at: datetime
 
 
 class StagedProvenance(BaseModel):
@@ -92,7 +92,7 @@ class StagedProvenance(BaseModel):
     kind: Literal["staged"] = "staged"
     head_oid: str | None
     layers: tuple[Literal["staged"]] = ("staged",)
-    observed_at: datetime
+    analysed_at: datetime
 
 
 class WorkingTreeProvenance(BaseModel):
@@ -104,7 +104,7 @@ class WorkingTreeProvenance(BaseModel):
         "unstaged",
         "untracked",
     )
-    observed_at: datetime
+    analysed_at: datetime
 
 
 ChangeProvenance = Annotated[
@@ -215,7 +215,7 @@ def _deduplicate(changes: list[ChangedPath]) -> list[ChangedPath]:
 
 def collect_change_set(repo_path: Path, selector: ChangeSelector) -> ChangeSet:
     """Resolve one selector and collect its repository-relative paths."""
-    observed_at = datetime.now(timezone.utc)
+    analysed_at = datetime.now(timezone.utc)
 
     if isinstance(selector, BaseChange):
         base_oid = _resolve_ref(repo_path, selector.base_ref)
@@ -241,7 +241,7 @@ def collect_change_set(repo_path: Path, selector: ChangeSelector) -> ChangeSet:
             requested_base=selector.base_ref,
             resolved_base_oid=base_oid,
             merge_base_oid=merge_base_oid,
-            observed_at=observed_at,
+            analysed_at=analysed_at,
         )
     elif isinstance(selector, StagedChange):
         head_oid = _resolve_optional_head(repo_path)
@@ -251,7 +251,7 @@ def collect_change_set(repo_path: Path, selector: ChangeSelector) -> ChangeSet:
         paths = _deduplicate(parse_name_status_z(run_git(repo_path, diff_args)))
         provenance = StagedProvenance(
             head_oid=head_oid,
-            observed_at=observed_at,
+            analysed_at=analysed_at,
         )
     else:
         head_oid = _resolve_optional_head(repo_path)
@@ -264,7 +264,7 @@ def collect_change_set(repo_path: Path, selector: ChangeSelector) -> ChangeSet:
         paths = _deduplicate([*tracked, *_untracked_paths(repo_path)])
         provenance = WorkingTreeProvenance(
             head_oid=head_oid,
-            observed_at=observed_at,
+            analysed_at=analysed_at,
         )
 
     return ChangeSet(selector=selector, provenance=provenance, paths=paths)

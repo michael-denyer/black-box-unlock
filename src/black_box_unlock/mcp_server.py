@@ -92,7 +92,10 @@ def _parse_roles(roles: list[str] | None) -> set[PathRole] | None:
 
 
 def _file_dict(f: FileForensics) -> dict:
-    return f.model_dump(mode="json")
+    """Dump a file for a tool result; the MCP analysis never runs X-Ray, so say so."""
+    data = f.model_dump(mode="json", exclude={"functions", "xray_failed"})
+    data["xray_skipped"] = "not requested"
+    return data
 
 
 def _provenance(result: AnalysisResult) -> dict | None:
@@ -264,7 +267,7 @@ def get_ownership(
       have left. The window bounds it, so a file untouched all window is
       absent, and ``orphaned`` is never reported here.
     - ``author_count`` and ``authors``: the raw spread. ``is_high_risk`` is
-      the older count-only test (>3 authors) and ignores the share.
+      true exactly when ``ownership_risk`` is ``diffuse``.
 
     file_path may be repo-relative or absolute inside the repo. The result has
     a ``provenance`` object.

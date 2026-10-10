@@ -346,3 +346,24 @@ class TestCouplingInfoConfidence:
         assert hub.confidence_lower_bound == wilson_lower_bound(4, 10)
         assert hub.confidence_lower_bound < hub.rate_to_partner
         assert leaf.confidence_lower_bound == wilson_lower_bound(4, 4)
+
+
+class TestIsHighRiskFollowsTheShare:
+    def test_dominant_author_among_four_is_not_high_risk(self):
+        from black_box_unlock.core.models import FileForensics, FileOwnership
+
+        four = ["a", "b", "c", "d"]
+        owned = FileOwnership(path="a.py", authors=four, commits=10, main_author_share=0.7)
+        diffuse = FileOwnership(path="b.py", authors=four, commits=10, main_author_share=0.3)
+
+        assert owned.is_high_risk is False
+        assert diffuse.is_high_risk is True
+        base = {"commits": 10, "lines_changed": 100, "complexity": 1.0, "coupled_with": []}
+        assert (
+            FileForensics(path="a.py", authors=four, main_author_share=0.7, **base).is_high_risk
+            is False
+        )
+        assert (
+            FileForensics(path="b.py", authors=four, main_author_share=0.3, **base).is_high_risk
+            is True
+        )

@@ -5,7 +5,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Protocol
 
-from ..core.models import HIGH_RISK_AUTHOR_THRESHOLD, FileOwnership
+from ..core.models import HIGH_RISK_AUTHOR_THRESHOLD, FileOwnership, is_diffuse
 from .log import Commit
 
 _GITHUB_BOT_EMAILS = frozenset({"noreply@github.com"})
@@ -23,10 +23,6 @@ class OwnershipRisk(str, Enum):
     shared = "shared"
     diffuse = "diffuse"
     orphaned = "orphaned"
-
-
-DOMINANT_AUTHOR_SHARE = 0.5
-"""A main author holding at least this share of non-bot commits keeps a many-author file out of ``diffuse``."""
 
 
 class _OwnershipFacts(Protocol):
@@ -50,7 +46,7 @@ def ownership_risk(ownership: _OwnershipFacts) -> OwnershipRisk:
     """
     if ownership.author_count <= HIGH_RISK_AUTHOR_THRESHOLD:
         return OwnershipRisk.owned
-    if ownership.main_author_share < DOMINANT_AUTHOR_SHARE:
+    if is_diffuse(ownership.author_count, ownership.main_author_share):
         return OwnershipRisk.diffuse
     return OwnershipRisk.shared
 

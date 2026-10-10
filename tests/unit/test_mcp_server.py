@@ -638,3 +638,17 @@ class TestUnbornAndUntrackedPaths:
         info = mcp_server.get_ownership("link.py", repo_path=str(scratch))
 
         assert info["path"] == "link.py"
+
+
+class TestXrayNotRequested:
+    @patch("black_box_unlock.mcp_server._analysis")
+    def test_file_results_say_xray_was_not_requested(self, mock_analysis):
+        mock_analysis.return_value = _result()
+
+        info = mcp_server.get_file_forensics("src/auth.py", repo_path=".", days=30)
+        hotspot = mcp_server.get_hotspots(repo_path=".")["hotspots"][0]
+
+        assert info["xray_skipped"] == "not requested"
+        assert hotspot["xray_skipped"] == "not requested"
+        assert "functions" not in info
+        assert "xray_failed" not in hotspot

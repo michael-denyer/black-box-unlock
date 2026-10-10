@@ -38,7 +38,7 @@ def _change_set(*paths: str) -> ChangeSet:
         selector=WorkingTreeChange(),
         provenance=WorkingTreeProvenance(
             head_oid="abc123",
-            observed_at=datetime(2026, 7, 30, tzinfo=timezone.utc),
+            analysed_at=datetime(2026, 7, 30, tzinfo=timezone.utc),
         ),
         paths=[ChangedPath(path=path, kind=ChangeKind.modified) for path in paths],
     )
@@ -265,7 +265,7 @@ def test_copy_starts_a_new_identity_without_source_coupling():
         selector=WorkingTreeChange(),
         provenance=WorkingTreeProvenance(
             head_oid="abc123",
-            observed_at=datetime(2026, 7, 30, tzinfo=timezone.utc),
+            analysed_at=datetime(2026, 7, 30, tzinfo=timezone.utc),
         ),
         paths=[
             ChangedPath(

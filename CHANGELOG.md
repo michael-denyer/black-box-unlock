@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- `bbu-mcp` file results say `xray_skipped: "not requested"` and omit
+  `functions` and `xray_failed`, because the MCP analysis never runs X-Ray.
+  Call `xray_file` for per-function churn.
+- Change-review provenance names its timestamp `analysed_at`, matching
+  `Provenance.analysed_at`, instead of `observed_at`. Readers of the review
+  JSON must rename the key.
+
+### Fixed
+
+- `is_high_risk`, `summary.high_risk_ownership`, and the HTML report's
+  "diffuse ownership" badge now use the same rule as `ownership_risk` and the
+  review focus action: more than three authors and no one holding half the
+  non-bot commits. A file with four authors and one dominant author is no
+  longer a risk anywhere.
+- Diagram labels and alt text in README and `docs/ARCHITECTURE.md` no longer
+  describe rename handling as a review-only feature.
+
 ## [2.0.0] - 2026-10-11
 
 ### Changed

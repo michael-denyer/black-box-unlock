@@ -75,12 +75,13 @@ class TestFileForensicsModel:
         assert forensics.author_count == 3
 
     def test_is_high_risk_true_when_more_than_three_authors(self):
-        """is_high_risk is True when author_count > 3."""
+        """is_high_risk is True when author_count > 3 and no author holds half."""
         forensics = FileForensics(
             path="src/auth.py",
             commits=10,
             lines_changed=100,
             authors=["a@x.com", "b@x.com", "c@x.com", "d@x.com"],
+            main_author_share=0.25,
             coupled_with=[],
         )
 

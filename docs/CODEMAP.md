@@ -61,7 +61,7 @@ sequenceDiagram
     participant User
     participant CLI as CLI [1a]
     participant Analysis as Analysis [2a]
-    participant Git as git log --numstat
+    participant Git as git log #45;#45;numstat
     participant Forensics as Git Forensics [3]
     participant Viz as Visualization [5]
 
@@ -234,7 +234,7 @@ classDiagram
 
     class FileOwnership {
         path: str
-        authors: list[str]
+        authors: list~str~
         +author_count
         +is_high_risk
     }
@@ -243,23 +243,23 @@ classDiagram
         path: str
         commits: int
         lines_changed: int
-        authors: list[str]
-        coupled_with: list[CouplingInfo]
+        authors: list~str~
+        coupled_with: list~CouplingInfo~
         +hotspot_score
     }
 
     class AnalysisResult {
         repo: str
-        files: list[FileForensics]
+        files: list~FileForensics~
         summary: AnalysisSummary
         parameters: AnalysisParameters
         ci_status: SignalStatus
     }
 
-    FileChurn --> FileForensics : aggregated
-    FileOwnership --> FileForensics : merged
-    TemporalCoupling --> FileForensics : coupled_with
-    FileForensics --> AnalysisResult : files
+    FileChurn ..> FileForensics : aggregated
+    FileOwnership ..> FileForensics : merged
+    TemporalCoupling ..> FileForensics : coupled_with
+    FileForensics ..> AnalysisResult : files
 ```
 
 ---

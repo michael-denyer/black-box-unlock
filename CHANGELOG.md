@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- The `maid` prek hook now checks every Markdown file. maid validates only its
+  first file argument, so a file was checked only when it came first in a
+  batch, and `docs/CODEMAP.md` carried errors that CI never reported
+- `docs/CODEMAP.md` now passes maid 0.0.29, which rejects three valid Mermaid
+  constructs. The `git log --numstat` participant spells its dashes as `#45;`
+  and renders the same text. In the model class diagram, relationships are
+  dashed (`..>`) instead of solid (`-->`) and list types render as `list<str>`
+  instead of `list[str]`
+
 ## [1.5.0] - 2026-10-10
 
 ### Added

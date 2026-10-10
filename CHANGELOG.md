@@ -7,8 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.1] - 2026-10-10
+
 ### Changed
 
+- The package keywords now match the GitHub repository topics. They add
+  `code-review`, `code-insights`, `clean-code`, `agent-plugin`, `claude-code`,
+  and `claude-plugin`
 - `run_change_review` takes one `ChangeReviewRequest` (selector, optional
   profile, and policy overrides) and resolves `.bbu.toml` itself.
   `resolve_review_settings`, `ReviewOverrides`, and `ResolvedReviewSettings`

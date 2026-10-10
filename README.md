@@ -168,7 +168,7 @@ format and glob rules are in
 | **Temporal Coupling** | Files changing together in at least two commits reveal hidden dependencies. Each pair reports the symmetric ratio and both directional rates. The edit hook and review warn from the edited file's rate, so editing a hub stays quiet about leaves. Repeated evidence ranks by a 95% Wilson lower bound, and partners deleted at HEAD are dropped |
 | **Bulk Commits** | Commits touching more than 50 files are excluded from churn, ownership, bug-fix, and coupling counts and reported as `ignored_large_changesets` |
 | **Change Review** | A fresh branch, staged, or working-tree review returns at most three typed actions with raw evidence |
-| **Ownership Risk** | More than three authors marks a coordination risk |
+| **Ownership Risk** | More than three authors with no one holding half the commits is diffuse, a coordination risk. More than three authors with one at 50% or more of non-bot commits is shared. Each file reports `main_author`, `main_author_share`, and `last_active` |
 | **Build Failures** | Failed workflow links and files changed in each failed commit, reported as implication rather than causation |
 | **Bug-fix Density** | Count of defect-repair commits per file |
 | **Flaky Steps** | CI steps that failed then passed on re-run |

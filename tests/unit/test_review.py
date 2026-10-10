@@ -438,3 +438,60 @@ def test_ci_evidence_cannot_create_an_action_when_the_signal_is_disabled():
 
     assert isinstance(result, ChangeReview)
     assert all(action.kind != "inspect_ci_failures" for action in result.actions)
+
+
+def _shared_file_analysis(path: str, authors: list[str], share: float) -> AnalysisResult:
+    analysis = _analysis()
+    analysis.files = [
+        FileForensics(
+            path=path,
+            commits=20,
+            lines_changed=100,
+            complexity=5,
+            authors=authors,
+            main_author=authors[0],
+            main_author_share=share,
+            coupled_with=[],
+        )
+    ]
+    analysis.couplings = []
+    return analysis
+
+
+def _focus_paths(result) -> list[str]:
+    assert isinstance(result, ChangeReview)
+    return [
+        item.path
+        for action in result.actions
+        if action.kind == "focus_review"
+        for item in action.evidence
+    ]
+
+
+FOUR_AUTHORS = ["a@x.com", "b@x.com", "c@x.com", "d@x.com"]
+
+
+def test_four_authors_with_one_dominant_do_not_trigger_focus_review():
+    analysis = _shared_file_analysis("src/owned.py", FOUR_AUTHORS, 0.9)
+
+    result = project_change_review(_change_set("src/owned.py"), analysis, ReviewParameters())
+
+    assert _focus_paths(result) == []
+
+
+def test_four_authors_at_exactly_half_do_not_trigger_focus_review():
+    analysis = _shared_file_analysis("src/shared.py", FOUR_AUTHORS, 0.5)
+
+    result = project_change_review(_change_set("src/shared.py"), analysis, ReviewParameters())
+
+    assert _focus_paths(result) == []
+
+
+def test_diffuse_ownership_triggers_focus_review_with_the_share_as_evidence():
+    analysis = _shared_file_analysis("src/diffuse.py", FOUR_AUTHORS, 0.3)
+
+    result = project_change_review(_change_set("src/diffuse.py"), analysis, ReviewParameters())
+
+    assert _focus_paths(result) == ["src/diffuse.py"]
+    focus = next(a for a in result.actions if a.kind == "focus_review")
+    assert focus.evidence[0].main_author_share == 0.3

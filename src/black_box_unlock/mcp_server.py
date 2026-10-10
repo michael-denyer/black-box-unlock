@@ -22,6 +22,7 @@ from .analysis import build_provenance, run_analysis
 from .core.exceptions import BlackBoxUnlockError
 from .core.models import AnalysisResult, FileForensics
 from .git.changes import BaseChange, StagedChange, WorkingTreeChange
+from .git.ownership import ownership_risk
 from .git.run import head_oid, run_git
 from .git.xray import xray_file as _xray_file
 from .path_roles import PathRole
@@ -246,7 +247,24 @@ def get_ownership(
     days: int = 30,
     include_ci: bool = False,
 ) -> dict:
-    """Authors of a file and whether it is a coordination risk (>3 authors).
+    """Who owns a file, how concentrated that is, and how recently it was touched.
+
+    Bot commits are ignored for all three numbers below. Authors are
+    ``.mailmap``-resolved emails.
+
+    - ``main_author`` and ``main_author_share``: the author with the most
+      commits in the window, and their fraction of the file's commits. Read
+      the share first. At or above 0.5 the file has an owner even with many
+      authors. Below 0.5 with more than 3 authors it is diffuse, a
+      coordination risk (``ownership_risk`` is ``diffuse``). ``shared`` means
+      more than 3 authors but one holds half or more. ``owned`` means 3 or
+      fewer authors. ``main_author_share`` is 0.0 when no human touched it.
+    - ``last_active``: ISO time of the latest non-bot commit in the window.
+      Use it to ask who to consult. A main author whose last commit is old may
+      have left. The window bounds it, so a file untouched all window is
+      absent, and ``orphaned`` is never reported here.
+    - ``author_count`` and ``authors``: the raw spread. ``is_high_risk`` is
+      the older count-only test (>3 authors) and ignores the share.
 
     file_path may be repo-relative or absolute inside the repo. The result has
     a ``provenance`` object.
@@ -259,6 +277,10 @@ def get_ownership(
         "path": f.path,
         "authors": f.authors,
         "author_count": f.author_count,
+        "main_author": f.main_author,
+        "main_author_share": f.main_author_share,
+        "last_active": f.last_active.isoformat() if f.last_active else None,
+        "ownership_risk": ownership_risk(f).value,
         "is_high_risk": f.is_high_risk,
         "provenance": _provenance(result),
     }

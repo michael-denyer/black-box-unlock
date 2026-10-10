@@ -26,7 +26,7 @@ src/black_box_unlock/
 │   ├── churn.py            # FileChurn aggregation
 │   ├── coupling.py         # Temporal coupling (symmetric ratio, directional rates)
 │   ├── changes.py          # Base, staged, and working-tree selection
-│   ├── ownership.py        # Authors per file
+│   ├── ownership.py        # Authors, main author share, last active
 │   └── defects.py          # Bug-fix commit detection
 ├── cicd/
 │   ├── models.py           # Typed workflow, job, step, and CI result models
@@ -44,7 +44,7 @@ src/black_box_unlock/
 | Hotspot score | git + file contents | commits x indentation complexity (serialized-data/lockfile/generated-asset files and generator-marked files score 0; notebooks scored over code cells) |
 | Temporal coupling | git | co_changes / min(commits_a, commits_b), plus rate_a_to_b = co_changes / commits_a and rate_b_to_a = co_changes / commits_b. Pairs need at least 2 shared revisions and are ordered by the 95% Wilson lower bound of the symmetric ratio. `coupled_with`, the edit hook, and review keep a partner only when the edited file's own rate reaches min_ratio. Pairs with a side missing from HEAD are dropped and counted |
 | Bulk commits | git | Commits touching more than `max_changeset_size` (50) files are excluded from churn, ownership, bug-fix, and coupling counts. X-Ray reads one file's history and keeps them |
-| Ownership risk | git | > 3 authors |
+| Ownership risk | git | `diffuse`: > 3 authors and the main author holds < 50% of non-bot commits. `shared`: > 3 authors, one holds >= 50%. `owned`: otherwise. `orphaned` needs a last-active date judged against today and is not decided, because the window bounds `last_active`. `FileForensics` carries `main_author`, `main_author_share`, `last_active` |
 | Bug-fix commits | git messages | fix(ing)/bug/hotfix/defect/regression/revert + repair verbs (correct/broke/crash/repair/fault/malfunction/stuck/hang) markers, excluding docs/style/test/chore/ci/build/refactor/feat-prefixed commits |
 | Build failures | gh CLI | failed workflow details plus paths changed in each failed commit; implication, not causality |
 | Flaky steps | gh api | flaky_runs / runs, where a flaky run has a step that failed on attempt N and passed on attempt M>N of the same run, and runs counts only the re-run runs examined in which the step executed |

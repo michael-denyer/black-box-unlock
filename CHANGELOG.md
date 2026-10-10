@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Ownership now says who owns a file, not only how many people touched it.
+  `FileOwnership` and `FileForensics` gain `main_author`,
+  `main_author_share` (the main author's commits over non-bot commits), and
+  `last_active` (latest non-bot commit in the window). `FileOwnership` also
+  gains `authors_by_commits`. Ties for main author go to the most recent
+  commit, then the lower name. `commits` still counts bot commits. A new
+  `ownership_risk()` returns `owned`, `shared`, or `diffuse`. `diffuse` needs
+  more than 3 authors and a main author below 50%. `orphaned` is reserved and
+  never returned, because the window bounds `last_active`. `review-change`
+  fires its focus action on `diffuse` only, so a four-author file where one
+  author wrote 90% of commits no longer triggers it. The `get_ownership` MCP
+  tool returns the new fields and `ownership_risk`. `is_high_risk` and the
+  report's ownership count still use the author count alone, and the HTML
+  badge "diffuse ownership" still means more than three authors regardless
+  of share. Timestamps are
+  the commit timestamps `fetch_git_history` returns (author date by default).
 - One frozen `CouplingPolicy` now drives `analyze-repo`, the MCP tools, the
   edit hook, and `review-change`. Its defaults are `min_ratio` 0.3,
   `min_shared_revisions` 2, `max_changeset_size` 50, and

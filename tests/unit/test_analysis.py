@@ -193,6 +193,31 @@ class TestRunAnalysis:
         assert auth_file.author_count == 2
         assert set(auth_file.authors) == {"alice@example.com", "bob@example.com"}
 
+    def test_copies_main_author_share_and_last_active_onto_forensics(self):
+        history = [
+            make_commit(
+                ["a.py"], author_email="alice@example.com", timestamp="2026-01-01T00:00:00+00:00"
+            ),
+            make_commit(
+                ["a.py"], author_email="alice@example.com", timestamp="2026-01-02T00:00:00+00:00"
+            ),
+            make_commit(
+                ["a.py"], author_email="bob@example.com", timestamp="2026-01-05T00:00:00+00:00"
+            ),
+        ]
+
+        with patch("black_box_unlock.analysis.fetch_git_history") as mock_fetch:
+            mock_fetch.return_value = history
+            result = run_analysis(Path("/fake/repo"), days=30)
+
+        (forensics,) = result.files
+        assert forensics.main_author == "alice@example.com"
+        assert forensics.main_author_share == pytest.approx(2 / 3)
+        assert forensics.last_active.day == 5
+        dumped = forensics.model_dump(mode="json")
+        assert dumped["main_author"] == "alice@example.com"
+        assert dumped["last_active"].startswith("2026-01-05")
+
     def test_computes_hotspot_scores(self):
         """Files are sorted by hotspot_score descending."""
         history = [make_commit(["low.py", "high.py"], author_email="alice@example.com")]

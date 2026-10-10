@@ -1,9 +1,15 @@
 """Unit tests for file ownership calculation."""
 
+from datetime import datetime, timezone
+
 import pytest
 
 from black_box_unlock.core.models import FileOwnership
-from black_box_unlock.git.ownership import parse_ownership_from_history
+from black_box_unlock.git.ownership import (
+    OwnershipRisk,
+    ownership_risk,
+    parse_ownership_from_history,
+)
 from tests.factories import make_commit
 
 
@@ -119,3 +125,103 @@ class TestParseOwnershipFromHistory:
 
         assert a_ownership.authors == ["unknown"]
         assert b_ownership.authors == ["unknown"]
+
+
+def _only(history):
+    (ownership,) = parse_ownership_from_history(history)
+    return ownership
+
+
+def _commits(author: str, count: int, *, day: int = 1, path: str = "a.py"):
+    return [
+        make_commit([path], author_email=author, timestamp=f"2026-01-{day:02d}T00:00:00+00:00")
+        for _ in range(count)
+    ]
+
+
+class TestMainAuthor:
+    def test_dominant_author_among_four_has_a_ninety_percent_share(self):
+        history = _commits("a@x.com", 9) + _commits("b@x.com", 1) + _commits("c@x.com", 0)
+        ownership = _only(history)
+
+        assert ownership.main_author == "a@x.com"
+        assert ownership.main_author_share == pytest.approx(0.9)
+        assert ownership.authors_by_commits == {"a@x.com": 9, "b@x.com": 1}
+
+    def test_equal_authors_each_hold_a_third(self):
+        history = _commits("a@x.com", 2) + _commits("b@x.com", 2) + _commits("c@x.com", 2)
+
+        assert _only(history).main_author_share == pytest.approx(1 / 3)
+
+    def test_tie_goes_to_the_most_recent_author(self):
+        history = _commits("zed@x.com", 2, day=10) + _commits("amy@x.com", 2, day=5)
+
+        assert _only(history).main_author == "zed@x.com"
+
+    def test_tie_with_equal_recency_goes_to_the_lower_name(self):
+        history = _commits("zed@x.com", 1, day=5) + _commits("amy@x.com", 1, day=5)
+
+        assert _only(history).main_author == "amy@x.com"
+
+    def test_bot_commits_count_in_commits_but_not_in_the_share(self):
+        history = _commits("alice@x.com", 1) + _commits("dependabot[bot]@x.com", 3, day=20)
+        ownership = _only(history)
+
+        assert ownership.commits == 4
+        assert ownership.main_author == "alice@x.com"
+        assert ownership.main_author_share == 1.0
+
+    def test_bot_only_file_has_no_owner_no_share_and_no_last_active(self):
+        ownership = _only(_commits("dependabot[bot]@x.com", 2))
+
+        assert ownership.main_author is None
+        assert ownership.main_author_share == 0.0
+        assert ownership.last_active is None
+        assert ownership.authors_by_commits == {}
+
+
+class TestLastActive:
+    def test_is_the_latest_human_commit_and_ignores_later_bot_commits(self):
+        history = (
+            _commits("alice@x.com", 1, day=3)
+            + _commits("bob@x.com", 1, day=7)
+            + _commits("dependabot[bot]@x.com", 1, day=28)
+        )
+
+        assert _only(history).last_active.day == 7
+
+
+class TestOwnershipRisk:
+    @pytest.mark.parametrize(
+        ("authors", "share", "expected"),
+        [
+            (3, 0.34, OwnershipRisk.owned),
+            (1, 1.0, OwnershipRisk.owned),
+            (0, 0.0, OwnershipRisk.owned),
+            (4, 0.9, OwnershipRisk.shared),
+            (4, 0.5, OwnershipRisk.shared),
+            (4, 0.49, OwnershipRisk.diffuse),
+            (6, 0.2, OwnershipRisk.diffuse),
+        ],
+    )
+    def test_rules(self, authors, share, expected):
+        ownership = FileOwnership(
+            path="a.py",
+            authors=[f"{i}@x.com" for i in range(authors)],
+            commits=10,
+            main_author_share=share,
+        )
+
+        assert ownership_risk(ownership) is expected
+
+    def test_orphaned_is_never_returned(self):
+        ownership = FileOwnership(
+            path="a.py",
+            authors=["a@x.com"],
+            commits=1,
+            main_author="a@x.com",
+            main_author_share=1.0,
+            last_active=datetime(2020, 1, 1, tzinfo=timezone.utc),
+        )
+
+        assert ownership_risk(ownership) is not OwnershipRisk.orphaned

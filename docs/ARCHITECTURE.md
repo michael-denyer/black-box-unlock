@@ -50,24 +50,7 @@ src/black_box_unlock/
 
 ## Data flow
 
-```mermaid
-flowchart LR
-    Git[git log --numstat] --> Parse[churn / coupling /<br/>ownership / defects]
-    GH[gh CLI + REST] --> CI[failed runs /<br/>flaky steps]
-    Config[.bbu.toml] --> Review
-    Parse --> Join[run_analysis join]
-    CI --> Join
-    Join --> JSON[JSON]
-    Join --> HTML[Offline investigation report]
-    Join --> MCP[bbu-mcp tools]
-    Join --> Guard[coupling guard hook]
-    Git --> Change[typed change selection]
-    Change --> Review[fresh change review]
-    Join --> Review
-    Review --> MCP
-    MCP --> Agent[Coding agent<br/>chooses where to focus]
-    Guard --> Agent
-```
+![Three paths serve the coding agent. MCP signal tools cache repository analysis; the edit hook reads its independent coupling snapshot; fresh change review resolves the request and profile, preserves rename history, and returns zero to three actions through CLI, MCP, or the plugin.](../assets/diagrams/architecture.svg)
 
 ## Degraded modes
 
@@ -81,5 +64,6 @@ flowchart LR
 
 ## Product constraints
 
-The product stays agent-native through MCP and the plugin. HTML is frozen.
+The product stays agent-native through MCP and the plugin. The HTML report
+is a self-contained investigation workspace.
 There is no IDE telemetry, PR-flow dashboard, or composite risk score.

@@ -111,7 +111,7 @@ def _load_or_build_cache(repo_path: Path) -> CouplingSnapshot:
     return snapshot
 
 
-def coupling_warnings(
+def coupling_warnings(  # [1c] Coupling guard for the edit hook
     file_path: str,
     repo_path: Path,
     threshold: float = 0.5,

@@ -7,6 +7,9 @@
 ```mermaid
 flowchart TB
     subgraph Layer1["Entry Points [1]"]
+        Agent["Coding agent"]
+        MCP["MCP Server [1b]"]
+        Guard["Coupling Guard Hook [1c]"]
         CLI["CLI Commands [1a]"]
     end
 
@@ -33,6 +36,10 @@ flowchart TB
         Workspace["Investigation Workspace [5c-e]"]
     end
 
+    Agent --> MCP
+    Agent --> Guard
+    MCP --> Analysis
+    Guard --> Coupling
     CLI --> Analysis
     Analysis --> Churn
     Analysis --> Coupling
@@ -74,17 +81,45 @@ sequenceDiagram
     end
 ```
 
+The agent path is the primary interface. The agent asks `bbu-mcp` for evidence
+and uses the answer to choose which files to inspect.
+
+```mermaid
+sequenceDiagram
+    participant Agent as Coding agent
+    participant MCP as MCP Server [1b]
+    participant Analysis as Analysis [2a]
+    participant Guard as Coupling Guard [1c]
+
+    Agent->>MCP: get_hotspots(repo_path, days)
+    MCP->>Analysis: run_analysis(path, days)
+    Analysis-->>MCP: AnalysisResult (cached per repo, days, CI)
+    MCP-->>Agent: files ranked by hotspot score
+    Agent->>MCP: get_file_forensics / get_coupled_files / xray_file
+    MCP-->>Agent: evidence for the files it chose
+    Agent->>Agent: inspect and edit the riskiest files first
+    Agent->>Guard: Edit or Write (PostToolUse hook)
+    Guard-->>Agent: warning when a coupled file was left out
+    Agent->>MCP: review_change(repo_path)
+    MCP-->>Agent: fresh review, at most three actions
+```
+
 ---
 
-### [1] Entry Points (CLI)
+### [1] Entry Points
 
-User-facing commands via Typer CLI.
+Agent-facing MCP tools and edit hook, and user-facing commands via Typer CLI.
 
 | ID | Component | Description | File:Line |
 |----|-----------|-------------|-----------|
 | 1a | CLI App | Typer application with `bbu` command | [cli.py:34](../src/black_box_unlock/cli.py#L34) |
 | 1a.1 | analyze_repo | Main analysis command | [cli.py:49](../src/black_box_unlock/cli.py#L49) |
 | 1a.2 | version | Version info command | [cli.py:78](../src/black_box_unlock/cli.py#L78) |
+| 1b | MCP Server | `bbu-mcp` server exposing forensic signals as agent tools | [mcp_server.py:24](../src/black_box_unlock/mcp_server.py#L24) |
+| 1b.1 | get_hotspots | First of six tools that read the cached analysis | [mcp_server.py:50](../src/black_box_unlock/mcp_server.py#L50) |
+| 1b.2 | xray_file | Per-function churn for one file, computed on each call | [mcp_server.py:164](../src/black_box_unlock/mcp_server.py#L164) |
+| 1b.3 | review_change | Fresh, uncached review of the selected change | [mcp_server.py:193](../src/black_box_unlock/mcp_server.py#L193) |
+| 1c | coupling_warnings | Coupling guard behind the `PostToolUse` edit hook | [guard.py:114](../src/black_box_unlock/guard.py#L114) |
 
 ---
 

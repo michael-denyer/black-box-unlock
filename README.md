@@ -26,6 +26,19 @@ signals through MCP tools and a Claude Code plugin.
 
 ## For agents (MCP + plugin)
 
+The agent calls `bbu-mcp` before it reads or edits code, and uses the ranked
+evidence to decide which files to inspect first.
+
+```mermaid
+flowchart LR
+    Agent[Coding agent] -->|calls a tool| MCP[bbu-mcp]
+    MCP -->|reads| History[Git history<br/>and GitHub Actions]
+    MCP -->|hotspots, coupling,<br/>ownership, CI failures| Agent
+    Agent -->|inspects the riskiest<br/>files first| Repo[Repository]
+    Agent -->|edits a file| Guard[Coupling guard hook]
+    Guard -->|warns about<br/>coupled files| Agent
+```
+
 ```bash
 uv tool install black-box-unlock   # provides bbu and bbu-mcp
 ```
@@ -185,8 +198,10 @@ needed to interpret them remains in keyboard-operable grids and text panels.
 
 ```mermaid
 flowchart LR
-    Git[Git History] --> Analyze[bbu analyze-repo]
+    Git[Git History] --> Analyze[Forensic analysis]
     CI[GitHub Actions] --> Analyze
+    Analyze --> MCP[bbu-mcp tools]
+    MCP --> Agent[Coding agent]
     Analyze --> JSON[JSON Output]
     Analyze --> HTML[HTML Report]
     HTML --> Grid[Searchable Evidence]

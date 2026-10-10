@@ -153,7 +153,7 @@ class TestMainAuthor:
 
         assert _only(history).main_author_share == pytest.approx(1 / 3)
 
-    def test_tie_goes_to_the_most_recent_committer(self):
+    def test_tie_goes_to_the_most_recent_author(self):
         history = _commits("zed@x.com", 2, day=10) + _commits("amy@x.com", 2, day=5)
 
         assert _only(history).main_author == "zed@x.com"

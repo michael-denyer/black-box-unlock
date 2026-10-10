@@ -17,7 +17,7 @@ from pydantic import (
 from ..path_roles import PathRole, classify_path_role
 
 HIGH_RISK_AUTHOR_THRESHOLD = 3
-"""Files with more than this many authors are considered coordination risks."""
+"""Above this many authors a file is shared or diffuse; see ``ownership_risk``."""
 
 
 class CouplingPolicy(BaseModel):
@@ -168,7 +168,7 @@ class FileOwnership(BaseModel):  # [4a.2] Authors per file
     main_author_share: float = Field(default=0.0, ge=0.0, le=1.0)
     """Main author's commits over the file's non-bot commits; 0.0 when there are none."""
     last_active: datetime | None = None
-    """Timestamp of the file's latest non-bot commit in the window; None when there is none."""
+    """Author timestamp of the latest non-bot commit in the window (committer when fetched with clock="committer"); None when there is none."""
     authors_by_commits: dict[str, int] = Field(default_factory=dict)
     """Non-bot commit count per author."""
 

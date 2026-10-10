@@ -21,7 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   fires its focus action on `diffuse` only, so a four-author file where one
   author wrote 90% of commits no longer triggers it. The `get_ownership` MCP
   tool returns the new fields and `ownership_risk`. `is_high_risk` and the
-  report's ownership count still use the author count alone. Timestamps are
+  report's ownership count still use the author count alone, and the HTML
+  badge "diffuse ownership" still means more than three authors regardless
+  of share. Timestamps are
   the commit timestamps `fetch_git_history` returns (author date by default).
 - One frozen `CouplingPolicy` now drives `analyze-repo`, the MCP tools, the
   edit hook, and `review-change`. Its defaults are `min_ratio` 0.3,

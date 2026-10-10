@@ -78,8 +78,15 @@ class _StepHistory:
             self.last_seen = completed_at
 
 
-def flaky_steps_from_jobs(jobs: list[WorkflowJob]) -> list[FlakyStep]:
-    """Detect steps that failed and then passed on a later run attempt."""
+def flaky_steps_from_jobs(
+    jobs: list[WorkflowJob], *, include_stable: bool = False
+) -> list[FlakyStep]:
+    """Observe each executed step of one run and flag fail-then-pass retries.
+
+    Each returned step stands for one run in which the step executed. Only steps
+    that failed and then passed on a later attempt are returned unless
+    include_stable is set, which the cross-run rate needs for its denominator.
+    """
     histories: dict[tuple[str, str], _StepHistory] = defaultdict(_StepHistory)
     for job in jobs:
         for step in job.steps:
@@ -106,13 +113,15 @@ def flaky_steps_from_jobs(jobs: list[WorkflowJob]) -> list[FlakyStep]:
                 if later_attempt > attempt
             )
         )
-        if flaky_count:
+        if flaky_count or include_stable:
             flaky.append(
                 FlakyStep(
                     job_name=job_name,
                     step_name=step_name,
                     first_seen=history.first_seen or now,
                     last_seen=history.last_seen or now,
+                    runs=1,
+                    flaky_runs=1 if flaky_count else 0,
                     total_attempts=len(attempts),
                     failures=failures,
                     flaky_count=flaky_count,
@@ -122,7 +131,10 @@ def flaky_steps_from_jobs(jobs: list[WorkflowJob]) -> list[FlakyStep]:
 
 
 def summarize_flaky_steps(steps: list[FlakyStep]) -> list[FlakyStepSummary]:
-    """Merge per-run observations into one summary per job and step."""
+    """Merge per-run observations into one summary per job and step.
+
+    Steps that never recovered in any observed run are dropped.
+    """
     summaries: dict[tuple[str, str], FlakyStepSummary] = {}
     for step in steps:
         key = (step.job_name, step.step_name)
@@ -133,17 +145,22 @@ def summarize_flaky_steps(steps: list[FlakyStep]) -> list[FlakyStepSummary]:
                 step_name=step.step_name,
                 first_seen=step.first_seen,
                 last_seen=step.last_seen,
+                runs=step.runs,
+                flaky_runs=step.flaky_runs,
                 total_attempts=step.total_attempts,
                 failures=step.failures,
                 flaky_count=step.flaky_count,
             )
             continue
+        summary.runs += step.runs
+        summary.flaky_runs += step.flaky_runs
         summary.total_attempts += step.total_attempts
         summary.failures += step.failures
         summary.flaky_count += step.flaky_count
         summary.first_seen = min(summary.first_seen, step.first_seen)
         summary.last_seen = max(summary.last_seen, step.last_seen)
-    return sorted(summaries.values(), key=lambda step: (step.job_name, step.step_name))
+    flaky = (summary for summary in summaries.values() if summary.flaky_runs)
+    return sorted(flaky, key=lambda step: (step.job_name, step.step_name))
 
 
 def _error_message(context: str, error: Exception) -> str:
@@ -199,7 +216,7 @@ def collect_ci_signals(repo_path: Path = Path("."), limit: int = 100) -> CIAnaly
             except Exception as error:
                 errors.append(_error_message(f"jobs for run {run.run_id}", error))
             else:
-                flaky_observations.extend(flaky_steps_from_jobs(jobs))
+                flaky_observations.extend(flaky_steps_from_jobs(jobs, include_stable=True))
 
     state = SignalState.partial if errors else SignalState.available
     return CIAnalysis(

@@ -386,6 +386,8 @@ class TestCIInPipeline:
                     step_name="Run tests",
                     first_seen=datetime(2026, 6, 1),
                     last_seen=datetime(2026, 6, 2),
+                    runs=1,
+                    flaky_runs=1,
                     total_attempts=2,
                     failures=1,
                     flaky_count=1,

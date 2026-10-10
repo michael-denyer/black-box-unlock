@@ -46,7 +46,7 @@ src/black_box_unlock/
 | Ownership risk | git | > 3 authors |
 | Bug-fix commits | git messages | fix(ing)/bug/hotfix/defect/regression/revert + repair verbs (correct/broke/crash/repair/fault/malfunction/stuck/hang) markers, excluding docs/style/test/chore/ci/build/refactor/feat-prefixed commits |
 | Build failures | gh CLI | failed workflow details plus paths changed in each failed commit; implication, not causality |
-| Flaky steps | gh api | step failed attempt N, passed attempt M>N (re-runs only) |
+| Flaky steps | gh api | flaky_runs / runs, where a flaky run has a step that failed on attempt N and passed on attempt M>N of the same run, and runs counts only the re-run runs examined in which the step executed |
 
 ## Data flow
 

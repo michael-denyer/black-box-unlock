@@ -109,6 +109,10 @@ before the first commit (2026-01-25).
   hotspot score that beats random but not churn or length is reported as
   such, not hidden.
 - One cutoff per run. A second split date is a second run.
+- Commits over the coupling policy's `max_changeset_size` (50 by default, or
+  the `[coupling]` table in `.bbu.toml`) are excluded from both halves, as
+  `analyze-repo` excludes them, so a 60-file `fix:` commit is not a fix on 60
+  files.
 
 ## Reproduce
 

@@ -13,6 +13,7 @@ from .core.exceptions import ConfigurationError
 from .core.models import (
     HIGH_RISK_AUTHOR_THRESHOLD,
     AnalysisResult,
+    CouplingPolicy,
     FileForensics,
     SignalStatus,
 )
@@ -39,8 +40,7 @@ class ReviewParameters(BaseModel):
     """Public policies needed to interpret a review."""
 
     days: int = Field(default=90, ge=1)
-    min_coupling: float = Field(default=0.3, ge=0.0, le=1.0)
-    min_shared_revisions: int = Field(default=2, ge=1)
+    coupling: CouplingPolicy = Field(default_factory=CouplingPolicy)
     include_ci: bool = False
     max_actions: int = Field(default=3, ge=1, le=3)
     profile: str = Field(default="default", min_length=1)
@@ -69,10 +69,17 @@ def _resolve_review_settings(
     repo_path: Path,
     request: ChangeReviewRequest,
 ) -> _ResolvedReviewSettings:
-    """Resolve project defaults and explicit overrides inside Change Review."""
+    """Resolve project defaults and explicit overrides inside Change Review.
+
+    The coupling policy starts from ``.bbu.toml``'s ``[coupling]`` table; a
+    profile's and then the request's ``min_coupling`` and
+    ``min_shared_revisions`` override it.
+    """
     config = load_project_config(repo_path)
     selected_name = request.profile if request.profile is not None else config.default_profile
-    values = ReviewParameters().model_dump(exclude={"profile", "config_path"})
+    values = ReviewParameters().model_dump(exclude={"profile", "config_path", "coupling"})
+    values["min_coupling"] = config.coupling.min_ratio
+    values["min_shared_revisions"] = config.coupling.min_shared_revisions
 
     if selected_name is not None:
         profile = config.profiles.get(selected_name)
@@ -96,9 +103,17 @@ def _resolve_review_settings(
         )
     )
     config_path = CONFIG_FILE_NAME if (repo_path.resolve() / CONFIG_FILE_NAME).exists() else None
+    coupling = CouplingPolicy.model_validate(
+        config.coupling.model_dump()
+        | {
+            "min_ratio": values.pop("min_coupling"),
+            "min_shared_revisions": values.pop("min_shared_revisions"),
+        }
+    )
     return _ResolvedReviewSettings(
         parameters=ReviewParameters(
             **values,
+            coupling=coupling,
             profile=selected_name or "default",
             config_path=config_path,
         ),
@@ -136,6 +151,7 @@ class CouplingEvidence(BaseModel):
     changed_path_revisions: int = Field(ge=1)
     coupled_path_revisions: int = Field(ge=1)
     coupling_ratio: float = Field(ge=0.0, le=1.0)
+    changed_to_coupled_rate: float = Field(ge=0.0, le=1.0)
     confidence_lower_bound: float = Field(ge=0.0, le=1.0)
     coupled_path_is_changed: bool
 
@@ -310,12 +326,15 @@ def _coupling_evidence(
     path_role_rules: tuple[PathRoleRule, ...],
     identities: dict[str, ChangedPathIdentity],
 ) -> list[CouplingEvidence]:
+    """Orient each pair from the changed path and keep partners it usually moves with.
+
+    The analysis already applied the support floor and live-partner rule. The
+    ratio floor applies to the directional rate shared / changed-path revisions.
+    """
     selected_paths = {change.path for change in change_set.paths}
 
     evidence: dict[tuple[str, str], CouplingEvidence] = {}
     for coupling in analysis.couplings:
-        if coupling.co_change_count < parameters.min_shared_revisions:
-            continue
         a_identity = identities.get(coupling.file_a)
         b_identity = identities.get(coupling.file_b)
         if a_identity is not None:
@@ -330,7 +349,8 @@ def _coupling_evidence(
             coupled_revisions = coupling.commits_a
         else:
             continue
-        if changed_path == coupled_path:
+        changed_to_coupled_rate = coupling.co_change_count / changed_revisions
+        if changed_path == coupled_path or changed_to_coupled_rate < parameters.coupling.min_ratio:
             continue
         item = CouplingEvidence(
             changed_path=changed_path,
@@ -341,6 +361,7 @@ def _coupling_evidence(
             changed_path_revisions=changed_revisions,
             coupled_path_revisions=coupled_revisions,
             coupling_ratio=coupling.coupling_ratio,
+            changed_to_coupled_rate=changed_to_coupled_rate,
             confidence_lower_bound=coupling.confidence_lower_bound,
             coupled_path_is_changed=coupled_path in selected_paths,
         )
@@ -543,9 +564,9 @@ def run_change_review(
     analysis = run_analysis(
         repo_path,
         days=policy.days,
-        min_coupling=policy.min_coupling,
         include_ci=policy.include_ci,
         xray_top=0,
+        policy=policy.coupling,
         ensure_paths=current_paths,
         path_aliases=_history_aliases(identities),
         rev=_history_end(change_set.provenance),

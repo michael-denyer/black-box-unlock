@@ -96,8 +96,8 @@ bbu analyze-repo --days=30
 # Generate interactive HTML report
 bbu analyze-repo --days=30 --output=html > report.html
 
-# Adjust coupling detection threshold (default 0.3)
-bbu analyze-repo --min-coupling=0.5 --output=html > report.html
+# Adjust the coupling policy (defaults 0.3, 2, and 50)
+bbu analyze-repo --min-coupling=0.5 --min-shared-revisions=3 --max-changeset-size=80
 
 # Skip CI failure analysis (faster, no GitHub access needed)
 bbu analyze-repo --no-ci --output=html > report.html
@@ -130,6 +130,12 @@ repository:
 ```toml
 default_profile = "release"
 
+[coupling]
+min_ratio = 0.3
+min_shared_revisions = 2
+max_changeset_size = 50
+require_live_partner = true
+
 [[path_roles]]
 pattern = "app/**/*.vue"
 role = "source"
@@ -146,7 +152,9 @@ include_ci = true
 max_actions = 3
 ```
 
-Project path rules run in file order before the built-in rules. Named profiles
+The `[coupling]` table sets one coupling policy for `analyze-repo`, the MCP
+tools, the edit hook, and review. Project path rules run in file order before
+the built-in rules. Named profiles
 set review defaults; command-line and MCP arguments override the selected
 profile. Invalid configuration stops the review with a clear error. The full
 format and glob rules are in
@@ -157,7 +165,8 @@ format and glob rules are in
 | Signal | Description |
 |--------|-------------|
 | **Hotspot Score** | commits × indentation complexity - identifies unstable complex code |
-| **Temporal Coupling** | Files changing together above the configured threshold reveal hidden dependencies; repeated evidence ranks by a 95% Wilson lower bound and bulk commits touching >50 files are excluded |
+| **Temporal Coupling** | Files changing together in at least two commits reveal hidden dependencies. Each pair reports the symmetric ratio and both directional rates. The edit hook and review warn from the edited file's rate, so editing a hub stays quiet about leaves. Repeated evidence ranks by a 95% Wilson lower bound, and partners deleted at HEAD are dropped |
+| **Bulk Commits** | Commits touching more than 50 files are excluded from churn, ownership, bug-fix, and coupling counts and reported as `ignored_large_changesets` |
 | **Change Review** | A fresh branch, staged, or working-tree review returns at most three typed actions with raw evidence |
 | **Ownership Risk** | More than three authors marks a coordination risk |
 | **Build Failures** | Failed workflow links and files changed in each failed commit, reported as implication rather than causation |

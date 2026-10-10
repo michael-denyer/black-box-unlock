@@ -1,8 +1,14 @@
 """Unit tests for temporal coupling detection."""
 
-from black_box_unlock.core.models import TemporalCoupling
-from black_box_unlock.git.coupling import analyze_temporal_coupling, detect_temporal_coupling
+from black_box_unlock.core.models import CouplingPolicy, TemporalCoupling
+from black_box_unlock.git.coupling import analyze_temporal_coupling
+from black_box_unlock.git.log import exclude_bulk
 from tests.factories import make_commit
+
+
+def _pairs(history, min_ratio=0.0, min_shared_revisions=1, live_paths=None):
+    policy = CouplingPolicy(min_ratio=min_ratio, min_shared_revisions=min_shared_revisions)
+    return analyze_temporal_coupling(history, policy, live_paths).couplings
 
 
 class TestTemporalCouplingModel:
@@ -50,8 +56,8 @@ class TestTemporalCouplingModel:
         assert coupling.coupling_ratio == 0.0
 
 
-class TestDetectTemporalCoupling:
-    """Tests for detect_temporal_coupling function."""
+class TestAnalyzeTemporalCoupling:
+    """Tests for analyze_temporal_coupling."""
 
     def test_detects_two_files_changing_together(self):
         """Detects coupling when two files appear in same commits."""
@@ -60,7 +66,7 @@ class TestDetectTemporalCoupling:
             make_commit(["a.py", "b.py"]),
         ]
 
-        result = detect_temporal_coupling(history, min_ratio=0.0)
+        result = _pairs(history, min_ratio=0.0)
 
         assert len(result) == 1
         coupling = result[0]
@@ -83,7 +89,7 @@ class TestDetectTemporalCoupling:
             make_commit(["b.py"]),
         ]
 
-        result = detect_temporal_coupling(history, min_ratio=0.5)
+        result = _pairs(history, min_ratio=0.5)
         assert len(result) == 1
 
     def test_excludes_pairs_below_threshold(self):
@@ -98,14 +104,14 @@ class TestDetectTemporalCoupling:
             make_commit(["b.py"]),
         ]
 
-        result = detect_temporal_coupling(history, min_ratio=0.6)
+        result = _pairs(history, min_ratio=0.6)
         assert len(result) == 0
 
     def test_alphabetical_ordering_avoids_duplicates(self):
         """Files are ordered alphabetically so (b, a) becomes (a, b)."""
         history = [make_commit(["zebra.py", "apple.py"])]
 
-        result = detect_temporal_coupling(history, min_ratio=0.0)
+        result = _pairs(history, min_ratio=0.0)
 
         assert len(result) == 1
         assert result[0].file_a == "apple.py"
@@ -115,33 +121,38 @@ class TestDetectTemporalCoupling:
         """Commits with only one file don't create any pairs."""
         history = [make_commit(["a.py"]), make_commit(["b.py"])]
 
-        result = detect_temporal_coupling(history, min_ratio=0.0)
+        result = _pairs(history, min_ratio=0.0)
 
         assert len(result) == 0
 
     def test_empty_data_returns_empty_list(self):
         """Empty history returns empty list."""
-        assert detect_temporal_coupling([], min_ratio=0.0) == []
+        assert _pairs([]) == []
 
-    def test_bulk_changeset_does_not_create_coupling_pairs(self):
-        history = [make_commit([f"generated/{i}.py" for i in range(51)])]
-
-        assert detect_temporal_coupling(history, min_ratio=0.0) == []
-
-    def test_bulk_changes_still_count_as_file_revisions(self):
-        bulk_files = ["a.py", "b.py", *[f"generated/{i}.py" for i in range(49)]]
+    def test_directional_rates_divide_by_each_side(self):
         history = [
-            make_commit(bulk_files),
-            make_commit(["a.py", "b.py"]),
+            *[make_commit(["hub.py", "leaf.py"]) for _ in range(3)],
+            *[make_commit(["hub.py"]) for _ in range(27)],
         ]
 
-        result = detect_temporal_coupling(history, min_ratio=0.5)
+        [pair] = _pairs(history)
 
-        assert len(result) == 1
-        assert result[0].co_change_count == 1
-        assert result[0].commits_a == 2
-        assert result[0].commits_b == 2
-        assert result[0].coupling_ratio == 0.5
+        assert (pair.file_a, pair.rate_a_to_b) == ("hub.py", 0.1)
+        assert (pair.file_b, pair.rate_b_to_a) == ("leaf.py", 1.0)
+        assert pair.coupling_ratio == 1.0
+        assert pair.model_dump()["rate_a_to_b"] == 0.1
+
+    def test_pairs_with_a_side_missing_from_live_paths_are_dropped_and_counted(self):
+        history = [make_commit(["a.py", "b.py", "gone.py"]) for _ in range(2)]
+
+        analysis = analyze_temporal_coupling(
+            history,
+            CouplingPolicy(),
+            live_paths=frozenset({"a.py", "b.py"}),
+        )
+
+        assert [(pair.file_a, pair.file_b) for pair in analysis.couplings] == [("a.py", "b.py")]
+        assert analysis.dropped_deleted_partners == 2
 
     def test_repeated_evidence_ranks_ahead_of_a_perfect_one_off(self):
         history = [
@@ -151,7 +162,7 @@ class TestDetectTemporalCoupling:
             make_commit(["src/one.py", "tests/test_one.py"]),
         ]
 
-        result = analyze_temporal_coupling(history, min_ratio=0.0).couplings
+        result = _pairs(history)
 
         assert (result[0].file_a, result[0].file_b) == (
             "src/a.py",
@@ -166,12 +177,33 @@ class TestDetectTemporalCoupling:
             make_commit(["src/repeated.py", "tests/test_repeated.py"]),
         ]
 
-        result = analyze_temporal_coupling(
-            history,
-            min_ratio=0.0,
-            min_shared_revisions=2,
-        ).couplings
+        result = _pairs(history, min_shared_revisions=2)
 
         assert [(pair.file_a, pair.file_b) for pair in result] == [
             ("src/repeated.py", "tests/test_repeated.py")
         ]
+
+
+class TestExcludeBulk:
+    def test_commit_over_the_cap_is_bulk_and_counted(self):
+        bulk = make_commit([f"generated/{i}.py" for i in range(51)])
+        normal = make_commit(["a.py", "b.py"])
+
+        kept, excluded = exclude_bulk([bulk, normal], max_changeset_size=50)
+
+        assert bulk.is_bulk(50) and not normal.is_bulk(50)
+        assert (kept, excluded) == ([normal], 1)
+
+    def test_commit_at_the_cap_is_not_bulk(self):
+        assert not make_commit([f"f{i}.py" for i in range(50)]).is_bulk(50)
+
+    def test_bulk_commits_do_not_count_as_file_revisions(self):
+        bulk_files = ["a.py", "b.py", *[f"generated/{i}.py" for i in range(49)]]
+        history, _ = exclude_bulk(
+            [make_commit(bulk_files), *[make_commit(["a.py", "b.py"]) for _ in range(2)]],
+            max_changeset_size=50,
+        )
+
+        [pair] = _pairs(history)
+
+        assert (pair.co_change_count, pair.commits_a, pair.commits_b) == (2, 2, 2)

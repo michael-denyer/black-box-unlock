@@ -5,12 +5,15 @@ from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 from black_box_unlock.analysis import export_to_json, run_analysis
 from black_box_unlock.cicd.models import CIAnalysis
 from black_box_unlock.core.models import (
     AnalysisResult,
     AnalysisSummary,
     CouplingInfo,
+    CouplingPolicy,
     FailedWorkflowRun,
     FileForensics,
     FlakyStepSummary,
@@ -18,6 +21,13 @@ from black_box_unlock.core.models import (
     SignalStatus,
 )
 from tests.factories import make_commit
+
+
+@pytest.fixture(autouse=True)
+def head_tree():
+    """Stand in for the HEAD tree of the fake repositories these tests analyze."""
+    with patch("black_box_unlock.analysis.head_paths", return_value=frozenset()) as mock:
+        yield mock
 
 
 class TestFileForensicsModel:
@@ -197,8 +207,9 @@ class TestRunAnalysis:
         assert result.files[0].path == "high.py"
         assert result.files[1].path == "low.py"
 
-    def test_includes_coupling_info(self):
+    def test_includes_coupling_info(self, head_tree):
         """Files include coupling info when above threshold."""
+        head_tree.return_value = frozenset({"a.py", "b.py"})
         history = [
             make_commit(["a.py", "b.py"], author_email="alice@example.com"),
             make_commit(["a.py", "b.py"], author_email="alice@example.com"),
@@ -206,7 +217,7 @@ class TestRunAnalysis:
 
         with patch("black_box_unlock.analysis.fetch_git_history") as mock_fetch:
             mock_fetch.return_value = history
-            result = run_analysis(Path("/fake/repo"), days=30, min_coupling=0.3)
+            result = run_analysis(Path("/fake/repo"), days=30)
 
         # a.py and b.py have 100% coupling (2/2 commits together)
         a_file = next(f for f in result.files if f.path == "a.py")
@@ -271,18 +282,122 @@ class TestRunAnalysis:
             result = run_analysis(
                 Path("/fake/repo"),
                 days=45,
-                min_coupling=0.75,
                 include_ci=False,
                 xray_top=0,
+                policy=CouplingPolicy(min_ratio=0.75),
             )
 
         assert result.parameters.model_dump() == {
-            "min_coupling": 0.75,
+            "coupling": {
+                "min_ratio": 0.75,
+                "min_shared_revisions": 2,
+                "max_changeset_size": 50,
+                "require_live_partner": True,
+            },
             "include_ci": False,
             "xray_top": 0,
-            "max_coupled_files_per_commit": 50,
         }
         assert result.summary.ignored_large_changesets == 1
+
+    def test_policy_defaults_come_from_bbu_toml(self, tmp_path):
+        (tmp_path / ".bbu.toml").write_text("[coupling]\nmin_shared_revisions = 4\n")
+        with patch("black_box_unlock.analysis.fetch_git_history", return_value=[]):
+            result = run_analysis(tmp_path, include_ci=False, xray_top=0)
+
+        assert result.parameters.coupling == CouplingPolicy(min_shared_revisions=4)
+
+
+class TestCouplingPolicyInPipeline:
+    def test_bulk_commit_is_excluded_from_every_history_signal(self, head_tree):
+        head_tree.return_value = frozenset({"src/a.py", "src/b.py"})
+        bulk = make_commit(
+            ["src/a.py", "src/b.py", *[f"gen/{i}.py" for i in range(49)]],
+            author_email="bot@example.com",
+            message="fix: reformat everything",
+        )
+        history = [
+            bulk,
+            make_commit(["src/a.py", "src/b.py"], author_email="dev@example.com"),
+            make_commit(["src/a.py", "src/b.py"], author_email="dev@example.com"),
+        ]
+
+        with patch("black_box_unlock.analysis.fetch_git_history", return_value=history):
+            result = run_analysis(Path("/fake/repo"), include_ci=False, xray_top=0)
+
+        a = next(file for file in result.files if file.path == "src/a.py")
+        assert (a.commits, a.bugfix_commits, a.authors) == (2, 0, ["dev@example.com"])
+        assert result.couplings[0].commits_a == 2
+        assert not any(file.path.startswith("gen/") for file in result.files)
+        assert result.summary.ignored_large_changesets == 1
+
+    def test_single_observation_pairs_are_not_reported(self, head_tree):
+        head_tree.return_value = frozenset({"a.py", "b.py"})
+        history = [make_commit(["a.py", "b.py"])]
+
+        with patch("black_box_unlock.analysis.fetch_git_history", return_value=history):
+            result = run_analysis(Path("/fake/repo"), include_ci=False, xray_top=0)
+
+        assert result.couplings == []
+        assert result.summary.coupled_pairs == 0
+
+    def test_partner_deleted_at_head_is_dropped_and_counted(self, head_tree):
+        head_tree.return_value = frozenset({"src/a.py"})
+        history = [make_commit(["src/a.py", "src/gone.py"]) for _ in range(3)]
+
+        with patch("black_box_unlock.analysis.fetch_git_history", return_value=history):
+            result = run_analysis(Path("/fake/repo"), include_ci=False, xray_top=0)
+
+        a = next(file for file in result.files if file.path == "src/a.py")
+        assert a.coupled_with == []
+        assert result.couplings == []
+        assert result.summary.dropped_deleted_partners == 1
+
+    def test_deleted_partner_is_kept_when_live_partner_is_not_required(self, head_tree):
+        history = [make_commit(["src/a.py", "src/gone.py"]) for _ in range(3)]
+
+        with patch("black_box_unlock.analysis.fetch_git_history", return_value=history):
+            result = run_analysis(
+                Path("/fake/repo"),
+                include_ci=False,
+                xray_top=0,
+                policy=CouplingPolicy(require_live_partner=False),
+            )
+
+        head_tree.assert_not_called()
+        assert [(pair.file_a, pair.file_b) for pair in result.couplings] == [
+            ("src/a.py", "src/gone.py")
+        ]
+
+    def test_ensured_path_counts_as_live(self, head_tree):
+        history = [make_commit(["src/new_name.py", "src/b.py"]) for _ in range(2)]
+        head_tree.return_value = frozenset({"src/b.py"})
+
+        with patch("black_box_unlock.analysis.fetch_git_history", return_value=history):
+            result = run_analysis(
+                Path("/fake/repo"),
+                include_ci=False,
+                xray_top=0,
+                ensure_paths=frozenset({"src/new_name.py"}),
+            )
+
+        assert len(result.couplings) == 1
+
+    def test_hub_does_not_list_a_leaf_but_the_leaf_lists_the_hub(self, head_tree):
+        head_tree.return_value = frozenset({"hub.py", "leaf.py"})
+        history = [
+            *[make_commit(["hub.py", "leaf.py"]) for _ in range(3)],
+            *[make_commit(["hub.py"]) for _ in range(27)],
+        ]
+
+        with patch("black_box_unlock.analysis.fetch_git_history", return_value=history):
+            result = run_analysis(Path("/fake/repo"), include_ci=False, xray_top=0)
+
+        by_path = {file.path: file for file in result.files}
+        assert by_path["hub.py"].coupled_with == []
+        assert [info.file for info in by_path["leaf.py"].coupled_with] == ["hub.py"]
+        assert by_path["leaf.py"].coupled_with[0].rate_to_partner == 1.0
+        pair = result.couplings[0]
+        assert (pair.rate_a_to_b, pair.rate_b_to_a, pair.coupling_ratio) == (0.1, 1.0, 1.0)
 
 
 class TestExportToJson:

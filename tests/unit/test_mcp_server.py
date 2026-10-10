@@ -148,6 +148,7 @@ class TestMcpTools:
                 "file_revisions": 10,
                 "coupled_file_revisions": 10,
                 "confidence_lower_bound": 0.49,
+                "rate_to_partner": 0.8,
             }
         ]
 

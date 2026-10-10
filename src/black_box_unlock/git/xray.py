@@ -281,6 +281,8 @@ def xray_file(
     ``skipped`` reason instead of guessed names.
     Python files get exact ast attribution per revision; other languages use
     git hunk-header names (complexity 0.0, ranked by revisions).
+    X-Ray reads only this file's history, so bulk commits that touch it count
+    as revisions here even though repository-wide signals exclude them.
 
     Raises:
         NotAGitRepoError: If repo_path is not a git repository.

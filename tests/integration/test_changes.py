@@ -130,3 +130,26 @@ def test_base_mode_history_excludes_the_reviewed_branch_commits(tmp_path):
     assert isinstance(result, ChangeReview)
     assert result.files[0].evidence.commits == 1
     assert result.files[0].evidence.bugfix_commits == 0
+
+
+def test_base_mode_still_flags_the_partner_of_a_deleted_file(tmp_path):
+    repo = tmp_path / "deleted-partner"
+    repo.mkdir()
+    _git(repo, "init", "-b", "main")
+    for attempt in range(4):
+        (repo / "hub.py").write_text(f"hub = {attempt}\n")
+        (repo / "leaf.py").write_text(f"leaf = {attempt}\n")
+        _git(repo, "add", ".")
+        _git(repo, "commit", "-m", f"touch both {attempt}")
+    for attempt in range(6):
+        (repo / "hub.py").write_text(f"hub = {attempt + 10}\n")
+        _git(repo, "commit", "-am", f"touch hub {attempt}")
+    _git(repo, "checkout", "-b", "feature")
+    _git(repo, "rm", "leaf.py")
+    _git(repo, "commit", "-m", "drop leaf")
+
+    result = run_change_review(repo, ChangeReviewRequest(selector=BaseChange(base_ref="main")))
+
+    assert isinstance(result, ChangeReview)
+    partners = [c.coupled_path for c in result.couplings]
+    assert partners == ["hub.py"]

@@ -9,6 +9,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- One frozen `CouplingPolicy` now drives `analyze-repo`, the MCP tools, the
+  edit hook, and `review-change`. Its defaults are `min_ratio` 0.3,
+  `min_shared_revisions` 2, `max_changeset_size` 50, and
+  `require_live_partner` true. The `[coupling]` table in `.bbu.toml`
+  overrides them. `analyze-repo` and the MCP tools used a floor of 1 shared
+  revision, so most reported pairs were single observations. They now use 2,
+  like review and the hook. `analyze-repo` gains `--min-shared-revisions`
+  and `--max-changeset-size`.
+- Each coupling pair reports `rate_a_to_b` and `rate_b_to_a` beside the
+  symmetric `coupling_ratio`. `CouplingInfo` reports `rate_to_partner`.
+  `coupled_with`, the edit hook, and the `check_coupled_paths` action keep a
+  partner only when the edited file's own rate reaches `min_ratio`. Editing
+  a hub file no longer warns about every small file it once touched. The
+  hook's default threshold moves from a 0.5 symmetric ratio to this 0.3
+  directional rate.
+- Coupling partners missing from HEAD are dropped and counted in
+  `summary.dropped_deleted_partners`. Review and the hook no longer
+  recommend deleted files.
+- Commits touching more than `max_changeset_size` files are excluded from
+  churn, ownership, bug-fix, and coupling counts, not only from pair
+  generation. `summary.ignored_large_changesets` counts them. X-Ray keeps
+  them because it reads one file's history. `bbu validate` excludes them from
+  both halves so it validates the ranking `analyze-repo` produces.
+- A partner's `confidence_lower_bound` in `coupled_with`, hook warnings, and
+  review evidence is the Wilson bound of the oriented rate (shared over the
+  edited file's revisions), so it never exceeds the rate shown beside it. The
+  symmetric bound still orders pairs in `couplings`.
+- Live partners are judged against the tree at the analysed revision, so a
+  `review-change --base` of a branch that deletes a file still reports that
+  file's partners. The frozen HTML report lists partners from `couplings` and
+  so still shows a leaf beside a hub that the tools omit.
+- JSON and API shape. `parameters.coupling` replaces
+  `parameters.min_coupling` and `parameters.max_coupled_files_per_commit`.
+  Review `parameters.min_coupling` and `parameters.min_shared_revisions`
+  move under `parameters.coupling`. The edit-hook cache moves to version 3
+  and rebuilds once. `run_analysis` takes `policy=` instead of
+  `min_coupling=`. `coupling_warnings` takes `policy=` instead of
+  `threshold=` and `min_shared_revisions=`. `analyze_temporal_coupling` takes
+  `(commits, policy, live_paths)`. `TemporalCoupling.coupling_ratio` and
+  `confidence_lower_bound` are computed fields and now appear in JSON.
+  `CouplingAnalysis.dropped_deleted_partners` replaces its
+  `ignored_large_changesets`.
+
+### Removed
+
+- `detect_temporal_coupling` and `DEFAULT_MAX_COUPLED_FILES_PER_COMMIT`.
+  Call `analyze_temporal_coupling` with a `CouplingPolicy`.
 - Path roles recognise test naming conventions outside a `tests/` directory:
   `_test.go`, `.test.tsx`, `.spec.ts`, `FooTest.java`, `FooSpec.scala`,
   `FooTests.cs`, `_spec.rb`, `_test.rs`, `foo_test.py`, `conftest.py`, and

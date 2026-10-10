@@ -6,7 +6,6 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_valida
 
 from .core.exceptions import ConfigurationError
 from .path_roles import PathRoleRule
-from .review import ReviewParameters
 
 try:
     import tomllib
@@ -28,10 +27,6 @@ class ReviewProfile(BaseModel):
     max_actions: int | None = Field(default=None, ge=1, le=3)
 
 
-class ReviewOverrides(ReviewProfile):
-    """Caller overrides applied after a named profile."""
-
-
 class ProjectConfig(BaseModel):
     """Validated contents of one ``.bbu.toml`` file."""
 
@@ -50,15 +45,6 @@ class ProjectConfig(BaseModel):
         return self
 
 
-class ResolvedReviewSettings(BaseModel):
-    """Effective review policy and path rules after config resolution."""
-
-    model_config = ConfigDict(frozen=True)
-
-    parameters: ReviewParameters
-    path_roles: tuple[PathRoleRule, ...] = ()
-
-
 def load_project_config(repo_path: Path) -> ProjectConfig:
     """Parse and validate ``.bbu.toml`` at the external configuration seam."""
     config_path = repo_path.resolve() / CONFIG_FILE_NAME
@@ -70,37 +56,3 @@ def load_project_config(repo_path: Path) -> ProjectConfig:
         return ProjectConfig.model_validate(raw)
     except (OSError, tomllib.TOMLDecodeError, ValidationError) as error:
         raise ConfigurationError(f"Invalid {CONFIG_FILE_NAME}: {error}") from error
-
-
-def resolve_review_settings(
-    repo_path: Path,
-    *,
-    profile_name: str | None = None,
-    overrides: ReviewOverrides | None = None,
-) -> ResolvedReviewSettings:
-    """Resolve one named profile, then apply explicit caller overrides."""
-    config = load_project_config(repo_path)
-    selected_name = profile_name if profile_name is not None else config.default_profile
-    values = ReviewParameters().model_dump(exclude={"profile", "config_path"})
-
-    if selected_name is not None:
-        profile = config.profiles.get(selected_name)
-        if profile is None:
-            available = ", ".join(sorted(config.profiles)) or "none"
-            raise ConfigurationError(
-                f"Unknown review profile {selected_name!r}; available profiles: {available}"
-            )
-        values.update(profile.model_dump(exclude_none=True))
-
-    if overrides is not None:
-        values.update(overrides.model_dump(exclude_none=True))
-
-    config_path = CONFIG_FILE_NAME if (repo_path.resolve() / CONFIG_FILE_NAME).exists() else None
-    return ResolvedReviewSettings(
-        parameters=ReviewParameters(
-            **values,
-            profile=selected_name or "default",
-            config_path=config_path,
-        ),
-        path_roles=config.path_roles,
-    )

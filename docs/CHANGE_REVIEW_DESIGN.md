@@ -65,6 +65,12 @@ conflict is a typed selection error rather than a misleading review.
 Staged and working-tree review also work before the repository's first commit;
 their provenance records `head_oid` as `null`.
 
+Change Review gives each rename one Changed Path Identity across its old and
+current paths. History is canonicalized before aggregation, so the rename
+revision counts once while earlier churn, defects, ownership, coupling, and CI
+evidence follow the current path. A copy starts a new identity; its source path
+is provenance, not inherited evidence.
+
 ## Evidence and ordering
 
 Raw temporal-coupling pairs remain authoritative:

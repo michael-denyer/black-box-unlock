@@ -8,6 +8,8 @@ so a new commit or a new hour triggers a fresh analysis. Every result carries a
 ``provenance`` object saying which HEAD it read and whether the cache served it.
 """
 
+import os
+import subprocess
 import time
 from collections import OrderedDict
 from pathlib import Path
@@ -97,24 +99,44 @@ def _provenance(result: AnalysisResult) -> dict | None:
 
 
 def _repo_relative(repo_path: str, file_path: str) -> str:
-    """Return file_path relative to the repo root.
+    """Return file_path relative to the repo root without following the file's own symlink.
+
+    Git records a tracked symlink under its own path, so only the root is
+    resolved. An absolute file_path is accepted under either the given or the
+    resolved root (macOS /tmp versus /private/tmp).
 
     Raises:
-        ToolError: If the path resolves outside the repository.
+        ToolError: If the path lies outside the repository, or is a directory.
     """
-    root = Path(repo_path).resolve()
-    resolved = (root / file_path).resolve()  # an absolute file_path replaces root
-    try:
-        return resolved.relative_to(root).as_posix()
-    except ValueError:
-        raise ToolError(f"{file_path} is outside the repository at {root}") from None
+    given_root = Path(repo_path).absolute()
+    root = given_root.resolve()
+    candidate = Path(file_path)
+    joined = candidate if candidate.is_absolute() else root / candidate
+    normalised = Path(os.path.normpath(joined))
+    for base in (root, given_root):
+        if normalised.is_relative_to(base):
+            rel = normalised.relative_to(base).as_posix()
+            break
+    else:
+        raise ToolError(f"{file_path} is outside the repository at {root}")
+    target = root / rel
+    if rel == "." or (target.is_dir() and not target.is_symlink()):
+        raise ToolError(f"{file_path} is a directory; name a file")
+    return rel
 
 
 def _in_tree(repo_path: str, rel: str) -> bool:
+    """True when git tracks rel in the index or at HEAD; untracked and ignored files are not."""
     root = Path(repo_path).resolve()
-    if (root / rel).exists():
+    try:
+        run_git(root, ["ls-files", "--error-unmatch", "--", rel])
         return True
-    return bool(run_git(root, ["ls-tree", "HEAD", "--", rel], tolerate_unborn=True).strip())
+    except subprocess.CalledProcessError:
+        pass
+    try:
+        return bool(run_git(root, ["ls-tree", "HEAD", "--", rel]).strip())
+    except subprocess.CalledProcessError:
+        return False
 
 
 def _no_history(repo_path: str, rel: str, days: int) -> ToolError:

@@ -560,3 +560,48 @@ class TestPathHandling:
         ):
             with pytest.raises(ToolError, match="old.py exists but has no history in the last 30"):
                 call()
+
+
+class TestUnbornAndUntrackedPaths:
+    def test_unborn_repository_returns_no_hotspots(self, tmp_path):
+        repo = tmp_path / "fresh"
+        repo.mkdir()
+        _git(repo, "init", "-b", "main")
+        mcp_server._cache.clear()
+
+        result = mcp_server.get_hotspots(repo_path=str(repo))
+
+        assert result["hotspots"] == []
+        assert result["provenance"]["head_oid"] is None
+
+    def test_gitignored_file_is_not_in_tree(self, scratch):
+        (scratch / ".gitignore").write_text("ignored.txt\n")
+        (scratch / "ignored.txt").write_text("x\n")
+        _git(scratch, "add", ".gitignore")
+        _git(scratch, "commit", "-m", "ignore")
+        mcp_server._cache.clear()
+
+        with pytest.raises(ToolError, match="not in the repository tree"):
+            mcp_server.get_file_forensics("ignored.txt", repo_path=str(scratch))
+        with pytest.raises(ToolError, match="not in the repository tree"):
+            mcp_server.xray_file("ignored.txt", repo_path=str(scratch))
+
+    def test_directory_path_is_rejected(self, scratch):
+        (scratch / "sub").mkdir()
+        (scratch / "sub" / "b.py").write_text("y = 1\n")
+        _git(scratch, "add", "sub")
+        _git(scratch, "commit", "-m", "sub")
+        mcp_server._cache.clear()
+
+        with pytest.raises(ToolError, match="is a directory"):
+            mcp_server.get_file_forensics("sub", repo_path=str(scratch))
+
+    def test_tracked_symlink_keeps_its_own_path(self, scratch):
+        (scratch / "link.py").symlink_to("a.py")
+        _git(scratch, "add", "link.py")
+        _git(scratch, "commit", "-m", "link")
+        mcp_server._cache.clear()
+
+        info = mcp_server.get_ownership("link.py", repo_path=str(scratch))
+
+        assert info["path"] == "link.py"

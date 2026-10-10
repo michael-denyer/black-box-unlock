@@ -50,9 +50,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a least-recently-used store of 8 entries.
 - `get_file_forensics`, `get_coupled_files`, `get_ownership`, and `xray_file`
   accept absolute paths inside the repository. They raise a `ToolError` that
-  separates "outside the repository", "not in the repository tree", and
-  "exists but has no history in the last N days", instead of returning an
-  empty result.
+  separates "outside the repository", "not in the repository tree", "is a
+  directory", and "exists but has no history in the last N days".
+  `get_coupled_files` raised nothing before and returned `[]`. A tracked
+  symlink is reported under its own path, and a gitignored or untracked file
+  is "not in the repository tree". An unborn repository reports no hotspots
+  and a null `head_oid` instead of a git error.
 - CI failures on merge commits now implicate the files the merge brought in
   (the diff against its first parent). Before, a merge or merge-queue commit
   listed no files and its failure was attributed to nothing

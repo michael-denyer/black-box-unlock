@@ -16,6 +16,9 @@ keywords = [
     "code-review",
     "code-insights",
     "clean-code",
+    "agent-plugin",
+    "claude-code",
+    "claude-plugin",
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",

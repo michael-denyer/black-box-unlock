@@ -578,7 +578,9 @@ class TestUnbornAndUntrackedPaths:
         (scratch / ".gitignore").write_text("ignored.txt\n")
         (scratch / "ignored.txt").write_text("x\n")
         _git(scratch, "add", ".gitignore")
-        _git(scratch, "commit", "-m", "ignore")
+        _git(
+            scratch, "-c", "user.name=T", "-c", "user.email=t@example.com", "commit", "-m", "ignore"
+        )
         mcp_server._cache.clear()
 
         with pytest.raises(ToolError, match="not in the repository tree"):
@@ -590,7 +592,7 @@ class TestUnbornAndUntrackedPaths:
         (scratch / "sub").mkdir()
         (scratch / "sub" / "b.py").write_text("y = 1\n")
         _git(scratch, "add", "sub")
-        _git(scratch, "commit", "-m", "sub")
+        _git(scratch, "-c", "user.name=T", "-c", "user.email=t@example.com", "commit", "-m", "sub")
         mcp_server._cache.clear()
 
         with pytest.raises(ToolError, match="is a directory"):
@@ -599,7 +601,7 @@ class TestUnbornAndUntrackedPaths:
     def test_tracked_symlink_keeps_its_own_path(self, scratch):
         (scratch / "link.py").symlink_to("a.py")
         _git(scratch, "add", "link.py")
-        _git(scratch, "commit", "-m", "link")
+        _git(scratch, "-c", "user.name=T", "-c", "user.email=t@example.com", "commit", "-m", "link")
         mcp_server._cache.clear()
 
         info = mcp_server.get_ownership("link.py", repo_path=str(scratch))

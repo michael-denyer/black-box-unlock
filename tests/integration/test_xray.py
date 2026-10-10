@@ -122,3 +122,78 @@ class TestXrayCoupling:
         assert {pair.function_a, pair.function_b} == {"alpha", "beta"}
         assert pair.shared_revisions == 3  # creation + p1 + p2
         assert pair.coupling_ratio == 3 / 4  # beta: 4 revisions, alpha: 5
+
+
+class TestDeletionAttribution:
+    def test_deleting_a_function_does_not_credit_its_neighbour(self, tmp_path):
+        _run(["git", "init", "-b", "main"], tmp_path)
+        _run(["git", "config", "user.email", "t@example.com"], tmp_path)
+        _run(["git", "config", "user.name", "Tester"], tmp_path)
+        mod = tmp_path / "mod.py"
+        mod.write_text("def a():\n    return 1\n\n\ndef b():\n    return 2\n")
+        _run(["git", "add", "."], tmp_path)
+        _run(["git", "commit", "-m", "add a and b"], tmp_path)
+        mod.write_text("def b():\n    return 2\n")
+        _run(["git", "commit", "-am", "delete a"], tmp_path)
+
+        result = xray_file(tmp_path, "mod.py", days=365)
+
+        b = next(f for f in result.functions if f.name == "b")
+        assert (b.revisions, b.lines_added, b.lines_deleted) == (1, 2, 0)
+
+
+class TestUnsupportedLanguage:
+    @pytest.fixture
+    def js_repo(self, tmp_path):
+        _run(["git", "init", "-b", "main"], tmp_path)
+        _run(["git", "config", "user.email", "t@example.com"], tmp_path)
+        _run(["git", "config", "user.name", "Tester"], tmp_path)
+        for i in range(2):
+            (tmp_path / "x.js").write_text(f"function f() {{\n  return {i};\n}}\n")
+            _run(["git", "add", "."], tmp_path)
+            _run(["git", "commit", "-m", f"step {i}"], tmp_path)
+        return tmp_path
+
+    def test_xray_file_reports_skip_instead_of_guessing(self, js_repo):
+        result = xray_file(js_repo, "x.js", days=365)
+        assert result.functions == []
+        assert result.skipped == "unsupported language"
+
+    def test_top_hotspot_pass_records_skip(self, js_repo):
+        from black_box_unlock.analysis import run_analysis
+
+        result = run_analysis(js_repo, days=365, include_ci=False, xray_top=5)
+        js = next(f for f in result.files if f.path == "x.js")
+        assert js.xray_skipped == "unsupported language"
+        assert js.xray_failed is False
+        assert js.functions == []
+        assert result.summary.xrayed_files == 0
+
+
+class TestUnparseableSnapshot:
+    @pytest.fixture
+    def deep_repo(self, tmp_path):
+        _run(["git", "init", "-b", "main"], tmp_path)
+        _run(["git", "config", "user.email", "t@example.com"], tmp_path)
+        _run(["git", "config", "user.name", "Tester"], tmp_path)
+        deep = "1" + "+1" * 50000  # ast.parse hits its recursion limit on this
+        for i in range(2):
+            (tmp_path / "gen.py").write_text(f"def f():\n    x = {i}\n    return {deep}\n")
+            _run(["git", "add", "."], tmp_path)
+            _run(["git", "commit", "-m", f"step {i}"], tmp_path)
+        return tmp_path
+
+    def test_recursion_error_does_not_abort_xray(self, deep_repo):
+        result = xray_file(deep_repo, "gen.py", days=365)
+        assert result.revisions_analyzed == 2
+        assert [f.name for f in result.functions] == ["f"]
+        # the creation hunk has no header context, so only the edit is attributable
+        assert result.functions[0].revisions == 1
+
+    def test_unparseable_snapshot_has_explicit_null_score(self, deep_repo):
+        f = xray_file(deep_repo, "gen.py", days=365).functions[0]
+        assert f.complexity is None
+        assert f.hotspot_score is None
+        assert f.score_unavailable_reason == "current snapshot could not be parsed"
+        dumped = f.model_dump(mode="json")
+        assert dumped["hotspot_score"] is None and dumped["complexity"] is None

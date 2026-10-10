@@ -48,24 +48,23 @@ class TestAttributeHunk:
     SPANS = [FunctionSpan("alpha", 1, 10), FunctionSpan("beta", 12, 20)]
 
     def test_added_lines_apportioned_per_line(self):
-        # hunk spans the gap: lines 9-13 -> 2 lines alpha, 2 lines beta, line 11 unowned;
-        # all 5 deleted lines go to the probe span (line 9 -> alpha)
+        # hunk spans the gap: lines 9-13 -> 2 lines alpha, 2 lines beta, line 11 unowned
         hunk = Hunk(9, 5, 9, 5, "")
-        out = _attribute_hunk(hunk, self.SPANS)
-        assert out == {"alpha": [2, 5], "beta": [2, 0]}
+        out = _attribute_hunk(hunk, self.SPANS, self.SPANS)
+        assert out == {"alpha": [2, 2], "beta": [2, 2]}
 
-    def test_deletion_only_hunk_attributed_to_probe_span(self):
+    def test_deletion_only_hunk_attributed_to_old_span(self):
         hunk = Hunk(15, 3, 14, 0, "")
-        out = _attribute_hunk(hunk, self.SPANS)
+        out = _attribute_hunk(hunk, self.SPANS, self.SPANS)
         assert out == {"beta": [0, 3]}
 
     def test_no_spans_falls_back_to_header(self):
         hunk = Hunk(5, 1, 5, 2, "def alpha(a, b):")
-        assert _attribute_hunk(hunk, []) == {"alpha": [2, 1]}
+        assert _attribute_hunk(hunk, None, None) == {"alpha": [2, 1]}
 
     def test_line_outside_spans_dropped(self):
         hunk = Hunk(11, 0, 11, 1, "")
-        assert _attribute_hunk(hunk, self.SPANS) == {}
+        assert _attribute_hunk(hunk, self.SPANS, self.SPANS) == {}
 
 
 class TestHeaderName:
@@ -141,3 +140,30 @@ class TestFunctionCouplingPairs:
         }
         pairs = _function_coupling(touched, {"a", "b", "x", "y"}, min_ratio=0.3)
         assert [(p.function_a, p.function_b) for p in pairs] == [("a", "b"), ("x", "y")]
+
+
+class TestAttributeHunkParentSide:
+    OLD = [FunctionSpan("a", 1, 2), FunctionSpan("b", 5, 6)]
+    NEW = [FunctionSpan("b", 1, 2)]
+
+    def test_deleted_function_gets_the_deletion(self):
+        hunk = Hunk(1, 4, 0, 0, "")
+        assert _attribute_hunk(hunk, self.NEW, self.OLD) == {"a": [0, 2]}
+
+    def test_deleted_lines_use_old_numbering_added_lines_use_new(self):
+        hunk = Hunk(2, 1, 2, 2, "")
+        new = [FunctionSpan("a", 1, 3)]
+        old = [FunctionSpan("a", 1, 2)]
+        assert _attribute_hunk(hunk, new, old) == {"a": [2, 1]}
+
+    def test_unparseable_child_falls_back_to_header_for_added_lines(self):
+        hunk = Hunk(1, 1, 1, 2, "def a():")
+        assert _attribute_hunk(hunk, None, self.OLD) == {"a": [2, 1]}
+
+    def test_unparseable_parent_falls_back_to_header_for_deleted_lines(self):
+        hunk = Hunk(1, 2, 1, 1, "def b():")
+        assert _attribute_hunk(hunk, self.NEW, None) == {"b": [1, 2]}
+
+    def test_parsed_but_empty_spans_do_not_fall_back(self):
+        hunk = Hunk(1, 1, 1, 1, "def a():")
+        assert _attribute_hunk(hunk, [], []) == {}

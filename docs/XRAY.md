@@ -10,7 +10,13 @@ lines added/deleted, `complexity` (the same indentation proxy bbu uses for files
 measured over the function's current span), and
 `hotspot_score = revisions × complexity` — the file formula at function scale.
 Functions are ranked by score; functions that no longer exist in the current snapshot
-are excluded, matching file-level behavior.
+are excluded, matching file-level behavior (a commit that deletes a function still
+credits its deletions to that function, not to a neighbour, but the row is then dropped
+from the output).
+
+When complexity cannot be measured (the current snapshot is too deeply nested for `ast`
+to parse), `complexity` and `hotspot_score` are `null` and `score_unavailable_reason`
+says why. A `null` score is unknown, not zero; for ordering only, such rows rank as if the score were 0.
 
 ## How
 
@@ -20,11 +26,22 @@ still wins) so hunk headers carry real function context.
 
 - **Python**: each revision's content is fetched (`git show`, newest-first, capped at
   200 revisions like CodeScene) and hunks are attributed per line to exact `ast` spans —
-  decorator-aware, with `Class.method` qualified names. Revisions that don't parse
+  decorator-aware, with `Class.method` qualified names. Added lines map through the
+  commit's own snapshot and deleted lines through its parent's snapshot, so removed
+  code lands on the function that held it. Revisions that don't parse
   (e.g. Python 2 history) fall back to indentation-based boundary detection.
+  A snapshot that hits the interpreter recursion limit is treated as unparseable, and
+  the lines on that side of the diff (added lines for the commit's snapshot, deleted
+  lines for the parent's) fall back to header-name attribution. When the current
+  snapshot is unparseable, every tallied name is listed, including functions that no
+  longer exist, because there is no current span list to filter against.
 - **Other languages** (~27 covered by git's drivers): attribution uses the hunk-header
   function name. Boundaries and complexity are unknown there, so those functions rank
   by revisions with `complexity: 0.0`.
+- **Unsupported languages** (any extension without a git diff driver, such as `.js` or
+  `.ts`): X-Ray does not guess. `bbu xray` returns no functions and
+  `"skipped": "unsupported language"`; the top-hotspot pass in `analyze-repo` sets
+  `xray_skipped` on that file and does not count it in `xrayed_files`.
 
 ## Usage
 
@@ -72,10 +89,20 @@ relying on a stored example.
 
 ## Performance
 
-Measured during design research: the windowed `-p` pass for one file took 0.03 s on a
-17k-commit repository; the Python path adds one `git show` per analyzed revision
-(milliseconds each, bounded by the 200-revision cap). Interactive MCP calls stay well
-under a second; `--xray-top 5` adds negligible cost to `analyze-repo`.
+Measured on this repository (230 commits in the 365-day window, `--no-ci`, five
+alternating runs after a warm-up, wall time including `uv run` start-up):
+
+```bash
+uv run bbu analyze-repo --repo . --days 365 --no-ci --xray-top 0   # 0.32-0.33 s
+uv run bbu analyze-repo --repo . --days 365 --no-ci --xray-top 5   # 1.88-2.14 s
+```
+
+The top-5 pass adds about 1.6 s here, roughly six times the base run. The cost is the
+Python path: each analyzed revision costs one `git show` for its snapshot and, when the
+commit removes lines, one more for its parent, bounded by the 200-revision cap per file.
+Cost grows with the revision count of the hottest files, so use `--xray-top 0` on large
+histories where analysis time matters. A single interactive `xray_file` call is
+one file, one pass of this work.
 
 ## Limitations
 

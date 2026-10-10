@@ -180,8 +180,11 @@ def run_analysis(  # [2a] Main analysis pipeline
             if not (repo_path / f.path).exists():
                 continue
             try:
-                f.functions = xray_file(repo_path, f.path, days=days).functions
-                xrayed += 1
+                xray = xray_file(repo_path, f.path, days=days)
+                f.functions = xray.functions
+                f.xray_skipped = xray.skipped
+                if xray.skipped is None:
+                    xrayed += 1
             except Exception as e:
                 f.xray_failed = True
                 logger.warning("X-Ray failed for {}: {}", f.path, e)

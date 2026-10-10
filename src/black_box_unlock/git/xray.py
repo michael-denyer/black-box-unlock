@@ -35,6 +35,10 @@ MIN_SHARED_REVISIONS = 2
 # logged. Narrowing these markers would spuriously warn on real deletions.
 _ABSENT_PATH_MARKERS = ("does not exist in", "exists on disk, but not in")
 
+UNSUPPORTED_LANGUAGE = "unsupported language"
+
+UNPARSEABLE_SNAPSHOT = "current snapshot could not be parsed"
+
 _COMMIT_MARKER = "\x01"
 _PRETTY_FORMAT = f"{_COMMIT_MARKER}%H"
 _HUNK_RE = re.compile(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@ ?(.*)$")
@@ -130,28 +134,33 @@ def _header_name(header: str) -> str | None:
     return header.strip() or None
 
 
-def _attribute_hunk(hunk: Hunk, spans: list[FunctionSpan]) -> dict[str, list[int]]:
+def _attribute_hunk(
+    hunk: Hunk, new_spans: list[FunctionSpan] | None, old_spans: list[FunctionSpan] | None
+) -> dict[str, list[int]]:
     """Map function name -> [added, deleted] for one hunk.
 
-    With spans (Python): added lines are apportioned per post-image line to the
-    innermost containing span; deletions go to the span containing the hunk's
-    post-image position. Without spans: the hunk-header name takes everything.
+    Each added line goes to the innermost span containing it in the post-image
+    (new_spans); each deleted line goes to the innermost span containing it in
+    the pre-image (old_spans), so a function removed by the commit still
+    receives its deletions. A side whose spans are None (no snapshot, or one
+    that could not be parsed) falls back to the hunk-header name for that
+    side's lines; an empty list means the snapshot parsed and owns no lines.
     """
     out: dict[str, list[int]] = {}
-    if not spans:
-        name = _header_name(hunk.header)
-        if name:
-            out[name] = [hunk.new_count, hunk.old_count]
-        return out
-    for line in range(hunk.new_start, hunk.new_start + hunk.new_count):
-        span = span_at(spans, line)
-        if span:
-            out.setdefault(span.name, [0, 0])[0] += 1
-    if hunk.old_count:
-        probe = max(hunk.new_start, 1)
-        span = span_at(spans, probe)
-        if span:
-            out.setdefault(span.name, [0, 0])[1] += hunk.old_count
+    header = _header_name(hunk.header)
+    sides = (
+        (new_spans, hunk.new_start, hunk.new_count, 0),
+        (old_spans, hunk.old_start, hunk.old_count, 1),
+    )
+    for spans, start, count, slot in sides:
+        if spans is None:
+            if header and count:
+                out.setdefault(header, [0, 0])[slot] += count
+            continue
+        for line in range(start, start + count):
+            span = span_at(spans, line)
+            if span:
+                out.setdefault(span.name, [0, 0])[slot] += 1
     return out
 
 
@@ -203,11 +212,28 @@ def _show(repo_path: Path, sha: str, file_path: str) -> str | None:
         return None
 
 
-def _spans_for(source: str) -> list[FunctionSpan]:
+def _spans_for(source: str, where: str = "current snapshot") -> list[FunctionSpan] | None:
+    """Spans for one snapshot; None when the source is too deeply nested to parse.
+
+    Pathological (usually generated) source makes ast recurse past the
+    interpreter limit. That snapshot is treated as unparseable so the rest of
+    the history is still analyzed.
+    """
     try:
         return python_spans(source)
     except SyntaxError:
         return indentation_spans(source)
+    except RecursionError:
+        logger.warning("X-Ray: {} too deeply nested to parse; skipping its spans", where)
+        return None
+
+
+def _spans_at(repo_path: Path, rev: str, file_path: str) -> list[FunctionSpan] | None:
+    """Function spans of the file at a revision; None if absent or unparseable there."""
+    content = _show(repo_path, rev, file_path)
+    if content is None:
+        return None
+    return _spans_for(content, f"{rev}:{file_path}")
 
 
 def _function_coupling(
@@ -251,6 +277,8 @@ def xray_file(
 
     Ranks the file's functions by revisions x current indentation complexity
     and reports function pairs that change together (internal coupling).
+    Files whose extension has no diff driver return no functions and a
+    ``skipped`` reason instead of guessed names.
     Python files get exact ast attribution per revision; other languages use
     git hunk-header names (complexity 0.0, ranked by revisions).
 
@@ -258,6 +286,15 @@ def xray_file(
         NotAGitRepoError: If repo_path is not a git repository.
         GitToolNotFoundError: If the git binary is not installed.
     """
+    if Path(file_path).suffix.lower() not in DIFF_DRIVERS:
+        return FileXRay(
+            path=file_path,
+            days=days,
+            revisions_analyzed=0,
+            revision_cap_hit=False,
+            functions=[],
+            skipped=UNSUPPORTED_LANGUAGE,
+        )
     commits = parse_patch_log(_git_patch_log(repo_path, file_path, days))
     cap_hit = len(commits) > rev_cap
     commits = commits[:rev_cap]  # git log emits newest first
@@ -266,19 +303,20 @@ def xray_file(
     tallies: dict[str, list[int]] = defaultdict(lambda: [0, 0])  # name -> [added, deleted]
     touched: dict[str, set[str]] = defaultdict(set)  # name -> commit shas
     for commit in commits:
-        spans: list[FunctionSpan] = []
+        new_spans: list[FunctionSpan] | None = None
+        old_spans: list[FunctionSpan] | None = None
         if is_python:
-            content = _show(repo_path, commit.sha, file_path)
-            if content is not None:
-                spans = _spans_for(content)
+            new_spans = _spans_at(repo_path, commit.sha, file_path)
+            if any(h.old_count for h in commit.hunks):
+                old_spans = _spans_at(repo_path, f"{commit.sha}^", file_path)
         for hunk in commit.hunks:
-            for name, (added, deleted) in _attribute_hunk(hunk, spans).items():
+            for name, (added, deleted) in _attribute_hunk(hunk, new_spans, old_spans).items():
                 tallies[name][0] += added
                 tallies[name][1] += deleted
                 touched[name].add(commit.sha)
 
     functions = _build_functions(repo_path, file_path, is_python, tallies, touched)
-    functions.sort(key=lambda f: (-f.hotspot_score, -f.revisions, f.name))
+    functions.sort(key=lambda f: (-(f.hotspot_score or 0.0), -f.revisions, f.name))
     coupling = _function_coupling(touched, {f.name for f in functions}, min_coupling)
     return FileXRay(
         path=file_path,
@@ -312,7 +350,20 @@ def _build_functions(
     if not full_path.exists():
         return []
     lines = full_path.read_text(errors="ignore").splitlines()
-    current = {s.name: s for s in _spans_for("\n".join(lines))}
+    spans = _spans_for("\n".join(lines))
+    if spans is None:
+        return [
+            FunctionChurn(
+                name=name,
+                revisions=len(touched[name]),
+                lines_added=added,
+                lines_deleted=deleted,
+                complexity=None,
+                score_unavailable_reason=UNPARSEABLE_SNAPSHOT,
+            )
+            for name, (added, deleted) in tallies.items()
+        ]
+    current = {s.name: s for s in spans}
     functions: list[FunctionChurn] = []
     for name, (added, deleted) in tallies.items():
         span = current.get(name)

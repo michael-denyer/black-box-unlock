@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- X-Ray attributes deleted lines through each commit's parent snapshot. Added
+  lines still use the commit's own snapshot. Before, deletions went to the
+  function after the gap or were lost, so a commit that removed one function
+  could credit its neighbour
+- X-Ray no longer guesses for files without a git diff driver (such as `.js`).
+  `bbu xray` returns `skipped: "unsupported language"`, and the top-hotspot
+  pass sets `xray_skipped` on the file
+- X-Ray survives snapshots that exceed the `ast` recursion limit. Function
+  `complexity` and `hotspot_score` are `null` with a
+  `score_unavailable_reason` when the current snapshot cannot be parsed
+- `docs/XRAY.md` replaces the "negligible cost" claim for `--xray-top 5` with
+  measured timings
+
 ## [1.5.1] - 2026-10-10
 
 ### Changed

@@ -16,7 +16,9 @@ from black_box_unlock.validation import MethodScore, RandomBaseline, ValidationR
 runner = CliRunner()
 
 
-def _validation_result(repo: str = "demo", spearman: float | None = 0.62) -> ValidationReport:
+def _validation_result(
+    repo: str = "demo", spearman: float | None = 0.62, insufficient: bool = False
+) -> ValidationReport:
     return ValidationReport(
         repo=repo,
         days=730,
@@ -41,6 +43,9 @@ def _validation_result(repo: str = "demo", spearman: float | None = 0.62) -> Val
             top_decile_share_mean=0.1,
             top_decile_share_sd=0.03,
         ),
+        p_value=0.005,
+        insufficient_data=insufficient,
+        insufficient_reasons=["5 universe files < 20"] if insufficient else [],
     )
 
 
@@ -183,6 +188,15 @@ class TestValidateCommand:
             result = runner.invoke(app, ["validate", "--repo", "."])
         assert result.exit_code == 0
         assert "0.62" in result.stdout
+
+    def test_insufficient_data_prints_counts_not_percentages(self):
+        with patch("black_box_unlock.validation.validate_repo") as mock_validate:
+            mock_validate.return_value = _validation_result(insufficient=True)
+            result = runner.invoke(app, ["validate", "--repo", "."])
+        assert result.exit_code == 0
+        assert "insufficient data: 5 universe files < 20" in result.stdout
+        assert "0.62" not in result.stdout
+        assert "45%" not in result.stdout
 
     def test_json_output(self):
         with patch("black_box_unlock.validation.validate_repo") as mock_validate:

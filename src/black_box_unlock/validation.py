@@ -27,6 +27,10 @@ TOP_DECILE = 0.10
 CLOCK: Clock = "committer"
 RANDOM_DRAWS = 200
 RANDOM_SEED = 20260612
+# Below either floor the percentages are noise: with few files the top decile
+# is one or two files, and with few fixes one commit swings the share.
+MIN_UNIVERSE_FILES = 20
+MIN_TEST_BUGFIX_COMMITS = 30
 
 
 class MethodScore(BaseModel):
@@ -65,6 +69,9 @@ class ValidationReport(BaseModel):
     bugfix_coverage: float | None
     methods: dict[str, MethodScore]
     random: RandomBaseline
+    p_value: float | None
+    insufficient_data: bool
+    insufficient_reasons: list[str]
 
 
 class CutoffFile(BaseModel):
@@ -179,6 +186,29 @@ def summarize_random(draws: list[MethodScore], seed: int = RANDOM_SEED) -> Rando
     )
 
 
+def permutation_p(observed: float | None, draws: list[float]) -> float | None:
+    """One-sided permutation p: share of random draws scoring at least `observed`.
+
+    Uses the (b + 1) / (K + 1) estimator, so K draws can never report 0.
+    """
+    if observed is None or not draws:
+        return None
+    at_or_above = sum(1 for d in draws if d >= observed)
+    return (at_or_above + 1) / (len(draws) + 1)
+
+
+def insufficiency_reasons(universe_size: int, test_bugfix_commits: int) -> list[str]:
+    """Which sample floors the run falls below; empty when the figures are usable."""
+    reasons = []
+    if universe_size < MIN_UNIVERSE_FILES:
+        reasons.append(f"{universe_size} universe files < {MIN_UNIVERSE_FILES}")
+    if test_bugfix_commits < MIN_TEST_BUGFIX_COMMITS:
+        reasons.append(
+            f"{test_bugfix_commits} post-cutoff bug-fix commits < {MIN_TEST_BUGFIX_COMMITS}"
+        )
+    return reasons
+
+
 def _pct(value: float | None) -> str:
     return f"{value:.0%}" if value is not None else "n/a"
 
@@ -196,6 +226,9 @@ def render_report(report: ValidationReport) -> str:
         f"{report.test_bugfix_touches} touches on the universe "
         f"(coverage {_pct(report.bugfix_coverage)})"
     ]
+    if report.insufficient_data:
+        lines.append("  insufficient data: " + "; ".join(report.insufficient_reasons))
+        return "\n".join(lines)
     for name, score in report.methods.items():
         lines.append(
             f"  {name:<8} rho={_rho(score.spearman)}  top-10% share={_pct(score.top_decile_share)}"
@@ -207,6 +240,8 @@ def render_report(report: ValidationReport) -> str:
         f"top-10% share={_pct(rnd.top_decile_share_mean)}{sd}  "
         f"mean of {rnd.draws} draws, seed {rnd.seed}"
     )
+    p = f"{report.p_value:.3f}" if report.p_value is not None else "n/a"
+    lines.append(f"  hotspot share vs random: one-sided permutation p={p}")
     return "\n".join(lines)
 
 
@@ -301,6 +336,8 @@ def validate_repo(repo_path: Path, days: int = 730, split: float = 0.5) -> Valid
         "length": score_ranking({f.path: float(f.lines) for f in universe}, touches),
     }
     draws = random_draws(sorted(universe_paths), touches)
+    test_bugfix_commits = sum(1 for c in test if is_bugfix_message(c.message))
+    reasons = insufficiency_reasons(len(universe), test_bugfix_commits)
 
     return ValidationReport(
         repo=repo_path.resolve().name,
@@ -312,9 +349,15 @@ def validate_repo(repo_path: Path, days: int = 730, split: float = 0.5) -> Valid
         universe_size=len(universe),
         train_commits=len(train),
         test_commits=len(test),
-        test_bugfix_commits=sum(1 for c in test if is_bugfix_message(c.message)),
+        test_bugfix_commits=test_bugfix_commits,
         test_bugfix_touches=universe_touches,
         bugfix_coverage=universe_touches / total_touches if total_touches else None,
         methods=methods,
         random=summarize_random(draws),
+        p_value=permutation_p(
+            methods["hotspot"].top_decile_share,
+            [d.top_decile_share for d in draws if d.top_decile_share is not None],
+        ),
+        insufficient_data=bool(reasons),
+        insufficient_reasons=reasons,
     )

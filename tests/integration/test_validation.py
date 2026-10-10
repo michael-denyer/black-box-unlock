@@ -10,7 +10,11 @@ from pathlib import Path
 
 import pytest
 
-from black_box_unlock.validation import validate_repo
+from black_box_unlock.validation import (
+    MIN_TEST_BUGFIX_COMMITS,
+    MIN_UNIVERSE_FILES,
+    validate_repo,
+)
 
 INDENTED = "def f(x):\n    if x:\n        return 1\n    return 0\n"
 FLAT = "X = 1\nY = 2\n"
@@ -157,3 +161,29 @@ class TestBaselines:
         # scores 0.5 or 0, so the mean sits strictly between and the sd is positive
         assert 0 < first.top_decile_share_mean < 0.5
         assert first.top_decile_share_sd > 0
+
+
+class TestSignificance:
+    def test_tiny_repo_is_flagged_insufficient_with_counts(self, scratch: ScratchRepo):
+        _seed_train_half(scratch)
+        scratch.commit("fix: crash", {"hot.py": INDENTED + "Z = 5\n"}, days_ago=10)
+
+        report = validate_repo(scratch.path, days=100, split=0.5)
+
+        assert report.insufficient_data is True
+        assert report.insufficient_reasons == [
+            f"2 universe files < {MIN_UNIVERSE_FILES}",
+            f"1 post-cutoff bug-fix commits < {MIN_TEST_BUGFIX_COMMITS}",
+        ]
+
+    def test_p_value_compares_hotspot_share_with_random_draws(self, scratch: ScratchRepo):
+        # hot.py takes the only touch. One random draw in four puts hot.py on
+        # top, so about a quarter of 200 draws tie the hotspot share of 1.0.
+        _seed_train_half(scratch)
+        scratch.commit("feat: more", {"flat.py": FLAT, "long.py": "X = 1\n" * 50}, days_ago=75)
+        scratch.commit("fix: crash", {"hot.py": INDENTED + "Z = 5\n"}, days_ago=10)
+
+        report = validate_repo(scratch.path, days=100, split=0.5)
+
+        assert report.methods["hotspot"].top_decile_share == pytest.approx(1.0)
+        assert 0.15 < report.p_value < 0.35

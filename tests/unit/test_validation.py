@@ -5,7 +5,12 @@ from datetime import datetime, timezone
 import pytest
 
 from black_box_unlock.git.log import Commit
-from black_box_unlock.validation import score_ranking, spearman_rho, split_history
+from black_box_unlock.validation import (
+    permutation_p,
+    score_ranking,
+    spearman_rho,
+    split_history,
+)
 from tests.factories import make_commit
 
 
@@ -65,6 +70,18 @@ class TestSplitHistory:
         train, test = split_history([], self.CUTOFF)
         assert train == []
         assert test == []
+
+
+class TestPermutationP:
+    def test_counts_draws_at_or_above_observed_with_plus_one_correction(self):
+        # one of four draws ties the observed share: (1 + 1) / (4 + 1)
+        assert permutation_p(0.5, [0.5, 0.0, 0.0, 0.0]) == pytest.approx(0.4)
+
+    def test_observed_above_every_draw_is_the_floor_not_zero(self):
+        assert permutation_p(1.0, [0.0] * 199) == pytest.approx(1 / 200)
+
+    def test_undefined_observed_share_gives_none(self):
+        assert permutation_p(None, [0.1, 0.2]) is None
 
 
 class TestScoreRanking:

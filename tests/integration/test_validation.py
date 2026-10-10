@@ -31,7 +31,7 @@ class ScratchRepo:
         self.path = root / "repo"
         self.path.mkdir()
         self._home = root
-        self._git("init")
+        self._git("init", "--initial-branch=main")
 
     def _git(self, *args: str, author_days: int = 0, committer_days: int = 0) -> None:
         subprocess.run(
@@ -72,6 +72,18 @@ class ScratchRepo:
             message,
             author_days=days_ago if author_days_ago is None else author_days_ago,
             committer_days=days_ago,
+        )
+
+    def branch(self, name: str, start: str = "HEAD") -> None:
+        self._git("switch", "-c", name, start)
+
+    def switch(self, name: str) -> None:
+        self._git("switch", name)
+
+    def merge(self, branch: str, message: str, *, days_ago: int) -> None:
+        """Merge `branch` with a merge commit (no fast-forward) at the given age."""
+        self._git(
+            "merge", "--no-ff", "-m", message, branch, author_days=days_ago, committer_days=days_ago
         )
 
 
@@ -175,6 +187,20 @@ class TestSignificance:
             f"2 universe files < {MIN_UNIVERSE_FILES}",
             f"1 post-cutoff bug-fix commits < {MIN_TEST_BUGFIX_COMMITS}",
         ]
+
+    def test_fix_named_merge_commit_is_not_a_bugfix_commit(self, scratch: ScratchRepo):
+        # A GitHub merge subject carries the branch name, so it matches the
+        # bug-fix pattern, but it changes no files and its fix is already counted.
+        _seed_train_half(scratch)
+        scratch.branch("fix/crash")
+        scratch.commit("fix: crash", {"hot.py": INDENTED + "Z = 5\n"}, days_ago=10)
+        scratch.switch("main")
+        scratch.merge("fix/crash", "Merge pull request #1 from me/fix/crash", days_ago=5)
+
+        report = validate_repo(scratch.path, days=100, split=0.5)
+
+        assert report.test_commits == 2
+        assert report.test_bugfix_commits == 1
 
     def test_p_value_compares_hotspot_share_with_random_draws(self, scratch: ScratchRepo):
         # hot.py takes the only touch. One random draw in four puts hot.py on

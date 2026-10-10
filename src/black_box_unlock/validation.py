@@ -336,7 +336,9 @@ def validate_repo(repo_path: Path, days: int = 730, split: float = 0.5) -> Valid
         "length": score_ranking({f.path: float(f.lines) for f in universe}, touches),
     }
     draws = random_draws(sorted(universe_paths), touches)
-    test_bugfix_commits = sum(1 for c in test if is_bugfix_message(c.message))
+    # Merge commits carry no files and often a fix-named branch in the subject;
+    # the fix they merge is already counted, so only commits with files count.
+    test_bugfix_commits = sum(1 for c in test if c.files and is_bugfix_message(c.message))
     reasons = insufficiency_reasons(len(universe), test_bugfix_commits)
 
     return ValidationReport(

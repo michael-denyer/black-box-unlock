@@ -206,16 +206,15 @@ def _rho(value: float | None) -> str:
 
 def render_report(report: ValidationReport) -> str:
     """One text block per repo: header line, then one line per ranking method."""
-    lines = [
+    header = (
         f"{report.repo} @ {report.cutoff_sha[:7]} ({report.cutoff:%Y-%m-%d}): "
         f"universe={report.universe_size} files, "
         f"{report.test_bugfix_commits} bug-fix commits after the cutoff, "
-        f"{report.test_bugfix_touches} touches on the universe "
-        f"(coverage {_pct(report.bugfix_coverage)})"
-    ]
+        f"{report.test_bugfix_touches} touches on the universe"
+    )
     if report.insufficient_data:
-        lines.append("  insufficient data: " + "; ".join(report.insufficient_reasons))
-        return "\n".join(lines)
+        return "\n".join([header, "  insufficient data: " + "; ".join(report.insufficient_reasons)])
+    lines = [f"{header} (coverage {_pct(report.bugfix_coverage)})"]
     for name, score in report.methods.items():
         lines.append(
             f"  {name:<8} rho={_rho(score.spearman)}  top-10% share={_pct(score.top_decile_share)}"

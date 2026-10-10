@@ -193,10 +193,23 @@ class TestValidateCommand:
         with patch("black_box_unlock.validation.validate_repo") as mock_validate:
             mock_validate.return_value = _validation_result(insufficient=True)
             result = runner.invoke(app, ["validate", "--repo", "."])
-        assert result.exit_code == 0
         assert "insufficient data: 5 universe files < 20" in result.stdout
         assert "0.62" not in result.stdout
         assert "45%" not in result.stdout
+        assert "coverage" not in result.stdout
+
+    def test_all_repos_insufficient_exits_nonzero(self):
+        with patch("black_box_unlock.validation.validate_repo") as mock_validate:
+            mock_validate.return_value = _validation_result(insufficient=True)
+            result = runner.invoke(app, ["validate", "--repo", "."])
+        assert result.exit_code == 1
+        assert "no repo met the sample floor" in result.stdout
+
+    def test_report_lines_are_not_wrapped_at_80_columns(self):
+        with patch("black_box_unlock.validation.validate_repo") as mock_validate:
+            mock_validate.return_value = _validation_result()
+            result = runner.invoke(app, ["validate", "--repo", "."])
+        assert "90 bug-fix commits after the cutoff, 200 touches on the universe" in result.stdout
 
     def test_json_output(self):
         with patch("black_box_unlock.validation.validate_repo") as mock_validate:
@@ -218,6 +231,18 @@ class TestValidateCommand:
         assert result.exit_code == 0
         assert "median" in result.stdout.lower()
         assert "0.60" in result.stdout
+
+    def test_median_rho_skips_insufficient_repos(self):
+        results = [
+            _validation_result("a", 0.4, insufficient=True),
+            _validation_result("b", 0.6),
+            _validation_result("c", 0.8),
+        ]
+        with patch("black_box_unlock.validation.validate_repo") as mock_validate:
+            mock_validate.side_effect = results
+            result = runner.invoke(app, ["validate", "--repo", "a", "--repo", "b", "--repo", "c"])
+        assert result.exit_code == 0
+        assert "median rho=0.70 across 2 repos" in result.stdout
 
     def test_failing_repo_reports_error_but_others_continue(self):
         with patch("black_box_unlock.validation.validate_repo") as mock_validate:

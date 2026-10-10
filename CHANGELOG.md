@@ -22,8 +22,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `docs/VALIDATION.md` is re-derived from the v2 method and the v1 per-repo
   table is withdrawn.
 
-## [1.5.2] - 2026-10-10
-
 ### Fixed
 
 - CI failures on merge commits now implicate the files the merge brought in
@@ -40,6 +38,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   window count. `get_ci_failures` and `get_flaky_steps` cover the last 30 days
 - Flaky detection stays within one workflow run, so a failure on one commit
   followed by a pass on another is not flaky
+
+## [1.5.2] - 2026-10-10
+
+### Fixed
+
 - The coupling guard cache moved from `.bbu/cache.json` in the working tree to
   `bbu/cache.json` in the worktree's git dir, and the guard refuses to write
   through a symlink. A committed `.bbu` symlink could make the edit hook

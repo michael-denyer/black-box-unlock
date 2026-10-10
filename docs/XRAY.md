@@ -106,9 +106,10 @@ one file, one pass of this work.
 
 ## Limitations
 
-- **Renames split identity** (file- and function-level). bbu analyzes with
-  `--no-renames`, and the recency window ages renames out — same stance as file-level
-  analysis.
+- **Renames follow git's detection.** X-Ray runs `git log --follow` and reads each
+  parent snapshot under the name the file had there, so function history continues
+  across a rename git detects (50% similarity). A function renamed inside the file
+  still starts a new identity.
 - **Non-Python attribution is heuristic**: git's hunk-header context can attribute
   decorator/signature edits to the *preceding* function and cannot see nesting. Python
   avoids this via ast; other languages carry the error tail (and `complexity: 0.0`

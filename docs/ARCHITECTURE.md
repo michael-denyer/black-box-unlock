@@ -22,7 +22,7 @@ src/black_box_unlock/
 │   ├── exceptions.py       # NotAGitRepoError, GitToolNotFoundError
 │   └── logging.py          # loguru configuration (--verbose)
 ├── git/
-│   ├── log.py              # Native git log --numstat extraction
+│   ├── log.py              # Native git log --numstat extraction, rename following
 │   ├── churn.py            # FileChurn aggregation
 │   ├── coupling.py         # Temporal coupling (symmetric ratio, directional rates)
 │   ├── changes.py          # Base, staged, and working-tree selection
@@ -53,6 +53,21 @@ One frozen `CouplingPolicy` in `core/models.py` holds the coupling and bulk
 thresholds: `min_ratio` 0.3, `min_shared_revisions` 2, `max_changeset_size`
 50, and `require_live_partner` true. The `[coupling]` table in `.bbu.toml`
 overrides the defaults, and CLI or MCP arguments override the table.
+
+### Renames
+
+`fetch_git_history` follows renames that git detects inside the window. It
+walks the log from newest to oldest and reports every commit's files under
+their name at the end of the history. Every signal therefore sees one file:
+churn, coupling, ownership, bug-fix counts, CI attribution, the edit hook's
+snapshot, and the MCP tools. `FileForensics.renamed_from` lists the older
+names whose history was merged. A name reused by a new file after a rename
+stays a separate file. Detection uses git's default similarity threshold
+(50%); bbu does not expose `--find-renames` tuning. A rename commit counts
+once, on the new path, and adds no line churn when the content is unchanged.
+X-Ray follows one file with `git log --follow` and reads each parent snapshot
+under the name the file had there. `review-change` adds the renames its own
+change makes, which history cannot see yet.
 
 ## Data flow
 

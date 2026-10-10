@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- `bbu-mcp` file results say `xray_skipped: "not requested"` and omit
+  `functions` and `xray_failed`, because the MCP analysis never runs X-Ray.
+  Call `xray_file` for per-function churn.
+- Change-review provenance names its timestamp `analysed_at`, matching
+  `Provenance.analysed_at`, instead of `observed_at`. Readers of the review
+  JSON must rename the key.
+
 ### Fixed
 
 - `is_high_risk`, `summary.high_risk_ownership`, and the HTML report's
@@ -14,12 +23,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   review focus action: more than three authors and no one holding half the
   non-bot commits. A file with four authors and one dominant author is no
   longer a risk anywhere.
-- `bbu-mcp` file results say `xray_skipped: "not requested"` and omit
-  `functions` and `xray_failed`, because the MCP analysis never runs X-Ray.
-  Call `xray_file` for per-function churn.
-- Change-review provenance names its timestamp `analysed_at`, matching
-  `Provenance.analysed_at`, instead of `observed_at`. Readers of the review
-  JSON must rename the key.
 - Diagram labels and alt text in README and `docs/ARCHITECTURE.md` no longer
   describe rename handling as a review-only feature.
 

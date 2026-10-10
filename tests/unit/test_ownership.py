@@ -39,11 +39,12 @@ class TestFileOwnershipModel:
         assert ownership.author_count == 3
 
     def test_is_high_risk_true_when_more_than_three_authors(self):
-        """is_high_risk is True when file has >3 authors."""
+        """is_high_risk is True when file has >3 authors and no author holds half."""
         ownership = FileOwnership(
             path="src/auth.py",
             authors=["a@x.com", "b@x.com", "c@x.com", "d@x.com"],
             commits=20,
+            main_author_share=0.25,
         )
 
         assert ownership.is_high_risk is True

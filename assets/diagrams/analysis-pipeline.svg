@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="820" viewBox="0 0 1500 820" role="img" aria-labelledby="title desc">
+<title id="title">Inside run_analysis [2a]</title>
+<desc id="desc">One history snapshot feeds the parsers. Evidence joins by path before hotspot ranking.</desc>
+<defs>
+<marker id="cyan-arrow" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0L9 4.5L0 9Z" fill="#47e4ef"/></marker>
+<marker id="amber-arrow" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0L9 4.5L0 9Z" fill="#ffca58"/></marker>
+</defs>
+<rect width="1500" height="820" rx="18" fill="#080f1c"/>
+<path d="M34 89V34H1466" fill="none" stroke="#219bff" stroke-width="3"/>
+<path d="M34 34H58L34 58Z" fill="#219bff"/>
+
+<text x="60" y="72" fill="#f4f8ff" font-family="DejaVu Sans, Arial, sans-serif" font-size="34" font-weight="700" text-anchor="start">Inside run_analysis [2a]</text>
+<text x="60" y="108" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="19" font-weight="400" text-anchor="start">One history snapshot feeds the parsers. Evidence joins by path before hotspot ranking.</text>
+<text x="45" y="162" fill="#47e4ef" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="700" text-anchor="start">01  COLLECT</text>
+<text x="380" y="162" fill="#47e4ef" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="700" text-anchor="start">02  PARSE + DETECT</text>
+<text x="800" y="162" fill="#47e4ef" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="700" text-anchor="start">03  JOIN + RANK</text>
+<text x="1195" y="162" fill="#47e4ef" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="700" text-anchor="start">04  RETURN</text>
+<path d="M60 195H305L320 210V312L305 327H60L45 312V210Z" fill="#0c2136" stroke="#219bff" stroke-width="2"/>
+<text x="69" y="234" fill="#f4f8ff" font-family="DejaVu Sans Mono, monospace" font-size="20" font-weight="700" text-anchor="start">fetch_git_history</text>
+<text x="69" y="275" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="17" font-weight="400" text-anchor="start">Typed Commit records</text>
+<text x="69" y="307" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="17" font-weight="400" text-anchor="start">git log --numstat</text>
+<path d="M395 195H720L735 210V263L720 278H395L380 263V210Z" fill="#0c2136" stroke="#219bff" stroke-width="2"/>
+<text x="404" y="234" fill="#f4f8ff" font-family="DejaVu Sans Mono, monospace" font-size="16.8" font-weight="700" text-anchor="start">parse_history_entries</text>
+<text x="404" y="260" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="400" text-anchor="start">Churn</text>
+<path d="M350 261V237H378" fill="none" stroke="#47e4ef" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#cyan-arrow)"/>
+<path d="M735 237H765V373" fill="none" stroke="#47e4ef" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M395 303H720L735 318V371L720 386H395L380 371V318Z" fill="#0c2136" stroke="#219bff" stroke-width="2"/>
+<text x="404" y="342" fill="#f4f8ff" font-family="DejaVu Sans Mono, monospace" font-size="16.8" font-weight="700" text-anchor="start">parse_ownership_from_history</text>
+<text x="404" y="368" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="400" text-anchor="start">Ownership</text>
+<path d="M350 261V345H378" fill="none" stroke="#47e4ef" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#cyan-arrow)"/>
+<path d="M735 345H765V373" fill="none" stroke="#47e4ef" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M395 411H720L735 426V479L720 494H395L380 479V426Z" fill="#0c2136" stroke="#219bff" stroke-width="2"/>
+<text x="404" y="450" fill="#f4f8ff" font-family="DejaVu Sans Mono, monospace" font-size="16.8" font-weight="700" text-anchor="start">analyze_temporal_coupling</text>
+<text x="404" y="476" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="400" text-anchor="start">Co-changing pairs</text>
+<path d="M350 261V453H378" fill="none" stroke="#47e4ef" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#cyan-arrow)"/>
+<path d="M735 453H765V373" fill="none" stroke="#47e4ef" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M395 519H720L735 534V587L720 602H395L380 587V534Z" fill="#0c2136" stroke="#219bff" stroke-width="2"/>
+<text x="404" y="558" fill="#f4f8ff" font-family="DejaVu Sans Mono, monospace" font-size="16.8" font-weight="700" text-anchor="start">bugfix_counts</text>
+<text x="404" y="584" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="400" text-anchor="start">Defect-repair commits</text>
+<path d="M350 261V561H378" fill="none" stroke="#47e4ef" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#cyan-arrow)"/>
+<path d="M735 561H765V373" fill="none" stroke="#47e4ef" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M320 261H350" fill="none" stroke="#47e4ef" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M60 555H305L320 570V640L305 655H60L45 640V570Z" fill="#0c2136" stroke="#47e4ef" stroke-width="2"/>
+<text x="69" y="594" fill="#f4f8ff" font-family="DejaVu Sans Mono, monospace" font-size="20" font-weight="700" text-anchor="start">collect_ci_signals</text>
+<text x="69" y="629" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="17" font-weight="400" text-anchor="start">Failed runs + flaky steps</text>
+<path d="M60 690H305L320 705V760L305 775H60L45 760V705Z" fill="#0c2136" stroke="#219bff" stroke-width="2"/>
+<text x="69" y="729" fill="#f4f8ff" font-family="DejaVu Sans, Arial, sans-serif" font-size="21" font-weight="700" text-anchor="start">Current files</text>
+<text x="69" y="752" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="17" font-weight="400" text-anchor="start">Indentation complexity</text>
+<path d="M815 225H1120L1135 240V600L1120 615H815L800 600V240Z" fill="#0c2136" stroke="#47e4ef" stroke-width="2"/>
+<text x="824" y="264" fill="#f4f8ff" font-family="DejaVu Sans, Arial, sans-serif" font-size="24" font-weight="700" text-anchor="start">Aggregate per file</text>
+<circle cx="829" cy="301" r="5" fill="#47e4ef"/>
+<text x="847" y="307" fill="#f4f8ff" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="400" text-anchor="start">Index by path</text>
+<circle cx="829" cy="366" r="5" fill="#47e4ef"/>
+<text x="847" y="372" fill="#f4f8ff" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="400" text-anchor="start">Build coupling lookup</text>
+<circle cx="829" cy="431" r="5" fill="#47e4ef"/>
+<text x="847" y="437" fill="#f4f8ff" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="400" text-anchor="start">Read file complexity</text>
+<circle cx="829" cy="496" r="5" fill="#ffca58"/>
+<text x="847" y="502" fill="#f4f8ff" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="400" text-anchor="start">Calculate hotspot score</text>
+<circle cx="829" cy="561" r="5" fill="#ffca58"/>
+<text x="847" y="567" fill="#f4f8ff" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="400" text-anchor="start">Rank + function X-Ray</text>
+<path d="M765 373H798" fill="none" stroke="#47e4ef" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#cyan-arrow)"/>
+<path d="M320 605H350V649H968V617" fill="none" stroke="#47e4ef" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#cyan-arrow)" stroke-dasharray="7 7"/>
+<path d="M320 733H1160V540H1137" fill="none" stroke="#47e4ef" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#cyan-arrow)"/>
+<path d="M1210 305H1440L1455 320V530L1440 545H1210L1195 530V320Z" fill="#0c2136" stroke="#ffca58" stroke-width="2"/>
+<text x="1219" y="344" fill="#f4f8ff" font-family="DejaVu Sans Mono, monospace" font-size="21" font-weight="700" text-anchor="start">AnalysisResult</text>
+<text x="1219" y="389" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="16.5" font-weight="400" text-anchor="start">FileForensics[]</text>
+<text x="1219" y="427" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="16.5" font-weight="400" text-anchor="start">Coupling pairs</text>
+<text x="1219" y="465" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="16.5" font-weight="400" text-anchor="start">Summary + parameters</text>
+<text x="1219" y="503" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="16.5" font-weight="400" text-anchor="start">Explicit CI status</text>
+<path d="M1135 405H1193" fill="none" stroke="#ffca58" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#amber-arrow)"/>
+<text x="380" y="780" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="20" font-weight="400" text-anchor="start">Missing or partial CI data remains visible in the result.</text>
+</svg>

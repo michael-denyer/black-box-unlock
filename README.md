@@ -24,6 +24,14 @@ signals through MCP tools and a Claude Code plugin.
 </tr>
 </table>
 
+## How it works
+
+Black Box Unlock ranks hotspots, finds files that change together, and exposes
+ownership, bug-fix, and optional CI evidence. A fresh change review turns that
+history into up to three checks for the change you are about to ship.
+
+![Black Box Unlock reads Git history and current code, with optional GitHub Actions evidence. It finds hotspots, coupled files, ownership and bug-fix history, and function churn. Branch, staged, or working-tree reviews return up to three checks with evidence. Use the results through MCP tools, the Claude Code plugin, CLI JSON, or the existing HTML report.](assets/overview.png)
+
 ## For agents (MCP + plugin)
 
 ```bash
@@ -173,15 +181,7 @@ The HTML report is feature-frozen; new signals land in JSON and MCP only.
 It displays the coupling threshold used and whether CI data was available,
 partial, unavailable, or disabled.
 
-```mermaid
-flowchart LR
-    Git[Git History] --> Analyze[bbu analyze-repo]
-    CI[GitHub Actions] --> Analyze
-    Analyze --> JSON[JSON Output]
-    Analyze --> HTML[HTML Report]
-    HTML --> Treemap[Hotspot Treemap]
-    HTML --> Graph[Coupling Graph]
-```
+![Git history and optional GitHub Actions evidence feed bbu analyze-repo. Analysis exports raw JSON or an HTML report with a hotspot treemap, coupling graph, and sortable table.](assets/diagrams/report-flow.svg)
 
 ## Architecture
 
@@ -216,7 +216,7 @@ bbu --verbose analyze-repo
 ```
 
 The `prek` gate covers repository hygiene, Ruff, Pyrefly, GitHub Actions
-linting, Markdown and link checks, Mermaid rendering, workflow security, and
+linting, Markdown and link checks, workflow security, and
 locked-dependency auditing. Link and dependency checks need network access.
 
 ## License

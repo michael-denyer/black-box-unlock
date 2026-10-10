@@ -1,0 +1,32 @@
+Use case: infographic-diagram.
+Asset type: README overview image for the Black Box Unlock repository. Landscape 2:1, approximately 2400 by 1200, crisp and readable when displayed 1000px wide.
+Reference image 1 (pstack-overview.png) supplies the visual style: charcoal outer background, deep navy panels with clipped corners, electric blue borders, bright cyan and amber accents, white bold condensed headings, restrained monospace code labels, clean geometric illustrations. Reference image 2 (Beagle workflow) supplies clear numbered left-to-right stages and uncluttered explanatory layout. Do not reproduce either project's text or subject.
+Create a professional technical editorial infographic explaining a Git code-forensics tool. Exact title at top left: "Black Box Unlock". Exact subtitle beneath: "Turn Git history into evidence for your next change."
+Three large equal-height numbered columns flow left to right through broad cyan arrows. Give each stage its own generous space. All icons must explain the specific signal with no numeric axes or fabricated metrics.
+
+Stage 1, exact heading "1  Read the repository".
+Draw a recognizable branching Git commit graph and a source-code document.
+Use the exact labels "Git history" and "Current code".
+Below, a small outlined optional input with a dashed arrow to stage 2, exact label "GitHub Actions (optional)" and a simple workflow icon.
+
+Stage 2, exact heading "2  Find the signals".
+Four evenly spaced compact illustrated rows, each label exactly:
+"Hotspots" with a blue/cyan treemap with one amber hot rectangle and the readable formula "commits × complexity";
+"Coupled files" with two source documents connected by repeated shared commit dots;
+"Ownership + bug fixes" with small author silhouettes and a repair/history symbol;
+"Function X-Ray" with a code document where one function is highlighted.
+The hotspot formula refers to indentation complexity, no percentages, no composite risk score.
+
+Stage 3, exact heading "3  Review your change".
+A slim monospace label "Branch / staged / working tree".
+A prominent amber badge "Up to 3 checks".
+Three navy checklist cards with cyan check icons. Exact labels "Check coupled files", "Add or update tests", "Focus review".
+At the bottom of this column, exact caption "Each check includes its evidence".
+The checklist items are examples, no promise of automatic fixes, testing, or merging.
+
+A full-width lower band, separated from the stages by a thin blue rule, exact heading "Use the evidence".
+Four tidy output badges with small recognizable icons, exact labels "MCP tools", "Claude Code plugin", "CLI / JSON", "HTML report".
+A very small but legible caption beneath the HTML badge only: "Existing views".
+At the bottom, one concise readable note exactly: "CI evidence is optional. Failed-run paths are clues, not proof."
+
+Keep large typography, ample whitespace, consistent icon weight, and a strong reading order. Give the visual the polished dark technical-panel feel of pstack and the clarity of the numbered Beagle workflow. Use crisp flat vector-like forms, not photorealism. No texture on text, no smoke, no neon glow haze, no extra slogans, no version numbers, no new claims, no external company logos. Spell X-Ray, GitHub, MCP, and CLI correctly.

@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="600" viewBox="0 0 1440 600" role="img" aria-labelledby="title desc">
+<title id="title">From history to a report</title>
+<desc id="desc">bbu analyze-repo joins repository signals and exports JSON or an interactive HTML report.</desc>
+<defs>
+<marker id="cyan-arrow" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0L9 4.5L0 9Z" fill="#47e4ef"/></marker>
+<marker id="amber-arrow" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0L9 4.5L0 9Z" fill="#ffca58"/></marker>
+</defs>
+<rect width="1440" height="600" rx="18" fill="#080f1c"/>
+<path d="M34 89V34H1406" fill="none" stroke="#219bff" stroke-width="3"/>
+<path d="M34 34H58L34 58Z" fill="#219bff"/>
+
+<text x="60" y="72" fill="#f4f8ff" font-family="DejaVu Sans, Arial, sans-serif" font-size="34" font-weight="700" text-anchor="start">From history to a report</text>
+<text x="60" y="108" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="19" font-weight="400" text-anchor="start">bbu analyze-repo joins repository signals and exports JSON or an interactive HTML report.</text>
+<path d="M60 155H300L315 170V305L300 320H60L45 305V170Z" fill="#0c2136" stroke="#219bff" stroke-width="2"/>
+<text x="69" y="194" fill="#f4f8ff" font-family="DejaVu Sans, Arial, sans-serif" font-size="23" font-weight="700" text-anchor="start">Git history</text>
+<path d="M78 218V285.84000000000003M78 235.92000000000002C110.0 235.92000000000002 110.0 244.88 110.0 256.4V275.6" fill="none" stroke="#219bff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="78.0" cy="218.0" r="5.12" fill="#47e4ef"/>
+<circle cx="78.0" cy="250.0" r="5.12" fill="#219bff"/>
+<circle cx="78.0" cy="285.84000000000003" r="5.12" fill="#47e4ef"/>
+<circle cx="110.0" cy="256.4" r="5.12" fill="#ffca58"/>
+<circle cx="110.0" cy="275.6" r="5.12" fill="#ffca58"/>
+<text x="135" y="231" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="400" text-anchor="start">Commits and paths</text>
+<text x="135" y="263" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="400" text-anchor="start">Authors and fixes</text>
+<path d="M60 365H300L315 380V455L300 470H60L45 455V380Z" fill="#0c2136" stroke="#47e4ef" stroke-width="2"/>
+<text x="69" y="404" fill="#f4f8ff" font-family="DejaVu Sans, Arial, sans-serif" font-size="23" font-weight="700" text-anchor="start">GitHub Actions</text>
+<text x="69" y="442" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="400" text-anchor="start">Optional CI evidence</text>
+<path d="M420 235H700L715 250V400L700 415H420L405 400V250Z" fill="#0c2136" stroke="#47e4ef" stroke-width="2"/>
+<text x="429" y="274" fill="#f4f8ff" font-family="DejaVu Sans Mono, monospace" font-size="23" font-weight="700" text-anchor="start">bbu analyze-repo</text>
+<text x="429" y="315" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="20" font-weight="400" text-anchor="start">Extract forensic signals</text>
+<text x="429" y="347" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="20" font-weight="400" text-anchor="start">Join evidence by file</text>
+<text x="429" y="379" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="20" font-weight="400" text-anchor="start">Rank hotspots</text>
+<path d="M315 237H360V283H403" fill="none" stroke="#47e4ef" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#cyan-arrow)"/>
+<path d="M315 418H360V365H403" fill="none" stroke="#47e4ef" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#cyan-arrow)" stroke-dasharray="7 7"/>
+<path d="M820 160H1035L1050 175V245L1035 260H820L805 245V175Z" fill="#0c2136" stroke="#47e4ef" stroke-width="2"/>
+<text x="829" y="199" fill="#f4f8ff" font-family="DejaVu Sans, Arial, sans-serif" font-size="23" font-weight="700" text-anchor="start">JSON</text>
+<text x="829" y="234" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="400" text-anchor="start">Raw file evidence</text>
+<path d="M820 340H1035L1050 355V425L1035 440H820L805 425V355Z" fill="#0c2136" stroke="#ffca58" stroke-width="2"/>
+<text x="829" y="379" fill="#f4f8ff" font-family="DejaVu Sans, Arial, sans-serif" font-size="23" font-weight="700" text-anchor="start">HTML report</text>
+<text x="829" y="414" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="400" text-anchor="start">Interactive views</text>
+<path d="M715 285H760V210H803" fill="none" stroke="#47e4ef" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#cyan-arrow)"/>
+<path d="M715 365H760V390H803" fill="none" stroke="#ffca58" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#amber-arrow)"/>
+<path d="M1125 155H1380L1395 170V280L1380 295H1125L1110 280V170Z" fill="#0c2136" stroke="#219bff" stroke-width="2"/>
+<text x="1134" y="194" fill="#f4f8ff" font-family="DejaVu Sans, Arial, sans-serif" font-size="22" font-weight="700" text-anchor="start">Hotspot treemap</text>
+<rect x="1140.0" y="212.0" width="31.200000000000003" height="21.45" rx="2" fill="#219bff"/>
+<rect x="1173.54" y="212.0" width="17.55" height="21.45" rx="2" fill="#47e4ef"/>
+<rect x="1193.43" y="212.0" width="29.25" height="35.1" rx="2" fill="#219bff"/>
+<rect x="1140.0" y="235.79" width="18.72" height="31.200000000000003" rx="2" fill="#47e4ef"/>
+<rect x="1161.06" y="235.79" width="30.03" height="31.200000000000003" rx="2" fill="#ffca58"/>
+<rect x="1193.43" y="249.44" width="29.25" height="17.55" rx="2" fill="#219bff"/>
+<text x="1240" y="235" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="17" font-weight="400" text-anchor="start">Churn by</text>
+<text x="1240" y="267" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="17" font-weight="400" text-anchor="start">directory</text>
+<path d="M1125 335H1380L1395 350V460L1380 475H1125L1110 460V350Z" fill="#0c2136" stroke="#219bff" stroke-width="2"/>
+<text x="1134" y="374" fill="#f4f8ff" font-family="DejaVu Sans, Arial, sans-serif" font-size="22" font-weight="700" text-anchor="start">Coupling graph</text>
+<path d="M1147.4 414.0L1174.2 395.2" fill="none" stroke="#219bff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M1147.4 414.0L1181.0 432.8" fill="none" stroke="#219bff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M1174.2 395.2L1211.8 410.8" fill="none" stroke="#219bff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M1181.0 432.8L1211.8 410.8" fill="none" stroke="#219bff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M1181.0 432.8L1225.0 438.0" fill="none" stroke="#219bff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M1211.8 410.8L1225.0 438.0" fill="none" stroke="#219bff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="1147.4" cy="414.0" r="4.800000000000001" fill="#47e4ef"/>
+<circle cx="1174.2" cy="395.2" r="4.800000000000001" fill="#47e4ef"/>
+<circle cx="1181.0" cy="432.8" r="4.800000000000001" fill="#47e4ef"/>
+<circle cx="1211.8" cy="410.8" r="4.800000000000001" fill="#ffca58"/>
+<circle cx="1225.0" cy="438.0" r="4.800000000000001" fill="#47e4ef"/>
+<text x="1240" y="414" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="17" font-weight="400" text-anchor="start">Co-changing</text>
+<text x="1240" y="446" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="17" font-weight="400" text-anchor="start">files</text>
+<path d="M1050 390H1080V240H1108" fill="none" stroke="#ffca58" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#amber-arrow)"/>
+<path d="M1080 390V405H1108" fill="none" stroke="#ffca58" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#amber-arrow)"/>
+<text x="60" y="547" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="20" font-weight="400" text-anchor="start">The report also includes a sortable table. CI availability is reported explicitly.</text>
+</svg>

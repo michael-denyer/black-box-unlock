@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="940" viewBox="0 0 1440 940" role="img" aria-labelledby="title desc">
+<title id="title">System overview</title>
+<desc id="desc">Follow the main analysis path. Bracketed IDs link to the source tables below.</desc>
+<defs>
+<marker id="cyan-arrow" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0L9 4.5L0 9Z" fill="#47e4ef"/></marker>
+<marker id="amber-arrow" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0L9 4.5L0 9Z" fill="#ffca58"/></marker>
+</defs>
+<rect width="1440" height="940" rx="18" fill="#080f1c"/>
+<path d="M34 89V34H1406" fill="none" stroke="#219bff" stroke-width="3"/>
+<path d="M34 34H58L34 58Z" fill="#219bff"/>
+
+<text x="60" y="72" fill="#f4f8ff" font-family="DejaVu Sans, Arial, sans-serif" font-size="34" font-weight="700" text-anchor="start">System overview</text>
+<text x="60" y="108" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="19" font-weight="400" text-anchor="start">Follow the main analysis path. Bracketed IDs link to the source tables below.</text>
+<path d="M60 150H1380L1395 165V240L1380 255H60L45 240V165Z" fill="#0c2136" stroke="#219bff" stroke-width="2"/>
+<text x="69" y="189" fill="#f4f8ff" font-family="DejaVu Sans, Arial, sans-serif" font-size="23" font-weight="700" text-anchor="start">Entry points [1]</text>
+<rect x="385" y="174" width="310" height="55" rx="4" fill="#102c44"/>
+<text x="540" y="210" fill="#47e4ef" font-family="DejaVu Sans, Arial, sans-serif" font-size="22" font-weight="700" text-anchor="middle">CLI [1a]</text>
+<rect x="705" y="174" width="310" height="55" rx="4" fill="#102c44"/>
+<text x="860" y="210" fill="#47e4ef" font-family="DejaVu Sans, Arial, sans-serif" font-size="22" font-weight="700" text-anchor="middle">MCP server</text>
+<rect x="1025" y="174" width="310" height="55" rx="4" fill="#102c44"/>
+<text x="1180" y="210" fill="#47e4ef" font-family="DejaVu Sans, Arial, sans-serif" font-size="22" font-weight="700" text-anchor="middle">Claude Code plugin</text>
+<path d="M720 255V293" fill="none" stroke="#47e4ef" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#cyan-arrow)"/>
+<path d="M360 295H1080L1095 310V380L1080 395H360L345 380V310Z" fill="#0c2136" stroke="#47e4ef" stroke-width="2"/>
+<text x="369" y="334" fill="#f4f8ff" font-family="DejaVu Sans, Arial, sans-serif" font-size="25" font-weight="700" text-anchor="start">Analysis orchestration [2]</text>
+<text x="369" y="370" fill="#b6cbdd" font-family="DejaVu Sans Mono, monospace" font-size="21" font-weight="400" text-anchor="start">run_analysis [2a]  ·  export_to_json [2b]</text>
+<path d="M720 395V425" fill="none" stroke="#47e4ef" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M720 425H260V453" fill="none" stroke="#47e4ef" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#cyan-arrow)"/>
+<path d="M60 455H460L475 470V552L460 567H60L45 552V470Z" fill="#0c2136" stroke="#219bff" stroke-width="2"/>
+<text x="69" y="494" fill="#f4f8ff" font-family="DejaVu Sans, Arial, sans-serif" font-size="24" font-weight="700" text-anchor="start">Churn [3a]</text>
+<text x="69" y="536" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="19" font-weight="400" text-anchor="start">Revision and line counts</text>
+<path d="M720 425H720V453" fill="none" stroke="#47e4ef" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#cyan-arrow)"/>
+<path d="M520 455H920L935 470V552L920 567H520L505 552V470Z" fill="#0c2136" stroke="#219bff" stroke-width="2"/>
+<text x="529" y="494" fill="#f4f8ff" font-family="DejaVu Sans, Arial, sans-serif" font-size="24" font-weight="700" text-anchor="start">Coupling [3b]</text>
+<text x="529" y="536" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="19" font-weight="400" text-anchor="start">Repeated co-changes</text>
+<path d="M720 425H1180V453" fill="none" stroke="#47e4ef" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#cyan-arrow)"/>
+<path d="M980 455H1380L1395 470V552L1380 567H980L965 552V470Z" fill="#0c2136" stroke="#219bff" stroke-width="2"/>
+<text x="989" y="494" fill="#f4f8ff" font-family="DejaVu Sans, Arial, sans-serif" font-size="24" font-weight="700" text-anchor="start">Ownership [3c]</text>
+<text x="989" y="536" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="19" font-weight="400" text-anchor="start">Authors for each file</text>
+<path d="M260 567V630H720" fill="none" stroke="#47e4ef" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M720 567V630H720" fill="none" stroke="#47e4ef" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M1180 567V630H720" fill="none" stroke="#47e4ef" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="450" y="583" width="540" height="31" rx="4" fill="#080f1c"/>
+<text x="720" y="605" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="19" font-weight="400" text-anchor="middle">Git forensics [3] also counts bug-fix commits.</text>
+<path d="M720 630V653" fill="none" stroke="#47e4ef" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#cyan-arrow)"/>
+<path d="M360 655H1080L1095 670V750L1080 765H360L345 750V670Z" fill="#0c2136" stroke="#47e4ef" stroke-width="2"/>
+<text x="369" y="694" fill="#f4f8ff" font-family="DejaVu Sans, Arial, sans-serif" font-size="25" font-weight="700" text-anchor="start">Core models [4a]</text>
+<text x="369" y="736" fill="#47e4ef" font-family="DejaVu Sans Mono, monospace" font-size="23" font-weight="400" text-anchor="start">FileForensics → AnalysisResult</text>
+<path d="M60 655H285L300 670V750L285 765H60L45 750V670Z" fill="#0c2136" stroke="#219bff" stroke-width="2"/>
+<text x="69" y="694" fill="#f4f8ff" font-family="DejaVu Sans, Arial, sans-serif" font-size="20" font-weight="700" text-anchor="start">Shared support [4]</text>
+<text x="69" y="725" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="17" font-weight="400" text-anchor="start">Exceptions [4b]</text>
+<text x="69" y="749" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="17" font-weight="400" text-anchor="start">Logging [4c]</text>
+<path d="M345 710H302" fill="none" stroke="#219bff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="7 7"/>
+<path d="M720 765V798" fill="none" stroke="#47e4ef" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M720 798H260V818" fill="none" stroke="#47e4ef" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#cyan-arrow)"/>
+<path d="M60 820H460L475 835V893L460 908H60L45 893V835Z" fill="#0c2136" stroke="#219bff" stroke-width="2"/>
+<text x="69" y="859" fill="#f4f8ff" font-family="DejaVu Sans, Arial, sans-serif" font-size="23" font-weight="700" text-anchor="start">JSON [2b]</text>
+<text x="69" y="885" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="400" text-anchor="start">Serialized file evidence</text>
+<path d="M720 798H720V818" fill="none" stroke="#47e4ef" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#cyan-arrow)"/>
+<path d="M520 820H920L935 835V893L920 908H520L505 893V835Z" fill="#0c2136" stroke="#219bff" stroke-width="2"/>
+<text x="529" y="859" fill="#f4f8ff" font-family="DejaVu Sans, Arial, sans-serif" font-size="23" font-weight="700" text-anchor="start">HTML report [5a]</text>
+<text x="529" y="885" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="400" text-anchor="start">Treemap [5b] + graph [5c]</text>
+<path d="M720 798H1180V818" fill="none" stroke="#47e4ef" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#cyan-arrow)"/>
+<path d="M980 820H1380L1395 835V893L1380 908H980L965 893V835Z" fill="#0c2136" stroke="#219bff" stroke-width="2"/>
+<text x="989" y="859" fill="#f4f8ff" font-family="DejaVu Sans, Arial, sans-serif" font-size="23" font-weight="700" text-anchor="start">Agent tools</text>
+<text x="989" y="885" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="400" text-anchor="start">MCP + coupling guard</text>
+</svg>

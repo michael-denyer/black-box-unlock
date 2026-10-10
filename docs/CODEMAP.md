@@ -4,75 +4,11 @@
 
 ## System Overview
 
-```mermaid
-flowchart TB
-    subgraph Layer1["Entry Points [1]"]
-        CLI["CLI Commands [1a]"]
-    end
-
-    subgraph Layer2["Analysis Orchestration [2]"]
-        Analysis["run_analysis [2a]"]
-        Export["export_to_json [2b]"]
-    end
-
-    subgraph Layer3["Git Forensics [3]"]
-        Churn["Churn Extraction [3a]"]
-        Coupling["Coupling Detection [3b]"]
-        Ownership["Ownership Parsing [3c]"]
-    end
-
-    subgraph Layer4["Core Data Models [4]"]
-        Models["Pydantic Models [4a]"]
-        Exceptions["Exceptions [4b]"]
-        Logging["Logging [4c]"]
-    end
-
-    subgraph Layer5["Visualization [5]"]
-        HTML["HTML Report [5a]"]
-        Treemap["Treemap Data [5b]"]
-        Graph["Coupling Graph [5c]"]
-    end
-
-    CLI --> Analysis
-    Analysis --> Churn
-    Analysis --> Coupling
-    Analysis --> Ownership
-    Churn --> Models
-    Coupling --> Models
-    Ownership --> Models
-    Analysis --> Export
-    Analysis --> HTML
-    HTML --> Treemap
-    HTML --> Graph
-    Models --> Exceptions
-```
+![System overview with source navigation IDs. Entry points call analysis orchestration, which extracts churn, coupling, ownership, and defects into core models. Results reach JSON, the HTML report, and agent tools; exceptions and logging provide shared support.](../assets/diagrams/system-overview.svg)
 
 ## Data Flow
 
-```mermaid
-sequenceDiagram
-    participant User
-    participant CLI as CLI [1a]
-    participant Analysis as Analysis [2a]
-    participant Git as git log --numstat
-    participant Forensics as Git Forensics [3]
-    participant Viz as Visualization [5]
-
-    User->>CLI: bbu analyze-repo
-    CLI->>Analysis: run_analysis(path, days)
-    Analysis->>Git: fetch_git_history(repo_path, days)
-    Git-->>Analysis: git history dict
-    Analysis->>Forensics: parse + detect
-    Forensics-->>Analysis: FileChurn, Coupling, Ownership
-    Analysis-->>CLI: AnalysisResult
-    alt --output=json
-        CLI->>User: JSON output
-    else --output=html
-        CLI->>Viz: generate_html_report()
-        Viz-->>CLI: HTML with treemap + graph
-        CLI->>User: HTML output
-    end
-```
+![Analysis sequence. The CLI calls run_analysis, which reads Git history, extracts forensic signals, and returns AnalysisResult. The CLI then returns JSON or asks the visualization module to generate an HTML report.](../assets/diagrams/analysis-sequence.svg)
 
 ---
 
@@ -100,40 +36,7 @@ Orchestrates forensic analysis by combining data from multiple sources.
 
 #### Analysis Pipeline [2a]
 
-```mermaid
-flowchart LR
-    subgraph Fetch["Data Fetch"]
-        GitLog[fetch_git_history]
-    end
-
-    subgraph Parse["Parse & Detect"]
-        Churn[parse_history_entries]
-        Owner[parse_ownership_from_history]
-        Couple[analyze_temporal_coupling]
-        CI[collect_ci_signals]
-    end
-
-    subgraph Join["Aggregate"]
-        Index[Index by path]
-        Build[Build coupling lookup]
-        Score[Calculate hotspot_score]
-    end
-
-    subgraph Out["Output"]
-        Result[AnalysisResult]
-    end
-
-    GitLog --> Churn
-    GitLog --> Owner
-    GitLog --> Couple
-    CI --> Index
-    Churn --> Index
-    Owner --> Index
-    Couple --> Build
-    Index --> Score
-    Build --> Score
-    Score --> Result
-```
+![Inside run_analysis. One Git history snapshot feeds churn, ownership, coupling, and defect parsers. Their results join by path with optional CI evidence and current file complexity, then hotspot ranking and function X-Ray produce AnalysisResult with explicit CI status.](../assets/diagrams/analysis-pipeline.svg)
 
 ---
 
@@ -180,52 +83,7 @@ Pydantic models and shared infrastructure.
 
 #### Model Relationships [4a]
 
-```mermaid
-classDiagram
-    class FileChurn {
-        path: str
-        commits: int
-        lines_added: int
-        lines_deleted: int
-        +total_lines_changed
-    }
-
-    class TemporalCoupling {
-        file_a: str
-        file_b: str
-        co_change_count: int
-        +coupling_ratio
-    }
-
-    class FileOwnership {
-        path: str
-        authors: list[str]
-        +author_count
-        +is_high_risk
-    }
-
-    class FileForensics {
-        path: str
-        commits: int
-        lines_changed: int
-        authors: list[str]
-        coupled_with: list[CouplingInfo]
-        +hotspot_score
-    }
-
-    class AnalysisResult {
-        repo: str
-        files: list[FileForensics]
-        summary: AnalysisSummary
-        parameters: AnalysisParameters
-        ci_status: SignalStatus
-    }
-
-    FileChurn --> FileForensics : aggregated
-    FileOwnership --> FileForensics : merged
-    TemporalCoupling --> FileForensics : coupled_with
-    FileForensics --> AnalysisResult : files
-```
+![Selected Pydantic model fields and relationships. FileChurn, FileOwnership, and TemporalCoupling aggregate into FileForensics. AnalysisResult contains those files, coupling pairs, summary, parameters, failed CI runs, flaky steps, and CI status.](../assets/diagrams/model-relationships.svg)
 
 ---
 
@@ -245,31 +103,7 @@ HTML report generation with interactive visualizations.
 
 #### HTML Report Structure [5a]
 
-```mermaid
-flowchart TB
-    subgraph Report["HTML Report"]
-        Header[Summary Cards]
-        Tabs[Tab Navigation]
-    end
-
-    subgraph Views["Tab Views"]
-        Table[Table View]
-        Hotspots[Hotspots View]
-        Coupling[Coupling View]
-    end
-
-    subgraph Viz["Visualizations"]
-        Plotly[Plotly Treemap 5b]
-        Cytoscape[Cytoscape Graph 5c]
-    end
-
-    Report --> Views
-    Tabs --> Table
-    Tabs --> Hotspots
-    Tabs --> Coupling
-    Hotspots --> Plotly
-    Coupling --> Cytoscape
-```
+![The HTML report has repository summary cards and three interactive tabs: a sortable metrics table, a Plotly hotspot treemap, and a Cytoscape coupling graph. Existing HTML views are feature-frozen.](../assets/diagrams/html-report.svg)
 
 ---
 

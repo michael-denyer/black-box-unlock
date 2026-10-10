@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="780" viewBox="0 0 1440 780" role="img" aria-labelledby="title desc">
+<title id="title">Inside the HTML report [5a]</title>
+<desc id="desc">A summary and three interactive tabs expose the existing repository evidence.</desc>
+<defs>
+<marker id="cyan-arrow" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0L9 4.5L0 9Z" fill="#47e4ef"/></marker>
+<marker id="amber-arrow" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0L9 4.5L0 9Z" fill="#ffca58"/></marker>
+</defs>
+<rect width="1440" height="780" rx="18" fill="#080f1c"/>
+<path d="M34 89V34H1406" fill="none" stroke="#219bff" stroke-width="3"/>
+<path d="M34 34H58L34 58Z" fill="#219bff"/>
+
+<text x="60" y="72" fill="#f4f8ff" font-family="DejaVu Sans, Arial, sans-serif" font-size="34" font-weight="700" text-anchor="start">Inside the HTML report [5a]</text>
+<text x="60" y="108" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="19" font-weight="400" text-anchor="start">A summary and three interactive tabs expose the existing repository evidence.</text>
+<path d="M60 150H1380L1395 165V700L1380 715H60L45 700V165Z" fill="#0c2136" stroke="#219bff" stroke-width="2"/>
+<text x="69" y="189" fill="#f4f8ff" font-family="DejaVu Sans, Arial, sans-serif" font-size="25" font-weight="700" text-anchor="start">Repository summary</text>
+<rect x="80" y="212" width="400" height="60" rx="4" fill="#102c44"/>
+<circle cx="106" cy="242" r="8" fill="#47e4ef"/>
+<text x="130" y="250" fill="#f4f8ff" font-family="DejaVu Sans, Arial, sans-serif" font-size="21" font-weight="400" text-anchor="start">Files analyzed</text>
+<rect x="520" y="212" width="400" height="60" rx="4" fill="#102c44"/>
+<circle cx="546" cy="242" r="8" fill="#47e4ef"/>
+<text x="570" y="250" fill="#f4f8ff" font-family="DejaVu Sans, Arial, sans-serif" font-size="21" font-weight="400" text-anchor="start">Ownership risks</text>
+<rect x="960" y="212" width="400" height="60" rx="4" fill="#102c44"/>
+<circle cx="986" cy="242" r="8" fill="#47e4ef"/>
+<text x="1010" y="250" fill="#f4f8ff" font-family="DejaVu Sans, Arial, sans-serif" font-size="21" font-weight="400" text-anchor="start">Coupled pairs</text>
+<path d="M95 310H465L480 325V645L465 660H95L80 645V325Z" fill="#0c2136" stroke="#47e4ef" stroke-width="2"/>
+<text x="104" y="349" fill="#f4f8ff" font-family="DejaVu Sans, Arial, sans-serif" font-size="27" font-weight="700" text-anchor="start">Table</text>
+<text x="104" y="632" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="19" font-weight="400" text-anchor="start">Sortable file metrics</text>
+<path d="M535 310H905L920 325V645L905 660H535L520 645V325Z" fill="#0c2136" stroke="#47e4ef" stroke-width="2"/>
+<text x="544" y="349" fill="#f4f8ff" font-family="DejaVu Sans, Arial, sans-serif" font-size="27" font-weight="700" text-anchor="start">Hotspots</text>
+<text x="544" y="632" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="19" font-weight="400" text-anchor="start">Plotly treemap [5b]</text>
+<path d="M975 310H1345L1360 325V645L1345 660H975L960 645V325Z" fill="#0c2136" stroke="#47e4ef" stroke-width="2"/>
+<text x="984" y="349" fill="#f4f8ff" font-family="DejaVu Sans, Arial, sans-serif" font-size="27" font-weight="700" text-anchor="start">Coupling</text>
+<text x="984" y="632" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="19" font-weight="400" text-anchor="start">Cytoscape graph [5c]</text>
+<text x="104" y="390" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="15" font-weight="700" text-anchor="start">FILE</text>
+<text x="325" y="390" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="15" font-weight="700" text-anchor="start">SIGNALS</text>
+<path d="M104 438H456" fill="none" stroke="#219bff" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="104" y="421" width="150" height="7" rx="4" fill="#219bff"/>
+<rect x="325" y="421" width="92" height="9" rx="4" fill="#ffca58"/>
+<path d="M104 478H456" fill="none" stroke="#219bff" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="104" y="461" width="134" height="7" rx="4" fill="#219bff"/>
+<rect x="325" y="461" width="80" height="9" rx="4" fill="#47e4ef"/>
+<path d="M104 518H456" fill="none" stroke="#219bff" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="104" y="501" width="118" height="7" rx="4" fill="#219bff"/>
+<rect x="325" y="501" width="68" height="9" rx="4" fill="#47e4ef"/>
+<path d="M104 558H456" fill="none" stroke="#219bff" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="104" y="541" width="102" height="7" rx="4" fill="#219bff"/>
+<rect x="325" y="541" width="56" height="9" rx="4" fill="#47e4ef"/>
+<rect x="564.0" y="392.0" width="114.39999999999999" height="78.64999999999999" rx="2" fill="#219bff"/>
+<rect x="686.98" y="392.0" width="64.35" height="78.64999999999999" rx="2" fill="#47e4ef"/>
+<rect x="759.91" y="392.0" width="107.25" height="128.7" rx="2" fill="#219bff"/>
+<rect x="564.0" y="479.23" width="68.64" height="114.39999999999999" rx="2" fill="#47e4ef"/>
+<rect x="641.22" y="479.23" width="110.11" height="114.39999999999999" rx="2" fill="#ffca58"/>
+<rect x="759.91" y="529.28" width="107.25" height="64.35" rx="2" fill="#219bff"/>
+<path d="M1022.88 487.95L1118.69 420.74" fill="none" stroke="#219bff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M1022.88 487.95L1143.0 555.16" fill="none" stroke="#219bff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M1118.69 420.74L1253.11 476.51" fill="none" stroke="#219bff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M1143.0 555.16L1253.11 476.51" fill="none" stroke="#219bff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M1143.0 555.16L1300.3 573.75" fill="none" stroke="#219bff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M1253.11 476.51L1300.3 573.75" fill="none" stroke="#219bff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="1022.88" cy="487.95" r="17.16" fill="#47e4ef"/>
+<circle cx="1118.69" cy="420.74" r="17.16" fill="#47e4ef"/>
+<circle cx="1143.0" cy="555.16" r="17.16" fill="#47e4ef"/>
+<circle cx="1253.11" cy="476.51" r="17.16" fill="#ffca58"/>
+<circle cx="1300.3" cy="573.75" r="17.16" fill="#47e4ef"/>
+<text x="60" y="755" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="20" font-weight="400" text-anchor="start">The HTML report is feature-frozen. New signals are available through JSON and MCP.</text>
+</svg>

@@ -50,22 +50,7 @@ src/black_box_unlock/
 
 ## Data flow
 
-```mermaid
-flowchart LR
-    Git[git log --numstat] --> Parse[churn / coupling /<br/>ownership / defects]
-    GH[gh CLI + REST] --> CI[failed runs /<br/>flaky steps]
-    Config[.bbu.toml] --> Review
-    Parse --> Join[run_analysis join]
-    CI --> Join
-    Join --> JSON[JSON]
-    Join --> HTML[HTML report - frozen]
-    Join --> MCP[bbu-mcp tools]
-    Join --> Guard[coupling guard hook]
-    Git --> Change[typed change selection]
-    Change --> Review[fresh change review]
-    Join --> Review
-    Review --> MCP
-```
+![Git history, current files, and optional CI evidence join in run_analysis and reach JSON, HTML, MCP tools, and the coupling guard. Fresh change review combines a new analysis with typed change selection and project configuration, returning up to three actions through the CLI, MCP, or plugin.](../assets/diagrams/architecture.svg)
 
 ## Degraded modes
 

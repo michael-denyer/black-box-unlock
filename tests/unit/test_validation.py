@@ -1,12 +1,33 @@
 """Unit tests for hotspot-vs-bugfix self-validation."""
 
+import subprocess
+from unittest.mock import patch
+
 import pytest
 
+from black_box_unlock.core.exceptions import BlackBoxUnlockError, GitToolNotFoundError
 from black_box_unlock.validation import (
+    _tree_contents,
     permutation_p,
     score_ranking,
     spearman_rho,
 )
+
+
+class TestTreeContents:
+    @patch("black_box_unlock.validation.subprocess.run")
+    def test_missing_git_raises_git_tool_not_found(self, mock_run, tmp_path):
+        mock_run.side_effect = FileNotFoundError(2, "No such file or directory", "git")
+        with pytest.raises(GitToolNotFoundError):
+            _tree_contents(tmp_path, "abc", ["a.py"])
+
+    @patch("black_box_unlock.validation.subprocess.run")
+    def test_failed_cat_file_raises_project_error_with_stderr(self, mock_run, tmp_path):
+        mock_run.side_effect = subprocess.CalledProcessError(
+            128, ["git"], stderr=b"fatal: not a git repository"
+        )
+        with pytest.raises(BlackBoxUnlockError, match="not a git repository"):
+            _tree_contents(tmp_path, "abc", ["a.py"])
 
 
 class TestSpearmanRho:

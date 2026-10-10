@@ -64,6 +64,7 @@ class ScratchRepo:
             if content is None:
                 target.unlink()
             else:
+                target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_text(content)
         self._git("add", "-A")
         self._git(
@@ -122,6 +123,18 @@ class TestCutoffUniverse:
 
         assert report.methods["hotspot"].top_files == ["hot.py"]
         assert len(report.cutoff_sha) == 40
+
+    def test_path_that_became_a_directory_is_skipped(self, scratch: ScratchRepo):
+        # pkg was a file, then a package. At the cutoff "pkg" names a tree, which
+        # has no lines to count, so only pkg/__init__.py is in the universe.
+        scratch.commit("feat: pkg file", {"pkg": FLAT}, days_ago=90)
+        scratch.commit("feat: pkg package", {"pkg": None, "pkg/__init__.py": INDENTED}, days_ago=80)
+        scratch.commit("fix: crash", {"pkg/__init__.py": INDENTED + "Z = 5\n"}, days_ago=5)
+
+        report = validate_repo(scratch.path, days=100, split=0.5)
+
+        assert report.methods["churn"].top_files == ["pkg/__init__.py"]
+        assert report.universe_size == 1
 
 
 class TestAncestrySplit:

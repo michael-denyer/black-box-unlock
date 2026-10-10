@@ -15,7 +15,7 @@ from pathlib import Path
 from pydantic import BaseModel
 
 from .complexity import indentation_complexity_text
-from .core.exceptions import InsufficientHistoryError
+from .core.exceptions import BlackBoxUnlockError, GitToolNotFoundError, InsufficientHistoryError
 from .git.churn import parse_history_entries
 from .git.defects import bugfix_counts, is_bugfix_message
 from .git.log import Clock, Commit, fetch_git_history
@@ -256,15 +256,29 @@ def _cutoff_commit(repo_path: Path, cutoff: datetime) -> str | None:
 
 
 def _tree_contents(repo_path: Path, sha: str, paths: list[str]) -> dict[str, str]:
-    """Read each path's content at `sha`; paths absent from that tree are omitted."""
+    """Read each path's blob at `sha`.
+
+    Paths absent from that tree, or naming a tree (a file later replaced by a
+    directory), are omitted. Bytes in and out, so this cannot go through
+    `run_git`, but it maps errors the same way.
+
+    Raises:
+        GitToolNotFoundError: If the git binary is not installed.
+        BlackBoxUnlockError: If `git cat-file` fails.
+    """
     if not paths:
         return {}
-    result = subprocess.run(
-        ["git", "-c", "core.quotePath=false", "-C", str(repo_path), "cat-file", "--batch"],
-        input="".join(f"{sha}:{path}\n" for path in paths).encode(),
-        capture_output=True,
-        check=True,
-    )
+    try:
+        result = subprocess.run(
+            ["git", "-c", "core.quotePath=false", "-C", str(repo_path), "cat-file", "--batch"],
+            input="".join(f"{sha}:{path}\n" for path in paths).encode(),
+            capture_output=True,
+            check=True,
+        )
+    except FileNotFoundError as e:
+        raise GitToolNotFoundError("git not found on PATH") from e
+    except subprocess.CalledProcessError as e:
+        raise BlackBoxUnlockError(f"git cat-file failed: {e.stderr.decode(errors='ignore')}") from e
     output = result.stdout
     contents: dict[str, str] = {}
     pos = 0
@@ -274,9 +288,10 @@ def _tree_contents(repo_path: Path, sha: str, paths: list[str]) -> dict[str, str
         pos = newline + 1
         if header.endswith(" missing"):
             continue
-        size = int(header.rsplit(" ", 1)[1])
-        contents[path] = output[pos : pos + size].decode(errors="ignore")
-        pos += size + 1
+        kind, size = header.split(" ")[1:]
+        if kind == "blob":
+            contents[path] = output[pos : pos + int(size)].decode(errors="ignore")
+        pos += int(size) + 1
     return contents
 
 

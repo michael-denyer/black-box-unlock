@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- A Codex plugin in the portable Agent Plugins format: `plugin.json` at the
+  repository root with OpenAI presentation under `extensions.com.openai`,
+  `.codex-plugin/plugin.json` as the fallback for older Codex builds,
+  `mcp.json` bundling `bbu-mcp` over stdio, four skills (`analyze`,
+  `hotspots`, `review-change`, `git-forensics`) mirroring the Claude Code
+  commands and agent, and `.agents/plugins/marketplace.json` so
+  `codex plugin marketplace add michael-denyer/black-box-unlock` works. The
+  coupling guard hook stays Claude Code only.
+- README badges for PyPI, the Claude Code plugin, and the Codex plugin.
+
 ## [2.0.1] - 2026-10-11
 
 ### Changed

@@ -1,0 +1,42 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "black-box-unlock",
+  "version": "2.0.1",
+  "description": "Code forensics for AI coding agents: hotspots, temporal coupling, ownership, bug-fix history, function X-Ray, and evidence-backed change review from git and CI history.",
+  "author": {
+    "name": "Michael Denyer",
+    "url": "https://github.com/michael-denyer"
+  },
+  "homepage": "https://github.com/michael-denyer/black-box-unlock",
+  "repository": "https://github.com/michael-denyer/black-box-unlock",
+  "license": "MIT",
+  "keywords": [
+    "code-forensics",
+    "git-analysis",
+    "technical-debt",
+    "hotspots",
+    "code-review",
+    "code-insights",
+    "clean-code",
+    "agent-plugin",
+    "claude-code",
+    "codex"
+  ],
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "Black Box Unlock",
+        "shortDescription": "Investigate your codebase like a crime scene",
+        "longDescription": "Black Box Unlock gives coding agents the signals from Adam Tornhill's Your Code as a Crime Scene: 2 to 8 percent of files cause 60 to 90 percent of defects. The bundled bbu-mcp server ranks hotspots (commits times complexity), lists files that change together with directional rates, reports ownership spread, counts bug-fix commits, X-Rays per-function churn, and reviews a branch, index, or working tree with at most three evidence-backed actions. Every signal follows renames and names the HEAD it read.",
+        "developerName": "Michael Denyer",
+        "category": "Developer Tools",
+        "websiteURL": "https://github.com/michael-denyer/black-box-unlock",
+        "defaultPrompt": [
+          "which files in this repo are riskiest to change?",
+          "review my branch against origin/main with bbu",
+          "what changes together with src/auth.py?"
+        ]
+      }
+    }
+  }
+}

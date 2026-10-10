@@ -86,6 +86,8 @@ change makes, which history cannot see yet.
 
 ## Product constraints
 
-The product stays agent-native through MCP and the plugin. The HTML report
+The product stays agent-native through MCP and the Claude Code and Codex
+plugins (the Codex plugin ships the same MCP server and skills mirroring the
+commands; only the edit hook is Claude Code specific). The HTML report
 is a self-contained investigation workspace.
 There is no IDE telemetry, PR-flow dashboard, or composite risk score.

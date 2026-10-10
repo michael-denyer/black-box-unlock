@@ -166,9 +166,10 @@ format and glob rules are in
 Measured with `bbu validate` (split-history: rank the files that existed at a
 cutoff commit using only history up to it, then count bug-fix commits after
 it, beside churn-only, file-length, and seeded random baselines). On this
-repository at `--days 365` the hotspot top 10% took **35%** of subsequent
-bug-fix touches against a random mean of 10% (permutation p = 0.005), while
-file length matched it on rank correlation. Method, the run, and limitations:
+repository at `--days 365` the hotspot top 10% took **30%** of subsequent
+bug-fix touches against a random mean of 10% (permutation p = 0.010), the
+same share as churn alone, while file length beat both on rank correlation.
+Method, the run, and limitations:
 [docs/VALIDATION.md](docs/VALIDATION.md).
 
 ```bash

@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="1100" viewBox="0 0 1440 1100" role="img" aria-labelledby="title desc">
+<title id="title">System overview</title>
+<desc id="desc">The coding agent asks MCP for evidence and gets coupling warnings from the independent edit hook.</desc>
+<defs>
+<marker id="cyan-arrow" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0L9 4.5L0 9Z" fill="#47e4ef"/></marker>
+<marker id="amber-arrow" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0L9 4.5L0 9Z" fill="#ffca58"/></marker>
+</defs>
+<rect width="1440" height="1100" rx="18" fill="#080f1c"/>
+<path d="M34 89V34H1406" fill="none" stroke="#219bff" stroke-width="3"/>
+<path d="M34 34H58L34 58Z" fill="#219bff"/>
+
+<text x="60" y="72" fill="#f4f8ff" font-family="DejaVu Sans, Arial, sans-serif" font-size="34" font-weight="700" text-anchor="start">System overview</text>
+<text x="60" y="108" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="19" font-weight="400" text-anchor="start">The coding agent asks MCP for evidence and gets coupling warnings from the independent edit hook.</text>
+<path d="M60 150H920L935 165V235L920 250H60L45 235V165Z" fill="#0c2136" stroke="#47e4ef" stroke-width="2"/>
+<text x="69" y="189" fill="#f4f8ff" font-family="DejaVu Sans, Arial, sans-serif" font-size="28" font-weight="700" text-anchor="start">Coding agent</text>
+<text x="69" y="225" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="21" font-weight="400" text-anchor="start">Tool queries before inspection · PostToolUse after Edit / Write</text>
+<path d="M980 150H1380L1395 165V235L1380 250H980L965 235V165Z" fill="#0c2136" stroke="#219bff" stroke-width="2"/>
+<text x="989" y="189" fill="#f4f8ff" font-family="DejaVu Sans, Arial, sans-serif" font-size="26" font-weight="700" text-anchor="start">CLI [1a]</text>
+<text x="989" y="225" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="21" font-weight="400" text-anchor="start">User-facing bbu commands</text>
+<path d="M60 300H460L475 315V385L460 400H60L45 385V315Z" fill="#0c2136" stroke="#47e4ef" stroke-width="2"/>
+<text x="69" y="339" fill="#f4f8ff" font-family="DejaVu Sans, Arial, sans-serif" font-size="25" font-weight="700" text-anchor="start">MCP server [1b]</text>
+<text x="69" y="375" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="19" font-weight="400" text-anchor="start">Signals + fresh review + per-call X-Ray</text>
+<path d="M520 300H920L935 315V385L920 400H520L505 385V315Z" fill="#0c2136" stroke="#ffca58" stroke-width="2"/>
+<text x="529" y="339" fill="#f4f8ff" font-family="DejaVu Sans, Arial, sans-serif" font-size="25" font-weight="700" text-anchor="start">Coupling guard [1c]</text>
+<text x="529" y="375" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="19" font-weight="400" text-anchor="start">Own typed snapshot of Git coupling</text>
+<path d="M260 250V298" fill="none" stroke="#47e4ef" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#cyan-arrow)"/>
+<path d="M720 250V298" fill="none" stroke="#ffca58" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#amber-arrow)"/>
+<path d="M60 450H920L935 465V535L920 550H60L45 535V465Z" fill="#0c2136" stroke="#47e4ef" stroke-width="2"/>
+<text x="69" y="489" fill="#f4f8ff" font-family="DejaVu Sans, Arial, sans-serif" font-size="25" font-weight="700" text-anchor="start">Analysis orchestration [2]</text>
+<text x="69" y="525" fill="#b6cbdd" font-family="DejaVu Sans Mono, monospace" font-size="23" font-weight="400" text-anchor="start">run_analysis [2a] · export_to_json [2b]</text>
+<path d="M260 400V448" fill="none" stroke="#47e4ef" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#cyan-arrow)"/>
+<path d="M1180 250V500H937" fill="none" stroke="#47e4ef" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#cyan-arrow)"/>
+<path d="M935 350H950V600H720V618" fill="none" stroke="#ffca58" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#amber-arrow)"/>
+<text x="975" y="560" fill="#ffca58" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="400" text-anchor="start">Hook reads coupling directly</text>
+<path d="M490 550V580" fill="none" stroke="#47e4ef" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M490 580H260V618" fill="none" stroke="#47e4ef" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#cyan-arrow)"/>
+<path d="M60 620H460L475 635V715L460 730H60L45 715V635Z" fill="#0c2136" stroke="#219bff" stroke-width="2"/>
+<text x="69" y="659" fill="#f4f8ff" font-family="DejaVu Sans, Arial, sans-serif" font-size="25" font-weight="700" text-anchor="start">Churn [3a]</text>
+<text x="69" y="701" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="20" font-weight="400" text-anchor="start">Revision and line counts</text>
+<path d="M260 730V765H720" fill="none" stroke="#47e4ef" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M490 580H720V618" fill="none" stroke="#47e4ef" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#cyan-arrow)"/>
+<path d="M520 620H920L935 635V715L920 730H520L505 715V635Z" fill="#0c2136" stroke="#219bff" stroke-width="2"/>
+<text x="529" y="659" fill="#f4f8ff" font-family="DejaVu Sans, Arial, sans-serif" font-size="25" font-weight="700" text-anchor="start">Coupling [3b]</text>
+<text x="529" y="701" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="20" font-weight="400" text-anchor="start">Repeated co-changes</text>
+<path d="M720 730V765H720" fill="none" stroke="#47e4ef" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M490 580H1180V618" fill="none" stroke="#47e4ef" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#cyan-arrow)"/>
+<path d="M980 620H1380L1395 635V715L1380 730H980L965 715V635Z" fill="#0c2136" stroke="#219bff" stroke-width="2"/>
+<text x="989" y="659" fill="#f4f8ff" font-family="DejaVu Sans, Arial, sans-serif" font-size="25" font-weight="700" text-anchor="start">Ownership [3c]</text>
+<text x="989" y="701" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="20" font-weight="400" text-anchor="start">Authors for each file</text>
+<path d="M1180 730V765H720" fill="none" stroke="#47e4ef" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M720 765V813" fill="none" stroke="#47e4ef" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#cyan-arrow)"/>
+<rect x="450" y="773" width="540" height="31" rx="4" fill="#080f1c"/>
+<text x="720" y="796" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="19" font-weight="400" text-anchor="middle">Git forensics [3] also counts bug-fix commits.</text>
+<path d="M360 815H1080L1095 830V900L1080 915H360L345 900V830Z" fill="#0c2136" stroke="#47e4ef" stroke-width="2"/>
+<text x="369" y="854" fill="#f4f8ff" font-family="DejaVu Sans, Arial, sans-serif" font-size="25" font-weight="700" text-anchor="start">Core models [4a]</text>
+<text x="369" y="890" fill="#47e4ef" font-family="DejaVu Sans Mono, monospace" font-size="23" font-weight="400" text-anchor="start">FileForensics → AnalysisResult</text>
+<path d="M60 815H285L300 830V900L285 915H60L45 900V830Z" fill="#0c2136" stroke="#219bff" stroke-width="2"/>
+<text x="69" y="854" fill="#f4f8ff" font-family="DejaVu Sans, Arial, sans-serif" font-size="20" font-weight="700" text-anchor="start">Shared support [4]</text>
+<text x="69" y="880" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="17" font-weight="400" text-anchor="start">Exceptions [4b]</text>
+<text x="69" y="903" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="17" font-weight="400" text-anchor="start">Logging [4c]</text>
+<path d="M345 865H302" fill="none" stroke="#219bff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="7 7"/>
+<path d="M720 915V950" fill="none" stroke="#47e4ef" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M720 950H260V978" fill="none" stroke="#47e4ef" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#cyan-arrow)"/>
+<path d="M60 980H460L475 995V1053L460 1068H60L45 1053V995Z" fill="#0c2136" stroke="#219bff" stroke-width="2"/>
+<text x="69" y="1019" fill="#f4f8ff" font-family="DejaVu Sans, Arial, sans-serif" font-size="24" font-weight="700" text-anchor="start">JSON [2b]</text>
+<text x="69" y="1045" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="400" text-anchor="start">Serialized file evidence</text>
+<path d="M720 950H720V978" fill="none" stroke="#47e4ef" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#cyan-arrow)"/>
+<path d="M520 980H920L935 995V1053L920 1068H520L505 1053V995Z" fill="#0c2136" stroke="#219bff" stroke-width="2"/>
+<text x="529" y="1019" fill="#f4f8ff" font-family="DejaVu Sans, Arial, sans-serif" font-size="24" font-weight="700" text-anchor="start">HTML report [5a]</text>
+<text x="529" y="1045" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="400" text-anchor="start">Payload [5b] + browser UI [5c–5e]</text>
+<path d="M720 950H1180V978" fill="none" stroke="#47e4ef" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#cyan-arrow)"/>
+<path d="M980 980H1380L1395 995V1053L1380 1068H980L965 1053V995Z" fill="#0c2136" stroke="#219bff" stroke-width="2"/>
+<text x="989" y="1019" fill="#f4f8ff" font-family="DejaVu Sans, Arial, sans-serif" font-size="24" font-weight="700" text-anchor="start">Agent evidence</text>
+<text x="989" y="1045" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="400" text-anchor="start">MCP signals + explicit fresh review</text>
+</svg>

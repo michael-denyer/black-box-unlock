@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1120" viewBox="0 0 1800 1120" role="img" aria-labelledby="title desc">
+<title id="title">Agent evidence, edit warnings, and fresh review</title>
+<desc id="desc">MCP signals use a process cache. The edit hook has its own coupling cache. Change review always reads fresh evidence.</desc>
+<defs>
+<marker id="cyan-arrow" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0L9 4.5L0 9Z" fill="#47e4ef"/></marker>
+<marker id="amber-arrow" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0L9 4.5L0 9Z" fill="#ffca58"/></marker>
+</defs>
+<rect width="1800" height="1120" rx="18" fill="#080f1c"/>
+<path d="M34 89V34H1766" fill="none" stroke="#219bff" stroke-width="3"/>
+<path d="M34 34H58L34 58Z" fill="#219bff"/>
+
+<text x="60" y="72" fill="#f4f8ff" font-family="DejaVu Sans, Arial, sans-serif" font-size="34" font-weight="700" text-anchor="start">Agent evidence, edit warnings, and fresh review</text>
+<text x="60" y="108" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="19" font-weight="400" text-anchor="start">MCP signals use a process cache. The edit hook has its own coupling cache. Change review always reads fresh evidence.</text>
+<text x="50" y="160" fill="#47e4ef" font-family="DejaVu Sans, Arial, sans-serif" font-size="19" font-weight="700" text-anchor="start">FORENSIC SIGNALS</text>
+<path d="M65 195H355L370 210V315L355 330H65L50 315V210Z" fill="#0c2136" stroke="#219bff" stroke-width="2"/>
+<text x="74" y="234" fill="#f4f8ff" font-family="DejaVu Sans, Arial, sans-serif" font-size="21" font-weight="700" text-anchor="start">Git history + current files</text>
+<text x="74" y="269" fill="#b6cbdd" font-family="DejaVu Sans Mono, monospace" font-size="18" font-weight="400" text-anchor="start">git log --numstat</text>
+<text x="74" y="301" fill="#b6cbdd" font-family="DejaVu Sans Mono, monospace" font-size="18" font-weight="400" text-anchor="start">Indentation complexity</text>
+<path d="M65 380H355L370 395V465L355 480H65L50 465V395Z" fill="#0c2136" stroke="#47e4ef" stroke-width="2"/>
+<text x="74" y="419" fill="#f4f8ff" font-family="DejaVu Sans, Arial, sans-serif" font-size="23" font-weight="700" text-anchor="start">GitHub Actions</text>
+<text x="74" y="455" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="400" text-anchor="start">gh CLI / REST · optional</text>
+<path d="M465 235H935L950 250V430L935 445H465L450 430V250Z" fill="#0c2136" stroke="#47e4ef" stroke-width="2"/>
+<text x="474" y="274" fill="#f4f8ff" font-family="DejaVu Sans Mono, monospace" font-size="27" font-weight="700" text-anchor="start">run_analysis()</text>
+<text x="474" y="317" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="20" font-weight="400" text-anchor="start">Churn, coupling, ownership, defects</text>
+<text x="474" y="359" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="20" font-weight="400" text-anchor="start">Per-file evidence + function X-Ray</text>
+<text x="474" y="401" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="20" font-weight="400" text-anchor="start">AnalysisResult</text>
+<path d="M370 263H410V290H448" fill="none" stroke="#47e4ef" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#cyan-arrow)"/>
+<path d="M370 430H410V390H448" fill="none" stroke="#47e4ef" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#cyan-arrow)" stroke-dasharray="7 7"/>
+<path d="M1045 200H1315L1330 215V285L1315 300H1045L1030 285V215Z" fill="#0c2136" stroke="#47e4ef" stroke-width="2"/>
+<text x="1054" y="239" fill="#f4f8ff" font-family="DejaVu Sans, Arial, sans-serif" font-size="23" font-weight="700" text-anchor="start">MCP tools [1b]</text>
+<text x="1054" y="274" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="17" font-weight="400" text-anchor="start">Cached by repo / days / CI</text>
+<path d="M1425 200H1735L1750 215V320L1735 335H1425L1410 320V215Z" fill="#0c2136" stroke="#47e4ef" stroke-width="2"/>
+<text x="1434" y="239" fill="#f4f8ff" font-family="DejaVu Sans, Arial, sans-serif" font-size="26" font-weight="700" text-anchor="start">Coding agent</text>
+<text x="1434" y="278" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="400" text-anchor="start">Chooses where to inspect</text>
+<text x="1434" y="307" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="400" text-anchor="start">and what to review</text>
+<path d="M950 290H990V250H1028" fill="none" stroke="#47e4ef" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#cyan-arrow)"/>
+<path d="M1330 260H1408" fill="none" stroke="#47e4ef" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#cyan-arrow)"/>
+<path d="M1580 200V170H1180V198" fill="none" stroke="#47e4ef" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#cyan-arrow)"/>
+<text x="1360" y="160" fill="#47e4ef" font-family="DejaVu Sans, Arial, sans-serif" font-size="17" font-weight="400" text-anchor="middle">Tool call</text>
+<path d="M1045 380H1735L1750 395V465L1735 480H1045L1030 465V395Z" fill="#0c2136" stroke="#219bff" stroke-width="2"/>
+<text x="1054" y="419" fill="#f4f8ff" font-family="DejaVu Sans, Arial, sans-serif" font-size="24" font-weight="700" text-anchor="start">CLI / JSON + offline HTML report</text>
+<text x="1054" y="454" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="400" text-anchor="start">Serialized evidence and the interactive investigation workspace</text>
+<path d="M990 290V430H1028" fill="none" stroke="#47e4ef" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#cyan-arrow)"/>
+<path d="M50 525H1750" fill="none" stroke="#219bff" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="50" y="563" fill="#ffca58" font-family="DejaVu Sans, Arial, sans-serif" font-size="19" font-weight="700" text-anchor="start">EDIT-TIME COUPLING GUARD</text>
+<path d="M65 615H355L370 630V690L355 705H65L50 690V630Z" fill="#0c2136" stroke="#219bff" stroke-width="2"/>
+<text x="74" y="654" fill="#f4f8ff" font-family="DejaVu Sans, Arial, sans-serif" font-size="23" font-weight="700" text-anchor="start">Git history</text>
+<text x="74" y="680" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" text-anchor="start">Current HEAD identifies freshness</text>
+<path d="M465 615H935L950 630V690L935 705H465L450 690V630Z" fill="#0c2136" stroke="#219bff" stroke-width="2"/>
+<text x="474" y="654" fill="#f4f8ff" font-family="DejaVu Sans, Arial, sans-serif" font-size="24" font-weight="700" text-anchor="start">Coupling-only snapshot</text>
+<text x="474" y="680" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="400" text-anchor="start">Independent typed cache for the hook</text>
+<path d="M1045 615H1315L1330 630V690L1315 705H1045L1030 690V630Z" fill="#0c2136" stroke="#ffca58" stroke-width="2"/>
+<text x="1054" y="654" fill="#f4f8ff" font-family="DejaVu Sans, Arial, sans-serif" font-size="23" font-weight="700" text-anchor="start">Guard hook [1c]</text>
+<text x="1054" y="680" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" text-anchor="start">Supported co-change pairs</text>
+<path d="M1425 615H1735L1750 630V690L1735 705H1425L1410 690V630Z" fill="#0c2136" stroke="#219bff" stroke-width="2"/>
+<text x="1434" y="654" fill="#f4f8ff" font-family="DejaVu Sans, Arial, sans-serif" font-size="24" font-weight="700" text-anchor="start">Coding agent</text>
+<text x="1434" y="680" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="400" text-anchor="start">Checks companion files</text>
+<path d="M370 660H448" fill="none" stroke="#47e4ef" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#cyan-arrow)"/>
+<path d="M950 660H1028" fill="none" stroke="#47e4ef" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#cyan-arrow)"/>
+<path d="M1330 660H1408" fill="none" stroke="#ffca58" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#amber-arrow)"/>
+<path d="M1580 615V590H1180V613" fill="none" stroke="#ffca58" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#amber-arrow)"/>
+<text x="1360" y="580" fill="#ffca58" font-family="DejaVu Sans, Arial, sans-serif" font-size="17" font-weight="400" text-anchor="middle">After Edit / Write</text>
+<path d="M50 755H1750" fill="none" stroke="#219bff" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="50" y="793" fill="#ffca58" font-family="DejaVu Sans, Arial, sans-serif" font-size="19" font-weight="700" text-anchor="start">FRESH CHANGE REVIEW</text>
+<path d="M65 830H355L370 845V905L355 920H65L50 905V845Z" fill="#0c2136" stroke="#219bff" stroke-width="2"/>
+<text x="74" y="869" fill="#f4f8ff" font-family="DejaVu Sans Mono, monospace" font-size="22" font-weight="700" text-anchor="start">ChangeReviewRequest</text>
+<text x="74" y="895" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="17" font-weight="400" text-anchor="start">Branch / staged / working tree</text>
+<path d="M65 970H355L370 985V1045L355 1060H65L50 1045V985Z" fill="#0c2136" stroke="#219bff" stroke-width="2"/>
+<text x="74" y="1009" fill="#f4f8ff" font-family="DejaVu Sans Mono, monospace" font-size="24" font-weight="700" text-anchor="start">.bbu.toml</text>
+<text x="74" y="1035" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="400" text-anchor="start">Profiles + path-role rules</text>
+<path d="M465 830H1315L1330 845V1045L1315 1060H465L450 1045V845Z" fill="#0c2136" stroke="#ffca58" stroke-width="2"/>
+<text x="474" y="869" fill="#f4f8ff" font-family="DejaVu Sans Mono, monospace" font-size="27" font-weight="700" text-anchor="start">run_change_review(repo, request)</text>
+<text x="474" y="910" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="21" font-weight="400" text-anchor="start">Resolve settings; collect the selected change</text>
+<text x="474" y="958" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="21" font-weight="400" text-anchor="start">Map renamed paths before fresh history + CI aggregation</text>
+<text x="474" y="1006" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="21" font-weight="400" text-anchor="start">project_change_review() returns 0–3 typed actions</text>
+<path d="M370 875H410V895H448" fill="none" stroke="#ffca58" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#amber-arrow)"/>
+<path d="M370 1015H410V1010H448" fill="none" stroke="#ffca58" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#amber-arrow)"/>
+<path d="M1425 870H1735L1750 885V1005L1735 1020H1425L1410 1005V885Z" fill="#0c2136" stroke="#ffca58" stroke-width="2"/>
+<text x="1434" y="909" fill="#f4f8ff" font-family="DejaVu Sans, Arial, sans-serif" font-size="24" font-weight="700" text-anchor="start">CLI / MCP / plugin</text>
+<text x="1434" y="950" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="400" text-anchor="start">Raw evidence accompanies</text>
+<text x="1434" y="981" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="400" text-anchor="start">each returned action</text>
+<path d="M1330 945H1408" fill="none" stroke="#ffca58" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#amber-arrow)"/>
+<text x="450" y="1097" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="19" font-weight="400" text-anchor="start">Review bypasses the MCP cache. CI is off unless requested. Renames retain history; copies start a new identity.</text>
+</svg>

@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="1160" viewBox="0 0 1500 1160" role="img" aria-labelledby="title desc">
+<title id="title">The agent workflow, step by step</title>
+<desc id="desc">MCP evidence guides inspection. The edit hook warns about coupled files. Explicit review bypasses the signal cache.</desc>
+<defs>
+<marker id="cyan-arrow" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0L9 4.5L0 9Z" fill="#47e4ef"/></marker>
+<marker id="amber-arrow" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0L9 4.5L0 9Z" fill="#ffca58"/></marker>
+</defs>
+<rect width="1500" height="1160" rx="18" fill="#080f1c"/>
+<path d="M34 89V34H1466" fill="none" stroke="#219bff" stroke-width="3"/>
+<path d="M34 34H58L34 58Z" fill="#219bff"/>
+
+<text x="60" y="72" fill="#f4f8ff" font-family="DejaVu Sans, Arial, sans-serif" font-size="34" font-weight="700" text-anchor="start">The agent workflow, step by step</text>
+<text x="60" y="108" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="19" font-weight="400" text-anchor="start">MCP evidence guides inspection. The edit hook warns about coupled files. Explicit review bypasses the signal cache.</text>
+<path d="M55 150H325L340 165V201L325 216H55L40 201V165Z" fill="#0c2136" stroke="#219bff" stroke-width="2"/>
+<text x="64" y="189" fill="#f4f8ff" font-family="DejaVu Sans, Arial, sans-serif" font-size="23" font-weight="700" text-anchor="start">Coding agent</text>
+<path d="M190 216V1100" fill="none" stroke="#219bff" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="7 7"/>
+<path d="M430 150H700L715 165V201L700 216H430L415 201V165Z" fill="#0c2136" stroke="#219bff" stroke-width="2"/>
+<text x="439" y="189" fill="#f4f8ff" font-family="DejaVu Sans, Arial, sans-serif" font-size="23" font-weight="700" text-anchor="start">MCP server [1b]</text>
+<path d="M565 216V1100" fill="none" stroke="#219bff" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="7 7"/>
+<path d="M805 150H1075L1090 165V201L1075 216H805L790 201V165Z" fill="#0c2136" stroke="#219bff" stroke-width="2"/>
+<text x="814" y="189" fill="#f4f8ff" font-family="DejaVu Sans, Arial, sans-serif" font-size="23" font-weight="700" text-anchor="start">Analysis [2a]</text>
+<path d="M940 216V1100" fill="none" stroke="#219bff" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="7 7"/>
+<path d="M1180 150H1450L1465 165V201L1450 216H1180L1165 201V165Z" fill="#0c2136" stroke="#219bff" stroke-width="2"/>
+<text x="1189" y="189" fill="#f4f8ff" font-family="DejaVu Sans, Arial, sans-serif" font-size="23" font-weight="700" text-anchor="start">Guard hook [1c]</text>
+<path d="M1315 216V1100" fill="none" stroke="#219bff" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="7 7"/>
+<path d="M190 280H565" fill="none" stroke="#47e4ef" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#cyan-arrow)"/>
+<text x="377.5" y="267" fill="#47e4ef" font-family="DejaVu Sans Mono, monospace" font-size="19" font-weight="400" text-anchor="middle">get_hotspots()</text>
+<path d="M565 350H940" fill="none" stroke="#47e4ef" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#cyan-arrow)"/>
+<text x="752.5" y="337" fill="#47e4ef" font-family="DejaVu Sans Mono, monospace" font-size="17" font-weight="400" text-anchor="middle">run_analysis() on cache miss</text>
+<path d="M940 420H565" fill="none" stroke="#47e4ef" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#cyan-arrow)" stroke-dasharray="7 7"/>
+<text x="752.5" y="407" fill="#47e4ef" font-family="DejaVu Sans Mono, monospace" font-size="19" font-weight="400" text-anchor="middle">AnalysisResult</text>
+<path d="M565 490H190" fill="none" stroke="#47e4ef" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#cyan-arrow)" stroke-dasharray="7 7"/>
+<text x="377.5" y="477" fill="#47e4ef" font-family="DejaVu Sans Mono, monospace" font-size="19" font-weight="400" text-anchor="middle">Ranked hotspot files</text>
+<path d="M190 560H565" fill="none" stroke="#47e4ef" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#cyan-arrow)"/>
+<text x="377.5" y="547" fill="#47e4ef" font-family="DejaVu Sans Mono, monospace" font-size="16" font-weight="400" text-anchor="middle">get_file_forensics / get_coupled_files</text>
+<path d="M565 630H190" fill="none" stroke="#47e4ef" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#cyan-arrow)" stroke-dasharray="7 7"/>
+<text x="377.5" y="617" fill="#47e4ef" font-family="DejaVu Sans Mono, monospace" font-size="19" font-weight="400" text-anchor="middle">Cached file evidence</text>
+<path d="M190 700H565" fill="none" stroke="#47e4ef" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#cyan-arrow)"/>
+<text x="377.5" y="687" fill="#47e4ef" font-family="DejaVu Sans Mono, monospace" font-size="19" font-weight="400" text-anchor="middle">xray_file()</text>
+<path d="M565 770H190" fill="none" stroke="#47e4ef" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#cyan-arrow)" stroke-dasharray="7 7"/>
+<text x="377.5" y="757" fill="#47e4ef" font-family="DejaVu Sans Mono, monospace" font-size="17" font-weight="400" text-anchor="middle">Per-call function evidence</text>
+<rect x="55" y="803" width="320" height="31" rx="4" fill="#102c44"/>
+<text x="69" y="826" fill="#f4f8ff" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="400" text-anchor="start">Inspect and edit selected files</text>
+<path d="M190 885H1315" fill="none" stroke="#ffca58" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#amber-arrow)"/>
+<text x="752.5" y="872" fill="#ffca58" font-family="DejaVu Sans Mono, monospace" font-size="19" font-weight="400" text-anchor="middle">Edit / Write: PostToolUse hook</text>
+<path d="M1315 950H190" fill="none" stroke="#ffca58" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#amber-arrow)" stroke-dasharray="7 7"/>
+<text x="752.5" y="937" fill="#ffca58" font-family="DejaVu Sans Mono, monospace" font-size="19" font-weight="400" text-anchor="middle">Supported coupling warnings</text>
+<path d="M190 1020H565" fill="none" stroke="#ffca58" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#amber-arrow)"/>
+<text x="377.5" y="1007" fill="#ffca58" font-family="DejaVu Sans Mono, monospace" font-size="19" font-weight="400" text-anchor="middle">review_change()</text>
+<path d="M565 1090H190" fill="none" stroke="#ffca58" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#amber-arrow)" stroke-dasharray="7 7"/>
+<text x="377.5" y="1077" fill="#ffca58" font-family="DejaVu Sans Mono, monospace" font-size="16" font-weight="400" text-anchor="middle">Fresh review: 0–3 checks + raw evidence</text>
+<text x="60" y="1138" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="19" font-weight="400" text-anchor="start">Review resolves .bbu.toml, selects the change, and maps rename history before fresh analysis. CI is opt-in.</text>
+</svg>

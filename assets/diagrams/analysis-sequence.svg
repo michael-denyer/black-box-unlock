@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="960" viewBox="0 0 1500 960" role="img" aria-labelledby="title desc">
+<title id="title">Repository analysis, step by step</title>
+<desc id="desc">Requests are solid cyan. Returned data is dashed. Amber shows the HTML output branch.</desc>
+<defs>
+<marker id="cyan-arrow" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0L9 4.5L0 9Z" fill="#47e4ef"/></marker>
+<marker id="amber-arrow" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0L9 4.5L0 9Z" fill="#ffca58"/></marker>
+</defs>
+<rect width="1500" height="960" rx="18" fill="#080f1c"/>
+<path d="M34 89V34H1466" fill="none" stroke="#219bff" stroke-width="3"/>
+<path d="M34 34H58L34 58Z" fill="#219bff"/>
+
+<text x="60" y="72" fill="#f4f8ff" font-family="DejaVu Sans, Arial, sans-serif" font-size="34" font-weight="700" text-anchor="start">Repository analysis, step by step</text>
+<text x="60" y="108" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="19" font-weight="400" text-anchor="start">Requests are solid cyan. Returned data is dashed. Amber shows the HTML output branch.</text>
+<path d="M47 150H233L248 165V201L233 216H47L32 201V165Z" fill="#0c2136" stroke="#219bff" stroke-width="2"/>
+<text x="56" y="189" fill="#f4f8ff" font-family="DejaVu Sans, Arial, sans-serif" font-size="21" font-weight="700" text-anchor="start">User</text>
+<path d="M140 216V888" fill="none" stroke="#219bff" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="7 7"/>
+<path d="M292 150H478L493 165V201L478 216H292L277 201V165Z" fill="#0c2136" stroke="#219bff" stroke-width="2"/>
+<text x="301" y="189" fill="#f4f8ff" font-family="DejaVu Sans, Arial, sans-serif" font-size="21" font-weight="700" text-anchor="start">CLI [1a]</text>
+<path d="M385 216V888" fill="none" stroke="#219bff" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="7 7"/>
+<path d="M537 150H723L738 165V201L723 216H537L522 201V165Z" fill="#0c2136" stroke="#219bff" stroke-width="2"/>
+<text x="546" y="189" fill="#f4f8ff" font-family="DejaVu Sans, Arial, sans-serif" font-size="21" font-weight="700" text-anchor="start">Analysis [2a]</text>
+<path d="M630 216V888" fill="none" stroke="#219bff" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="7 7"/>
+<path d="M782 150H968L983 165V201L968 216H782L767 201V165Z" fill="#0c2136" stroke="#219bff" stroke-width="2"/>
+<text x="791" y="189" fill="#f4f8ff" font-family="DejaVu Sans, Arial, sans-serif" font-size="21" font-weight="700" text-anchor="start">Git history</text>
+<path d="M875 216V888" fill="none" stroke="#219bff" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="7 7"/>
+<path d="M1027 150H1213L1228 165V201L1213 216H1027L1012 201V165Z" fill="#0c2136" stroke="#219bff" stroke-width="2"/>
+<text x="1036" y="189" fill="#f4f8ff" font-family="DejaVu Sans, Arial, sans-serif" font-size="21" font-weight="700" text-anchor="start">Forensics [3]</text>
+<path d="M1120 216V888" fill="none" stroke="#219bff" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="7 7"/>
+<path d="M1272 150H1458L1473 165V201L1458 216H1272L1257 201V165Z" fill="#0c2136" stroke="#219bff" stroke-width="2"/>
+<text x="1281" y="189" fill="#f4f8ff" font-family="DejaVu Sans, Arial, sans-serif" font-size="21" font-weight="700" text-anchor="start">Views [5]</text>
+<path d="M1365 216V888" fill="none" stroke="#219bff" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="7 7"/>
+<path d="M140 270H385" fill="none" stroke="#47e4ef" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#cyan-arrow)"/>
+<text x="262.5" y="258" fill="#47e4ef" font-family="DejaVu Sans Mono, monospace" font-size="18" font-weight="400" text-anchor="middle">bbu analyze-repo</text>
+<path d="M385 335H630" fill="none" stroke="#47e4ef" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#cyan-arrow)"/>
+<text x="507.5" y="323" fill="#47e4ef" font-family="DejaVu Sans Mono, monospace" font-size="18" font-weight="400" text-anchor="middle">run_analysis()</text>
+<path d="M630 400H875" fill="none" stroke="#47e4ef" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#cyan-arrow)"/>
+<text x="752.5" y="388" fill="#47e4ef" font-family="DejaVu Sans Mono, monospace" font-size="18" font-weight="400" text-anchor="middle">fetch_git_history()</text>
+<path d="M875 465H630" fill="none" stroke="#47e4ef" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#cyan-arrow)" stroke-dasharray="7 7"/>
+<text x="752.5" y="453" fill="#47e4ef" font-family="DejaVu Sans Mono, monospace" font-size="18" font-weight="400" text-anchor="middle">Commit records</text>
+<path d="M630 530H1120" fill="none" stroke="#47e4ef" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#cyan-arrow)"/>
+<text x="875.0" y="518" fill="#47e4ef" font-family="DejaVu Sans Mono, monospace" font-size="18" font-weight="400" text-anchor="middle">parse + detect signals</text>
+<path d="M1120 595H630" fill="none" stroke="#47e4ef" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#cyan-arrow)" stroke-dasharray="7 7"/>
+<text x="875.0" y="583" fill="#47e4ef" font-family="DejaVu Sans Mono, monospace" font-size="18" font-weight="400" text-anchor="middle">Churn / coupling / ownership / defects</text>
+<path d="M630 660H385" fill="none" stroke="#47e4ef" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#cyan-arrow)" stroke-dasharray="7 7"/>
+<text x="507.5" y="648" fill="#47e4ef" font-family="DejaVu Sans Mono, monospace" font-size="18" font-weight="400" text-anchor="middle">AnalysisResult</text>
+<rect x="50" y="692" width="235" height="29" rx="4" fill="#102c44"/>
+<text x="64" y="713" fill="#47e4ef" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="700" text-anchor="start">JSON output</text>
+<path d="M385 750H140" fill="none" stroke="#47e4ef" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#cyan-arrow)" stroke-dasharray="7 7"/>
+<text x="262.5" y="738" fill="#47e4ef" font-family="DejaVu Sans Mono, monospace" font-size="18" font-weight="400" text-anchor="middle">JSON</text>
+<rect x="470" y="692" width="320" height="29" rx="4" fill="#102c44"/>
+<text x="484" y="713" fill="#ffca58" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="700" text-anchor="start">Alternative: HTML output</text>
+<path d="M385 785H1365" fill="none" stroke="#ffca58" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#amber-arrow)"/>
+<text x="875.0" y="773" fill="#ffca58" font-family="DejaVu Sans Mono, monospace" font-size="18" font-weight="400" text-anchor="middle">generate_html_report()</text>
+<path d="M1365 840H385" fill="none" stroke="#ffca58" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#amber-arrow)" stroke-dasharray="7 7"/>
+<text x="875.0" y="828" fill="#ffca58" font-family="DejaVu Sans Mono, monospace" font-size="18" font-weight="400" text-anchor="middle">Offline investigation workspace</text>
+<path d="M385 890H140" fill="none" stroke="#ffca58" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#amber-arrow)" stroke-dasharray="7 7"/>
+<text x="262.5" y="878" fill="#ffca58" font-family="DejaVu Sans Mono, monospace" font-size="18" font-weight="400" text-anchor="middle">HTML</text>
+<text x="60" y="936" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="19" font-weight="400" text-anchor="start">CI collection is optional and joins the evidence before AnalysisResult is returned.</text>
+</svg>

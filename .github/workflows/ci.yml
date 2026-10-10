@@ -11,9 +11,6 @@ permissions:
 
 jobs:
   quality:
-    # mmdc needs Chromium's process sandbox. Ubuntu 24.04 blocks the required
-    # user namespaces, so use 22.04 instead of weakening Chromium with
-    # --no-sandbox.
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v6

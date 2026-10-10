@@ -4,105 +4,16 @@
 
 ## System Overview
 
-```mermaid
-flowchart TB
-    subgraph Layer1["Entry Points [1]"]
-        Agent["Coding agent"]
-        MCP["MCP Server [1b]"]
-        Guard["Coupling Guard Hook [1c]"]
-        CLI["CLI Commands [1a]"]
-    end
-
-    subgraph Layer2["Analysis Orchestration [2]"]
-        Analysis["run_analysis [2a]"]
-        Export["export_to_json [2b]"]
-    end
-
-    subgraph Layer3["Git Forensics [3]"]
-        Churn["Churn Extraction [3a]"]
-        Coupling["Coupling Detection [3b]"]
-        Ownership["Ownership Parsing [3c]"]
-    end
-
-    subgraph Layer4["Core Data Models [4]"]
-        Models["Pydantic Models [4a]"]
-        Exceptions["Exceptions [4b]"]
-        Logging["Logging [4c]"]
-    end
-
-    subgraph Layer5["Visualization [5]"]
-        HTML["HTML Report [5a]"]
-        Payload["Report Payload [5b]"]
-        Workspace["Investigation Workspace [5c-e]"]
-    end
-
-    Agent --> MCP
-    Agent --> Guard
-    MCP --> Analysis
-    Guard --> Coupling
-    CLI --> Analysis
-    Analysis --> Churn
-    Analysis --> Coupling
-    Analysis --> Ownership
-    Churn --> Models
-    Coupling --> Models
-    Ownership --> Models
-    Analysis --> Export
-    Analysis --> HTML
-    HTML --> Payload
-    HTML --> Workspace
-    Models --> Exceptions
-```
+![The coding agent calls MCP server 1b and receives warnings from coupling guard 1c after edits. MCP and CLI 1a call analysis orchestration, while the hook uses its own coupling cache. Core file evidence reaches JSON, HTML, and agent tools.](../assets/diagrams/system-overview.svg)
 
 ## Data Flow
 
-```mermaid
-sequenceDiagram
-    participant User
-    participant CLI as CLI [1a]
-    participant Analysis as Analysis [2a]
-    participant Git as git log #45;#45;numstat
-    participant Forensics as Git Forensics [3]
-    participant Viz as Visualization [5]
-
-    User->>CLI: bbu analyze-repo
-    CLI->>Analysis: run_analysis(path, days)
-    Analysis->>Git: fetch_git_history(repo_path, days)
-    Git-->>Analysis: git history dict
-    Analysis->>Forensics: parse + detect
-    Forensics-->>Analysis: FileChurn, Coupling, Ownership
-    Analysis-->>CLI: AnalysisResult
-    alt --output=json
-        CLI->>User: JSON output
-    else --output=html
-        CLI->>Viz: generate_html_report()
-        Viz-->>CLI: Offline investigation workspace
-        CLI->>User: HTML output
-    end
-```
+![The CLI calls run_analysis, which reads Git history, extracts forensic signals, and returns AnalysisResult. The CLI then returns JSON or generates the offline HTML investigation workspace.](../assets/diagrams/analysis-sequence.svg)
 
 The agent path is the primary interface. The agent asks `bbu-mcp` for evidence
 and uses the answer to choose which files to inspect.
 
-```mermaid
-sequenceDiagram
-    participant Agent as Coding agent
-    participant MCP as MCP Server [1b]
-    participant Analysis as Analysis [2a]
-    participant Guard as Coupling Guard [1c]
-
-    Agent->>MCP: get_hotspots(repo_path, days)
-    MCP->>Analysis: run_analysis(path, days)
-    Analysis-->>MCP: AnalysisResult (cached per repo, days, CI)
-    MCP-->>Agent: files ranked by hotspot score
-    Agent->>MCP: get_file_forensics / get_coupled_files / xray_file
-    MCP-->>Agent: evidence for the files it chose
-    Agent->>Agent: inspect and edit the riskiest files first
-    Agent->>Guard: Edit or Write (PostToolUse hook)
-    Guard-->>Agent: warning when a coupled file was left out
-    Agent->>MCP: review_change(repo_path)
-    MCP-->>Agent: fresh review, at most three actions
-```
+![The coding agent requests hotspots and file evidence through the MCP signal cache, calls xray_file for fresh function evidence, receives PostToolUse coupling warnings after edits, and explicitly calls review_change for up to three fresh checks.](../assets/diagrams/agent-sequence.svg)
 
 ---
 
@@ -112,9 +23,9 @@ Agent-facing MCP tools and edit hook, and user-facing commands via Typer CLI.
 
 | ID | Component | Description | File:Line |
 |----|-----------|-------------|-----------|
-| 1a | CLI App | Typer application with `bbu` command | [cli.py:34](../src/black_box_unlock/cli.py#L34) |
-| 1a.1 | analyze_repo | Main analysis command | [cli.py:49](../src/black_box_unlock/cli.py#L49) |
-| 1a.2 | version | Version info command | [cli.py:78](../src/black_box_unlock/cli.py#L78) |
+| 1a | CLI App | Typer application with `bbu` command | [cli.py:41](../src/black_box_unlock/cli.py#L41) |
+| 1a.1 | analyze_repo | Main analysis command | [cli.py:71](../src/black_box_unlock/cli.py#L71) |
+| 1a.2 | version | Version info command | [cli.py:344](../src/black_box_unlock/cli.py#L344) |
 | 1b | MCP Server | `bbu-mcp` server exposing forensic signals as agent tools | [mcp_server.py:24](../src/black_box_unlock/mcp_server.py#L24) |
 | 1b.1 | get_hotspots | First of six tools that read the cached analysis | [mcp_server.py:50](../src/black_box_unlock/mcp_server.py#L50) |
 | 1b.2 | xray_file | Per-function churn for one file, computed on each call | [mcp_server.py:164](../src/black_box_unlock/mcp_server.py#L164) |
@@ -129,46 +40,13 @@ Orchestrates forensic analysis by combining data from multiple sources.
 
 | ID | Component | Description | File:Line |
 |----|-----------|-------------|-----------|
-| 2a | run_analysis | Main analysis pipeline | [analysis.py:30](../src/black_box_unlock/analysis.py#L30) |
-| 2a.1 | collect_ci_signals | Collect failure and flaky-step data from one typed run snapshot | [github_actions.py:153](../src/black_box_unlock/cicd/github_actions.py#L153) |
-| 2b | export_to_json | Serialize result to JSON | [analysis.py:155](../src/black_box_unlock/analysis.py#L155) |
+| 2a | run_analysis | Main analysis pipeline | [analysis.py:88](../src/black_box_unlock/analysis.py#L88) |
+| 2a.1 | collect_ci_signals | Collect failure and flaky-step data from one typed run snapshot | [github_actions.py:154](../src/black_box_unlock/cicd/github_actions.py#L154) |
+| 2b | export_to_json | Serialize result to JSON | [analysis.py:221](../src/black_box_unlock/analysis.py#L221) |
 
 #### Analysis Pipeline [2a]
 
-```mermaid
-flowchart LR
-    subgraph Fetch["Data Fetch"]
-        GitLog[fetch_git_history]
-    end
-
-    subgraph Parse["Parse & Detect"]
-        Churn[parse_history_entries]
-        Owner[parse_ownership_from_history]
-        Couple[analyze_temporal_coupling]
-        CI[collect_ci_signals]
-    end
-
-    subgraph Join["Aggregate"]
-        Index[Index by path]
-        Build[Build coupling lookup]
-        Score[Calculate hotspot_score]
-    end
-
-    subgraph Out["Output"]
-        Result[AnalysisResult]
-    end
-
-    GitLog --> Churn
-    GitLog --> Owner
-    GitLog --> Couple
-    CI --> Index
-    Churn --> Index
-    Owner --> Index
-    Couple --> Build
-    Index --> Score
-    Build --> Score
-    Score --> Result
-```
+![One history snapshot feeds churn, ownership, coupling, and defect parsers. Change review maps renamed paths before aggregation, including failed-run paths. Current complexity and optional CI evidence join by file before hotspot ranking and function X-Ray.](../assets/diagrams/analysis-pipeline.svg)
 
 ---
 
@@ -178,10 +56,10 @@ Domain logic for extracting forensic signals from git history.
 
 | ID | Component | Description | File:Line |
 |----|-----------|-------------|-----------|
-| 3a | parse_history_entries | Parse git log dict to FileChurn list | [churn.py:12](../src/black_box_unlock/git/churn.py#L12) |
-| 3a.1 | extract_file_churn | Extract churn from git repo | [churn.py:43](../src/black_box_unlock/git/churn.py#L43) |
+| 3a | parse_history_entries | Parse git log dict to FileChurn list | [churn.py:11](../src/black_box_unlock/git/churn.py#L11) |
+| 3a.1 | extract_file_churn | Extract churn from git repo | [churn.py:38](../src/black_box_unlock/git/churn.py#L38) |
 | 3b | analyze_temporal_coupling | Find co-changing files and count ignored bulk changesets | [coupling.py:19](../src/black_box_unlock/git/coupling.py#L19) |
-| 3c | parse_ownership_from_history | Parse authors per file from git log | [ownership.py:11](../src/black_box_unlock/git/ownership.py#L11) |
+| 3c | parse_ownership_from_history | Parse authors per file from git log | [ownership.py:9](../src/black_box_unlock/git/ownership.py#L9) |
 
 #### Coupling Detection Formula [3b]
 
@@ -205,62 +83,17 @@ Pydantic models and shared infrastructure.
 
 | ID | Component | Description | File:Line |
 |----|-----------|-------------|-----------|
-| 4a | FileChurn | Churn metrics per file | [models.py:35](../src/black_box_unlock/core/models.py#L35) |
-| 4a.1 | TemporalCoupling | File pair co-change | [models.py:60](../src/black_box_unlock/core/models.py#L60) |
-| 4a.2 | FileOwnership | Authors per file | [models.py:79](../src/black_box_unlock/core/models.py#L79) |
-| 4a.3 | FileForensics | Combined forensics | [models.py:163](../src/black_box_unlock/core/models.py#L163) |
-| 4a.4 | AnalysisResult | Complete analysis output, parameters, and signal status | [models.py:286](../src/black_box_unlock/core/models.py#L286) |
+| 4a | FileChurn | Churn metrics per file | [models.py:56](../src/black_box_unlock/core/models.py#L56) |
+| 4a.1 | TemporalCoupling | File pair co-change | [models.py:81](../src/black_box_unlock/core/models.py#L81) |
+| 4a.2 | FileOwnership | Authors per file | [models.py:114](../src/black_box_unlock/core/models.py#L114) |
+| 4a.3 | FileForensics | Combined forensics | [models.py:234](../src/black_box_unlock/core/models.py#L234) |
+| 4a.4 | AnalysisResult | Complete analysis output, parameters, and signal status | [models.py:370](../src/black_box_unlock/core/models.py#L370) |
 | 4b | Exceptions | Custom exception classes | [exceptions.py:4](../src/black_box_unlock/core/exceptions.py#L4) |
 | 4c | configure_logging | Loguru configuration | [logging.py:8](../src/black_box_unlock/core/logging.py#L8) |
 
 #### Model Relationships [4a]
 
-```mermaid
-classDiagram
-    class FileChurn {
-        path: str
-        commits: int
-        lines_added: int
-        lines_deleted: int
-        +total_lines_changed
-    }
-
-    class TemporalCoupling {
-        file_a: str
-        file_b: str
-        co_change_count: int
-        +coupling_ratio
-    }
-
-    class FileOwnership {
-        path: str
-        authors: list~str~
-        +author_count
-        +is_high_risk
-    }
-
-    class FileForensics {
-        path: str
-        commits: int
-        lines_changed: int
-        authors: list~str~
-        coupled_with: list~CouplingInfo~
-        +hotspot_score
-    }
-
-    class AnalysisResult {
-        repo: str
-        files: list~FileForensics~
-        summary: AnalysisSummary
-        parameters: AnalysisParameters
-        ci_status: SignalStatus
-    }
-
-    FileChurn ..> FileForensics : aggregated
-    FileOwnership ..> FileForensics : merged
-    TemporalCoupling ..> FileForensics : coupled_with
-    FileForensics ..> AnalysisResult : files
-```
+![FileChurn, FileOwnership, and TemporalCoupling aggregate into FileForensics. AnalysisResult contains files, coupling pairs, summary, parameters, failed CI runs, flaky steps, and CI status.](../assets/diagrams/model-relationships.svg)
 
 ---
 
@@ -278,31 +111,7 @@ HTML report generation with interactive visualizations.
 
 #### HTML Report Structure [5a]
 
-```mermaid
-flowchart TB
-    subgraph Report["HTML Report"]
-        Header[Summary Cards]
-        Tabs[Tab Navigation]
-    end
-
-    subgraph Views["Investigation Views"]
-        Files[Searchable File Grid]
-        Evidence[Selected File Evidence]
-        Coupling[Confidence-first Coupling Grid]
-    end
-
-    subgraph Viz["Visualizations"]
-        Matrix[ECharts Risk Matrix]
-        Map[ECharts Repository Map]
-    end
-
-    Report --> Views
-    Tabs --> Files
-    Tabs --> Coupling
-    Files --> Evidence
-    Matrix --> Evidence
-    Map --> Evidence
-```
+![The offline HTML report includes summary cards, files and coupling grids, a risk matrix, and a repository map. File selection links grids and charts to an evidence drawer. Filters and collection status keep evidence scope explicit.](../assets/diagrams/html-report.svg)
 
 ---
 

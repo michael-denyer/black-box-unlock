@@ -24,20 +24,20 @@ signals through MCP tools and a Claude Code plugin.
 </tr>
 </table>
 
+## How it works
+
+Coding agents ask `bbu-mcp` for forensic evidence before they inspect or edit
+code. Ranked hotspots and coupled files guide their focus, the edit hook warns
+about companion files, and a fresh change review returns up to three checks.
+
+![A coding agent calls bbu-mcp to read Git history, current code, and optional CI evidence. Hotspots, coupling, ownership, bug-fix history, and function X-Ray guide file inspection. The edit hook warns about coupled files; fresh review returns up to three checks and retains rename history. CLI JSON, the Claude Code plugin, and offline HTML are also available.](assets/overview.png)
+
 ## For agents (MCP + plugin)
 
 The agent calls `bbu-mcp` before it reads or edits code, and uses the ranked
 evidence to decide which files to inspect first.
 
-```mermaid
-flowchart LR
-    Agent[Coding agent] -->|calls a tool| MCP[bbu-mcp]
-    MCP -->|reads| History[Git history<br/>and GitHub Actions]
-    MCP -->|hotspots, coupling,<br/>ownership, CI failures| Agent
-    Agent -->|inspects the riskiest<br/>files first| Repo[Repository]
-    Agent -->|edits a file| Guard[Coupling guard hook]
-    Guard -->|warns about<br/>coupled files| Agent
-```
+![The coding agent queries bbu-mcp for ranked repository evidence, then inspects and edits files. The PostToolUse coupling guard warns about companion files. Explicit review_change queries return fresh, rename-aware checks.](assets/diagrams/agent-flow.svg)
 
 ```bash
 uv tool install black-box-unlock   # provides bbu and bbu-mcp
@@ -196,18 +196,7 @@ Pinned ECharts and Tabulator assets are embedded in the document, so opening a
 saved report makes no CDN requests. Charts are supplementary: the evidence
 needed to interpret them remains in keyboard-operable grids and text panels.
 
-```mermaid
-flowchart LR
-    Git[Git History] --> Analyze[Forensic analysis]
-    CI[GitHub Actions] --> Analyze
-    Analyze --> MCP[bbu-mcp tools]
-    MCP --> Agent[Coding agent]
-    Analyze --> JSON[JSON Output]
-    Analyze --> HTML[HTML Report]
-    HTML --> Grid[Searchable Evidence]
-    HTML --> Matrix[Risk Matrix]
-    HTML --> Treemap[Repository Map]
-```
+![Git history and optional CI feed shared forensic analysis. bbu-mcp returns ranked evidence to the coding agent. CLI JSON and an offline HTML report expose the same analysis through searchable evidence, a risk matrix, and a repository map.](assets/diagrams/report-flow.svg)
 
 ## Architecture
 
@@ -242,7 +231,7 @@ bbu --verbose analyze-repo
 ```
 
 The `prek` gate covers repository hygiene, Ruff, Pyrefly, GitHub Actions
-linting, Markdown and link checks, Mermaid rendering, workflow security, and
+linting, Markdown and link checks, workflow security, and
 locked-dependency auditing. Link and dependency checks need network access.
 
 ## License

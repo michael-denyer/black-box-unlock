@@ -148,13 +148,7 @@ def classify_path_role(
     top_level_dir = candidate.parts[0].lower() if len(candidate.parts) > 1 else ""
     suffix = candidate.suffix.lower()
 
-    if (
-        lowered_parts & _TEST_SEGMENTS
-        or name.startswith(("test_", "test.", "spec_"))
-        or name in _TEST_NAMES
-        or _TEST_NAME_PATTERN.fullmatch(name)
-        or _TEST_CLASS_PATTERN.fullmatch(candidate.name)
-    ):
+    if lowered_parts & _TEST_SEGMENTS or name.startswith(("test_", "test.", "spec_")):
         return PathRoleClassification(role=PathRole.test, rule="test-path")
     if top_level_dir in _TOP_LEVEL_DOC_DIRS or suffix in _DOC_SUFFIXES:
         return PathRoleClassification(role=PathRole.docs, rule="docs-path")
@@ -173,5 +167,11 @@ def classify_path_role(
     ):
         return PathRoleClassification(role=PathRole.config, rule="config-path")
     if suffix in _SOURCE_SUFFIXES:
+        if (
+            name in _TEST_NAMES
+            or _TEST_NAME_PATTERN.fullmatch(name)
+            or _TEST_CLASS_PATTERN.fullmatch(candidate.name)
+        ):
+            return PathRoleClassification(role=PathRole.test, rule="test-name")
         return PathRoleClassification(role=PathRole.source, rule="source-extension")
     return PathRoleClassification(role=PathRole.other, rule="fallback")

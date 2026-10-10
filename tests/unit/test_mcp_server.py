@@ -102,6 +102,12 @@ class TestMcpTools:
         with pytest.raises(ToolError, match="Unknown path role"):
             mcp_server.get_hotspots(repo_path=".", roles=["source", "scrips"])
 
+    def test_get_hotspots_empty_roles_raises(self, mock_analysis):
+        mock_analysis.return_value = _result()
+
+        with pytest.raises(ToolError, match="roles must not be empty"):
+            mcp_server.get_hotspots(repo_path=".", roles=[])
+
     def test_get_file_forensics_finds_file(self, mock_analysis):
         mock_analysis.return_value = _result()
 

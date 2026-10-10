@@ -47,6 +47,8 @@ def _parse_roles(roles: list[str] | None) -> set[PathRole] | None:
     """Validate role names at the tool boundary."""
     if roles is None:
         return None
+    if not roles:
+        raise ToolError("roles must not be empty; omit it to return every role")
     valid = {role.value for role in PathRole}
     unknown = sorted(set(roles) - valid)
     if unknown:

@@ -27,9 +27,9 @@ Agent-facing MCP tools and edit hook, and user-facing commands via Typer CLI.
 | 1a.1 | analyze_repo | Main analysis command | [cli.py:71](../src/black_box_unlock/cli.py#L71) |
 | 1a.2 | version | Version info command | [cli.py:344](../src/black_box_unlock/cli.py#L344) |
 | 1b | MCP Server | `bbu-mcp` server exposing forensic signals as agent tools | [mcp_server.py:25](../src/black_box_unlock/mcp_server.py#L25) |
-| 1b.1 | get_hotspots | First of six tools that read the cached analysis | [mcp_server.py:61](../src/black_box_unlock/mcp_server.py#L61) |
-| 1b.2 | xray_file | Per-function churn for one file, computed on each call | [mcp_server.py:180](../src/black_box_unlock/mcp_server.py#L180) |
-| 1b.3 | review_change | Fresh, uncached review of the selected change | [mcp_server.py:211](../src/black_box_unlock/mcp_server.py#L211) |
+| 1b.1 | get_hotspots | First of six tools that read the cached analysis | [mcp_server.py:62](../src/black_box_unlock/mcp_server.py#L62) |
+| 1b.2 | xray_file | Per-function churn for one file, computed on each call | [mcp_server.py:181](../src/black_box_unlock/mcp_server.py#L181) |
+| 1b.3 | review_change | Fresh, uncached review of the selected change | [mcp_server.py:212](../src/black_box_unlock/mcp_server.py#L212) |
 | 1c | coupling_warnings | Coupling guard behind the `PostToolUse` edit hook | [guard.py:114](../src/black_box_unlock/guard.py#L114) |
 
 ---

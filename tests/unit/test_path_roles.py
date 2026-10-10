@@ -117,6 +117,22 @@ def test_names_that_merely_contain_test_are_not_test(path):
 @pytest.mark.parametrize(
     ("path", "role"),
     [
+        ("docs/how_to_test.md", PathRole.docs),
+        ("docs/api.spec.md", PathRole.docs),
+        (".github/workflows/unit_test.yml", PathRole.config),
+        ("config/load_test.toml", PathRole.config),
+        ("migrations/0001_test.sql", PathRole.migration),
+        ("vendor/x/foo_test.go", PathRole.generated),
+        ("node_modules/a/b.spec.js", PathRole.generated),
+    ],
+)
+def test_test_suffix_does_not_override_docs_config_migration_or_generated(path, role):
+    assert classify_path_role(path).role is role
+
+
+@pytest.mark.parametrize(
+    ("path", "role"),
+    [
         ("src/hooks/useThing.ts", PathRole.source),
         ("web/src/hooks/useThing.tsx", PathRole.source),
         ("hooks/guard.sh", PathRole.config),

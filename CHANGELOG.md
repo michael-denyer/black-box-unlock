@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- `bbu validate` v2. The universe and its complexity are read from the tree
+  at the cutoff commit instead of HEAD, history is split by ancestry of the
+  cutoff commit on the committer clock that `git log --since` already
+  filters on, and the hotspot score is reported beside churn-only,
+  file-length, and seeded random (200 draws) baselines with a one-sided
+  permutation p-value. Runs with fewer than 20 universe files or 30
+  post-cutoff bug-fix commits that change files are flagged
+  `insufficient_data`, print counts instead of percentages, are left out of
+  the median, and exit 1 when no repo is usable. `ValidationReport` replaces
+  `ValidationResult`; `fetch_git_history` gains a `clock` keyword.
+  `docs/VALIDATION.md` is re-derived from the v2 method and the v1 per-repo
+  table is withdrawn.
+
 ## [1.5.2] - 2026-10-10
 
 ### Fixed

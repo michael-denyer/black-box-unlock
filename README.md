@@ -163,12 +163,12 @@ format and glob rules are in
 
 ## Does the ranking actually predict bugs?
 
-Measured with `bbu validate` (split-history: rank hotspots on the older half,
-count bug-fix commits in the newer half): median Spearman rho **0.46** across
-six real repos (click, flask, pydantic, rich, fastapi, httpx); the top 10% of
-ranked files attracted a median **46%** of subsequent bug-fix touches in the
-four repos with enough bug-fix signal (39.5% across all six); uniform would be
-10%. Method, per-repo numbers, and limitations:
+Measured with `bbu validate` (split-history: rank the files that existed at a
+cutoff commit using only history up to it, then count bug-fix commits after
+it, beside churn-only, file-length, and seeded random baselines). On this
+repository at `--days 365` the hotspot top 10% took **35%** of subsequent
+bug-fix touches against a random mean of 10% (permutation p = 0.005), while
+file length matched it on rank correlation. Method, the run, and limitations:
 [docs/VALIDATION.md](docs/VALIDATION.md).
 
 ```bash

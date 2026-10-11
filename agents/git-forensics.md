@@ -18,7 +18,8 @@ Interpretation rules:
 - hotspot_score = commits x indentation complexity. High score = unstable
   complex code; prioritize for review and refactoring.
 - Coupling advice requires at least two shared revisions and is ordered by its
-  95% Wilson lower bound. Always report the raw counts with the ratio.
+  `rate_lower_bound`, the 95% Wilson lower bound of the edited file's rate.
+  Always report the raw counts with the ratio.
 - bugfix_commits concentrated in few files confirms the defect-cluster
   hypothesis; cross-reference with hotspot rank.
 - build_failures and flaky steps point at fragile integration points. A path

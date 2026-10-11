@@ -109,7 +109,7 @@ def main() -> None:
     assert coupling["coupled_path"] == "tests/test_a.py"
     assert coupling["shared_revisions"] == 11
     assert coupling["changed_path_revisions"] == 13
-    assert coupling["confidence_lower_bound"] > 0.5
+    assert coupling["ratio_lower_bound"] > 0.5
     print("change-review release proof passed")
 
 

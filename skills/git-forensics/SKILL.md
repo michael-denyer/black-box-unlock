@@ -19,7 +19,8 @@ Interpretation rules:
 - hotspot_score = commits x indentation complexity. High score = unstable
   complex code; prioritize for review and refactoring.
 - Coupling advice requires at least two shared revisions and is ordered by its
-  95% Wilson lower bound. `rate_to_partner` is the share of the edited file's
+  `rate_lower_bound`, the 95% Wilson lower bound of the edited file's rate.
+  `rate_to_partner` is the share of the edited file's
   revisions that also touched the partner. Always report the raw counts with
   the rate.
 - Ownership is `owned`, `shared`, or `diffuse`. Only `diffuse` (more than

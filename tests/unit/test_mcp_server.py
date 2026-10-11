@@ -45,7 +45,7 @@ def _result() -> AnalysisResult:
                         shared_revisions=8,
                         file_revisions=10,
                         coupled_file_revisions=10,
-                        confidence_lower_bound=0.49,
+                        rate_lower_bound=0.49,
                     )
                 ],
                 build_failures=2,
@@ -151,7 +151,7 @@ class TestMcpTools:
                 "shared_revisions": 8,
                 "file_revisions": 10,
                 "coupled_file_revisions": 10,
-                "confidence_lower_bound": 0.49,
+                "rate_lower_bound": 0.49,
                 "rate_to_partner": 0.8,
             }
         ]

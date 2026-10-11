@@ -20,13 +20,13 @@ def _coupling_row(pair: TemporalCoupling, roles_by_path: dict[str, str]) -> dict
         "revisions_b": pair.commits_b,
         "denominator": denominator,
         "raw_ratio": pair.coupling_ratio,
-        "confidence_lower_bound": pair.confidence_lower_bound,
+        "ratio_lower_bound": pair.ratio_lower_bound,
     }
 
 
 def _coupling_sort_key(row: dict[str, Any]) -> tuple[float, int, float, str, str]:
     return (
-        -row["confidence_lower_bound"],
+        -row["ratio_lower_bound"],
         -row["shared_revisions"],
         -row["raw_ratio"],
         row["file_a"],

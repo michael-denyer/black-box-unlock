@@ -68,18 +68,18 @@ def coupling_evidence(
             coupled_path_revisions=info.coupled_file_revisions,
             coupling_ratio=info.ratio,
             changed_to_coupled_rate=info.rate_to_partner,
-            confidence_lower_bound=coupling.confidence_lower_bound,
+            ratio_lower_bound=coupling.ratio_lower_bound,
             coupled_path_is_changed=info.file in selected_paths,
         )
         key = (changed_path, info.file)
         current = evidence.get(key)
-        if current is None or item.confidence_lower_bound > current.confidence_lower_bound:
+        if current is None or item.ratio_lower_bound > current.ratio_lower_bound:
             evidence[key] = item
 
     return sorted(
         evidence.values(),
         key=lambda item: (
-            -item.confidence_lower_bound,
+            -item.ratio_lower_bound,
             -item.shared_revisions,
             -item.coupling_ratio,
             item.changed_path,

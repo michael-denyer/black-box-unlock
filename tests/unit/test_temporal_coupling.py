@@ -168,7 +168,7 @@ class TestAnalyzeTemporalCoupling:
             "src/a.py",
             "tests/test_a.py",
         )
-        assert result[0].confidence_lower_bound > result[-1].confidence_lower_bound
+        assert result[0].ratio_lower_bound > result[-1].ratio_lower_bound
 
     def test_support_floor_excludes_one_off_pairs(self):
         history = [

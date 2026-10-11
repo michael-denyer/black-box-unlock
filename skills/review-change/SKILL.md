@@ -17,7 +17,8 @@ Review the change that is about to ship:
    - Use `--profile NAME` when `.bbu.toml` defines a profile for this review.
    - Use `--include-ci` only when failed GitHub workflow evidence is useful.
 2. Report the returned `actions` in order. Preserve the exact paths, raw
-   revision counts, directional coupling rate, and confidence lower bound.
+   revision counts, directional coupling rate, and `ratio_lower_bound`, the
+   95% lower bound of the symmetric ratio.
 3. Treat an empty action list as a valid clean result. Do not invent extra
    recommendations or turn the evidence into a composite risk score. If
    `omitted_actions` is non-zero, say how many candidates the cap dropped.

@@ -79,7 +79,7 @@ def analyze_temporal_coupling(  # [3b] Find co-changing files
 
     included.sort(
         key=lambda coupling: (
-            -coupling.confidence_lower_bound,
+            -coupling.ratio_lower_bound,
             -coupling.co_change_count,
             -coupling.coupling_ratio,
             coupling.file_a,

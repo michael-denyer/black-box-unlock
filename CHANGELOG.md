@@ -19,6 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   that falls back to `.codex-plugin/` loads it, and it exits without output
   because Codex sends a patch rather than a file path.
 - README badges for PyPI, the Claude Code plugin, and the Codex plugin.
+- `bbu analyze-repo` JSON and the HTML report payload carry a `provenance`
+  object (HEAD oid, time, window, shallow-clone flag, bbu version, warnings),
+  the same one `bbu-mcp` results already had.
 
 ### Changed
 

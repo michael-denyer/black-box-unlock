@@ -1,7 +1,7 @@
 """Repository analysis combining git forensics."""
 
 import json
-from collections import Counter, defaultdict
+from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -11,7 +11,7 @@ from . import __version__
 from .cicd.github_actions import collect_ci_signals
 from .cicd.models import CIAnalysis
 from .complexity import indentation_complexity
-from .config import load_project_config, resolve_coupling_policy
+from .config import load_project_config
 from .core.models import (
     AnalysisParameters,
     AnalysisResult,
@@ -25,31 +25,11 @@ from .core.models import (
 from .git.churn import parse_history_entries
 from .git.coupling import analyze_temporal_coupling, couplings_by_file
 from .git.defects import bugfix_counts
-from .git.log import Commit, exclude_bulk, fetch_git_history
+from .git.history import load_history_window
 from .git.ownership import parse_ownership_from_history
-from .git.run import head_paths, is_shallow
+from .git.run import head_oid, is_shallow
 from .git.xray import xray_file
 from .path_roles import classify_path_role
-
-
-def _former_paths_by_path(commits: list[Commit]) -> dict[str, list[str]]:
-    """Collect every earlier name each current path had across the history."""
-    former: dict[str, set[str]] = defaultdict(set)
-    for commit in commits:
-        for file in commit.files:
-            former[file.path].update(file.former_paths)
-    return {path: sorted(names - {path}) for path, names in former.items() if names - {path}}
-
-
-def _rename_aliases(commits: list[Commit], renamed_from: dict[str, list[str]]) -> dict[str, str]:
-    """Map each earlier name to its current path, skipping names a current file still uses."""
-    current_paths = {file.path for commit in commits for file in commit.files}
-    return {
-        name: path
-        for path, names in renamed_from.items()
-        for name in names
-        if name not in current_paths
-    }
 
 
 def _canonicalize_ci_paths(
@@ -105,6 +85,36 @@ def build_provenance(
     )
 
 
+def _ci_signals(repo_path: Path, days: int, aliases: dict[str, str]) -> CIAnalysis:
+    """Collect CI evidence for the window and record it under current paths."""
+    ci_analysis = _canonicalize_ci_paths(
+        collect_ci_signals(repo_path=repo_path, limit=100, days=days), aliases
+    )
+    for error in ci_analysis.status.errors:
+        logger.warning("CI data degraded: {}", error)
+    return ci_analysis
+
+
+def _xray_top_hotspots(repo_path: Path, files: list[FileForensics], top: int, days: int) -> int:
+    """Attach per-function churn to the top hotspots in place; return how many were X-Rayed."""
+    if top <= 0:
+        return 0
+    xrayed = 0
+    for f in files[:top]:
+        if not (repo_path / f.path).exists():
+            continue
+        try:
+            xray = xray_file(repo_path, f.path, days=days)
+            f.functions = xray.functions
+            f.xray_skipped = xray.skipped
+            if xray.skipped is None:
+                xrayed += 1
+        except Exception as e:
+            f.xray_failed = True
+            logger.warning("X-Ray failed for {}: {}", f.path, e)
+    return xrayed
+
+
 def run_analysis(  # [2a] Main analysis pipeline
     repo_path: Path,
     days: int = 30,
@@ -146,35 +156,27 @@ def run_analysis(  # [2a] Main analysis pipeline
         rev: Last revision whose history is analyzed (HEAD when None).
 
     Returns:
-        AnalysisResult with file forensics and summary.
+        AnalysisResult with file forensics, summary, and the provenance of the
+        repository state it read.
     """
-    policy = policy if policy is not None else resolve_coupling_policy(repo_path)
-    aliases = path_aliases or {}
-    full_history = fetch_git_history(repo_path, days, rev, aliases=aliases)
-    renamed_from = _former_paths_by_path(full_history)
-    ci_aliases = _rename_aliases(full_history, renamed_from) | aliases
-    history, bulk_commits = exclude_bulk(full_history, policy.max_changeset_size)
-    live_paths = (
-        head_paths(repo_path, rev or "HEAD") | ensure_paths | frozenset(aliases.values())
-        if policy.require_live_partner and history
-        else None
+    config = load_project_config(repo_path)
+    policy = policy if policy is not None else config.coupling
+    window = load_history_window(
+        repo_path, days, policy, rev=rev, aliases=path_aliases, ensure_paths=ensure_paths
     )
 
     ci_analysis = CIAnalysis(
         status=SignalStatus(state=SignalState.disabled),
     )
     if include_ci:
-        ci_analysis = collect_ci_signals(repo_path=repo_path, limit=100, days=days)
-        ci_analysis = _canonicalize_ci_paths(ci_analysis, ci_aliases)
-        for error in ci_analysis.status.errors:
-            logger.warning("CI data degraded: {}", error)
+        ci_analysis = _ci_signals(repo_path, days, window.aliases)
 
     # Parse individual analyses
-    churn_list = parse_history_entries(history)
-    ownership_list = parse_ownership_from_history(history)
-    coupling_analysis = analyze_temporal_coupling(history, policy, live_paths)
+    churn_list = parse_history_entries(window.commits)
+    ownership_list = parse_ownership_from_history(window.commits)
+    coupling_analysis = analyze_temporal_coupling(window.commits, policy, window.live_paths)
     coupling_list = coupling_analysis.couplings
-    defect_counts = bugfix_counts(history)
+    defect_counts = bugfix_counts(window.commits)
 
     # Index by path for joining
     churn_by_path = {c.path: c for c in churn_list}
@@ -190,8 +192,6 @@ def run_analysis(  # [2a] Main analysis pipeline
         | set(ensure_paths)
     )
 
-    path_role_rules = load_project_config(repo_path).path_roles
-
     # Build FileForensics for each file
     files: list[FileForensics] = []
     for path in all_paths:
@@ -201,7 +201,7 @@ def run_analysis(  # [2a] Main analysis pipeline
         files.append(
             FileForensics(
                 path=path,
-                path_role=classify_path_role(path, path_role_rules).role,
+                path_role=classify_path_role(path, config.path_roles).role,
                 commits=churn.commits if churn else 0,
                 lines_changed=churn.total_lines_changed if churn else 0,
                 complexity=indentation_complexity(repo_path / path),
@@ -212,41 +212,28 @@ def run_analysis(  # [2a] Main analysis pipeline
                 coupled_with=coupling_by_file.get(path, []),
                 build_failures=ci_analysis.file_failures.get(path, 0),
                 bugfix_commits=defect_counts.get(path, 0),
-                renamed_from=renamed_from.get(path, []),
+                renamed_from=window.renamed_from.get(path, []),
             )
         )
 
     # Hotspot score descending; path breaks ties so output is reproducible
     files.sort(key=lambda f: (-f.hotspot_score, f.path))
 
-    # Auto X-Ray: per-function churn for the top hotspots (JSON/MCP only)
-    xrayed = 0
-    if xray_top > 0:
-        for f in files[:xray_top]:
-            if not (repo_path / f.path).exists():
-                continue
-            try:
-                xray = xray_file(repo_path, f.path, days=days)
-                f.functions = xray.functions
-                f.xray_skipped = xray.skipped
-                if xray.skipped is None:
-                    xrayed += 1
-            except Exception as e:
-                f.xray_failed = True
-                logger.warning("X-Ray failed for {}: {}", f.path, e)
+    xrayed = _xray_top_hotspots(repo_path, files, xray_top, days)
 
     # Compute summary
     high_risk_count = sum(1 for f in files if f.is_high_risk)
     coupled_pairs = len(coupling_list)
 
     repo_name = repo_path.resolve().name
+    generated_at = datetime.now(timezone.utc)
 
     logger.info("Analyzed {} files over {} days", len(files), days)
 
     return AnalysisResult(
         repo=repo_name,
         analyzed_days=days,
-        generated_at=datetime.now(timezone.utc),
+        generated_at=generated_at,
         files=files,
         couplings=coupling_list,
         parameters=AnalysisParameters(
@@ -262,8 +249,15 @@ def run_analysis(  # [2a] Main analysis pipeline
             high_risk_ownership=high_risk_count,
             coupled_pairs=coupled_pairs,
             xrayed_files=xrayed,
-            ignored_large_changesets=bulk_commits,
+            ignored_large_changesets=window.ignored_bulk_commits,
             dropped_deleted_partners=coupling_analysis.dropped_deleted_partners,
+        ),
+        provenance=build_provenance(
+            repo_path,
+            days,
+            include_ci,
+            oid=head_oid(repo_path, rev or "HEAD"),
+            analysed_at=generated_at,
         ),
     )
 

@@ -10,6 +10,7 @@ from black_box_unlock.core.models import (
 )
 from black_box_unlock.path_roles import PathRole
 from black_box_unlock.visualization.report_data import build_report_payload
+from tests.factories import make_provenance
 
 
 def _result(*, couplings: list[TemporalCoupling] | None = None) -> AnalysisResult:
@@ -51,6 +52,7 @@ def _result(*, couplings: list[TemporalCoupling] | None = None) -> AnalysisResul
             high_risk_ownership=0,
             coupled_pairs=len(couplings or []),
         ),
+        provenance=make_provenance(),
     )
 
 

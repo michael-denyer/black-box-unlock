@@ -31,6 +31,7 @@ from black_box_unlock.review import (
     project_change_review,
     run_change_review,
 )
+from tests.factories import make_provenance
 
 
 def _change_set(*paths: str) -> ChangeSet:
@@ -79,6 +80,7 @@ def _analysis() -> AnalysisResult:
         ],
         summary=AnalysisSummary(total_files=2, high_risk_ownership=0, coupled_pairs=1),
         ci_status=SignalStatus(),
+        provenance=make_provenance(),
     )
 
 

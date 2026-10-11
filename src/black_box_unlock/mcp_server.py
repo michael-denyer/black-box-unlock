@@ -53,18 +53,9 @@ def _analysis(repo_path: str, days: int, include_ci: bool = False) -> AnalysisRe
     hit = _cache.get(key)
     if hit is not None:
         _cache.move_to_end(key)
-        if hit.provenance is None:
-            return hit
         provenance = hit.provenance.model_copy(update={"cached": True})
         return hit.model_copy(update={"provenance": provenance})
     result = run_analysis(root, days=days, include_ci=include_ci, xray_top=0)
-    result = result.model_copy(
-        update={
-            "provenance": build_provenance(
-                root, days, include_ci, oid=oid, analysed_at=result.generated_at
-            )
-        }
-    )
     _cache[key] = result
     while len(_cache) > _CACHE_SIZE:
         _cache.popitem(last=False)
@@ -108,8 +99,8 @@ def _file_dict(f: FileForensics) -> dict:
     return data
 
 
-def _provenance(result: AnalysisResult) -> dict | None:
-    return result.provenance.model_dump(mode="json") if result.provenance else None
+def _provenance(result: AnalysisResult) -> dict:
+    return result.provenance.model_dump(mode="json")
 
 
 def _in_tree(repo_path: str, rel: str) -> bool:

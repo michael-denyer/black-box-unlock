@@ -496,4 +496,4 @@ class AnalysisResult(BaseModel):  # [4a.4] Complete analysis output
     ci_status: SignalStatus = Field(default_factory=SignalStatus)
     failed_ci_runs: list[FailedWorkflowRun] = Field(default_factory=list)
     flaky_steps: list[FlakyStepSummary] = Field(default_factory=list)
-    provenance: Provenance | None = None
+    provenance: Provenance

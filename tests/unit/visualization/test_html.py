@@ -14,6 +14,7 @@ from black_box_unlock.core.models import (
     TemporalCoupling,
 )
 from black_box_unlock.visualization.html import generate_html_report
+from tests.factories import make_provenance
 
 
 def _result(*, repo: str = "test-repo", path: str = "src/auth.py") -> AnalysisResult:
@@ -56,6 +57,7 @@ def _result(*, repo: str = "test-repo", path: str = "src/auth.py") -> AnalysisRe
             coupled_pairs=1,
             xrayed_files=0,
         ),
+        provenance=make_provenance(),
     )
 
 

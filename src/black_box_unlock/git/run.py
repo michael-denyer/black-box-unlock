@@ -13,6 +13,23 @@ from ..core.exceptions import GitToolNotFoundError, NotAGitRepoError, Repository
 _UNBORN_HEAD_MARKERS = ("does not have any commits", "bad default revision")
 
 
+def _run(cmd: list[str], *, text: bool, stdin: bytes | None = None) -> subprocess.CompletedProcess:
+    """Run cmd checked, mapping a missing git binary. A failed command propagates."""
+    try:
+        return subprocess.run(cmd, input=stdin, capture_output=True, text=text, check=True)
+    except FileNotFoundError as e:
+        raise GitToolNotFoundError("git not found on PATH") from e
+
+
+def _git_command(repo_path: Path, args: list[str], config: list[str] | None = None) -> list[str]:
+    if not (repo_path / ".git").exists():
+        raise NotAGitRepoError(f"Not a git repository: {repo_path}")
+    cmd = ["git", "-c", "core.quotePath=false"]
+    for setting in config or []:
+        cmd += ["-c", setting]
+    return [*cmd, "-C", str(repo_path), *args]
+
+
 def repo_toplevel(path: Path) -> Path:
     """Return the working-tree root that contains path, asking git rather than looking for .git.
 
@@ -23,11 +40,8 @@ def repo_toplevel(path: Path) -> Path:
         NotAGitRepoError: If path is not inside a git working tree.
         GitToolNotFoundError: If the git binary is not installed.
     """
-    cmd = ["git", "-C", str(path), "rev-parse", "--show-toplevel"]
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-    except FileNotFoundError as e:
-        raise GitToolNotFoundError("git not found on PATH") from e
+        result = _run(["git", "-C", str(path), "rev-parse", "--show-toplevel"], text=True)
     except subprocess.CalledProcessError as e:
         raise NotAGitRepoError(f"Not a git repository: {path}: {e.stderr.strip()}") from e
     return Path(result.stdout.strip())
@@ -50,17 +64,8 @@ def run_git(
         NotAGitRepoError: If repo_path is not a git repository.
         GitToolNotFoundError: If the git binary is not installed.
     """
-    if not (repo_path / ".git").exists():
-        raise NotAGitRepoError(f"Not a git repository: {repo_path}")
-
-    cmd = ["git", "-c", "core.quotePath=false"]
-    for setting in config or []:
-        cmd += ["-c", setting]
-    cmd += ["-C", str(repo_path), *args]
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-    except FileNotFoundError as e:
-        raise GitToolNotFoundError("git not found on PATH") from e
+        result = _run(_git_command(repo_path, args, config), text=True)
     except subprocess.CalledProcessError as e:
         if (
             tolerate_unborn
@@ -70,6 +75,20 @@ def run_git(
             return ""
         raise
     return result.stdout
+
+
+def run_git_bytes(repo_path: Path, args: list[str], *, stdin: bytes = b"") -> bytes:
+    """Run a checked git command with bytes on stdin and return stdout as bytes.
+
+    For batch commands such as ``cat-file --batch`` whose output mixes headers
+    with raw blob contents. A failed command raises
+    subprocess.CalledProcessError whose ``stderr`` is bytes.
+
+    Raises:
+        NotAGitRepoError: If repo_path is not a git repository.
+        GitToolNotFoundError: If the git binary is not installed.
+    """
+    return _run(_git_command(repo_path, args), text=False, stdin=stdin).stdout
 
 
 def head_oid(repo_path: Path, rev: str = "HEAD") -> str | None:

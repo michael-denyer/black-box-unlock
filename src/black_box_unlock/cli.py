@@ -2,6 +2,7 @@
 
 import json
 import shutil
+import statistics
 import subprocess
 import sys
 from enum import Enum
@@ -11,6 +12,7 @@ import typer
 from loguru import logger
 from rich.console import Console
 
+from black_box_unlock import validation
 from black_box_unlock.analysis import SHALLOW_CLONE_WARNING, export_to_json, run_analysis
 from black_box_unlock.config import load_project_config, resolve_coupling_policy
 from black_box_unlock.core.exceptions import BlackBoxUnlockError, RepositoryPathError
@@ -321,6 +323,50 @@ def doctor(
     )
 
 
+def _render_validation_report(report: validation.ValidationReport) -> str:
+    """One text block per repo: header line, then one line per ranking method."""
+    header = (
+        f"{report.repo} @ {report.cutoff_sha[:7]} ({report.cutoff:%Y-%m-%d}): "
+        f"universe={report.universe_size} files, "
+        f"{report.test_bugfix_commits} bug-fix commits after the cutoff, "
+        f"{report.test_bugfix_touches} touches on the universe"
+    )
+    if report.insufficient_data:
+        return "\n".join([header, "  insufficient data: " + "; ".join(report.insufficient_reasons)])
+    lines = [f"{header} (coverage {_pct(report.bugfix_coverage)})"]
+    for name, score in report.methods.items():
+        lines.append(
+            f"  {name:<8} rho={_rho(score.spearman)}  top-10% share={_pct(score.top_decile_share)}"
+        )
+    rnd = report.random
+    sd = f" (sd {rnd.top_decile_share_sd:.0%})" if rnd.top_decile_share_sd is not None else ""
+    lines.append(
+        f"  {'random':<8} rho={_rho(rnd.spearman_mean)}  "
+        f"top-10% share={_pct(rnd.top_decile_share_mean)}{sd}  "
+        f"mean of {rnd.draws} draws, seed {rnd.seed}"
+    )
+    lines.append(f"  hotspot share vs random: one-sided permutation {_p_label(report)}")
+    return "\n".join(lines)
+
+
+def _pct(value: float | None) -> str:
+    return f"{value:.0%}" if value is not None else "n/a"
+
+
+def _rho(value: float | None) -> str:
+    return f"{value:.2f}" if value is not None else "n/a"
+
+
+def _p_label(report: validation.ValidationReport) -> str:
+    """`p=0.025`, or a bound when no draw reached the observed share."""
+    if report.p_value is None:
+        return "p=n/a"
+    floor = 1 / (report.random.draws + 1)
+    if report.p_value <= floor:
+        return f"p<{floor:.3f} (no draw reached it)"
+    return f"p={report.p_value:.3f}"
+
+
 @app.command()
 def validate(
     repos: list[Path] = typer.Option(
@@ -335,10 +381,6 @@ def validate(
     Splits history at a cutoff: files are ranked by hotspot score from the
     older half, then scored against bug-fix commits in the newer half.
     """
-    import statistics
-
-    from black_box_unlock import validation
-
     results = []
     for repo in repos:
         try:
@@ -350,7 +392,7 @@ def validate(
         print(json.dumps([r.model_dump(mode="json") for r in results], indent=2))
     else:
         for r in results:
-            console.print(validation.render_report(r), soft_wrap=True)
+            console.print(_render_validation_report(r), soft_wrap=True)
         rhos = [
             r.methods["hotspot"].spearman
             for r in usable

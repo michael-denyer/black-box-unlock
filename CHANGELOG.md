@@ -25,6 +25,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `confidence_lower_bound` is renamed, because it named two different
+  numbers. Coupling pairs (`couplings` in `bbu analyze-repo` JSON and the HTML
+  payload, `couplings` in `bbu review-change` output) carry
+  `ratio_lower_bound`, the 95% Wilson lower bound of `coupling_ratio` over
+  the smaller revision count. Partner entries (`coupled_with` in file
+  forensics, `coupled_files` from the `get_coupled_files` MCP tool) carry
+  `rate_lower_bound`, the bound of `rate_to_partner` over the file's own
+  revisions. The values are unchanged; consumers that read the old key must
+  switch. The coupling guard cache is version 5, so existing caches rebuild
+  on first use.
 - `validation.py` is the experiment alone: the terminal rendering of a
   `ValidationReport` lives in the CLI, and the `cat-file --batch` read goes
   through the new `git.run.run_git_bytes`, so the not-a-repo guard and the

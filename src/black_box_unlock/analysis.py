@@ -28,34 +28,11 @@ from .core.models import (
 from .git.churn import parse_history_entries
 from .git.coupling import analyze_temporal_coupling
 from .git.defects import bugfix_counts
-from .git.log import Commit, CommitFile, exclude_bulk, fetch_git_history, merge_commit_files
+from .git.log import Commit, exclude_bulk, fetch_git_history
 from .git.ownership import parse_ownership_from_history
 from .git.run import head_paths, is_shallow
 from .git.xray import xray_file
 from .path_roles import classify_path_role
-
-
-def _canonicalize_history_paths(
-    commits: list[Commit],
-    path_aliases: dict[str, str],
-) -> list[Commit]:
-    """Apply caller renames on top of the renames git history already followed."""
-    if not path_aliases:
-        return commits
-
-    canonical: list[Commit] = []
-    for commit in commits:
-        files_by_path: dict[str, CommitFile] = {}
-        for file in commit.files:
-            path = path_aliases.get(file.path, file.path)
-            if path != file.path:
-                file = file.model_copy(
-                    update={"path": path, "former_paths": [file.path, *file.former_paths]}
-                )
-            existing = files_by_path.get(path)
-            files_by_path[path] = file if existing is None else merge_commit_files(existing, file)
-        canonical.append(commit.model_copy(update={"files": list(files_by_path.values())}))
-    return canonical
 
 
 def _former_paths_by_path(commits: list[Commit]) -> dict[str, list[str]]:
@@ -176,7 +153,7 @@ def run_analysis(  # [2a] Main analysis pipeline
     """
     policy = policy if policy is not None else resolve_coupling_policy(repo_path)
     aliases = path_aliases or {}
-    full_history = _canonicalize_history_paths(fetch_git_history(repo_path, days, rev), aliases)
+    full_history = fetch_git_history(repo_path, days, rev, aliases=aliases)
     renamed_from = _former_paths_by_path(full_history)
     ci_aliases = _rename_aliases(full_history, renamed_from) | aliases
     history, bulk_commits = exclude_bulk(full_history, policy.max_changeset_size)

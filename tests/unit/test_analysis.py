@@ -256,14 +256,14 @@ class TestRunAnalysis:
         assert a_file.coupled_with[0].confidence_lower_bound > 0
         assert result.couplings[0].co_change_count == 2
 
-    def test_renamed_from_lists_every_former_name_including_caller_renames(self):
-        """History git followed and the caller's own rename both surface on the final path."""
+    def test_caller_renames_reach_history_as_aliases_and_surface_in_renamed_from(self):
+        """The reviewed change's own renames seed git history, so the final path carries every former name."""
         history = [
-            make_commit(files=[{"path": "src/b.py", "former_paths": ["src/a.py"]}]),
-            make_commit(files=[{"path": "src/b.py", "former_paths": ["src/a.py"]}]),
+            make_commit(files=[{"path": "src/c.py", "former_paths": ["src/b.py"]}]),
+            make_commit(files=[{"path": "src/c.py", "former_paths": ["src/a.py", "src/b.py"]}]),
             make_commit(["src/other.py"]),
         ]
-        with patch("black_box_unlock.analysis.fetch_git_history", return_value=history):
+        with patch("black_box_unlock.analysis.fetch_git_history", return_value=history) as fetch:
             result = run_analysis(
                 Path("/fake/repo"),
                 include_ci=False,
@@ -271,6 +271,9 @@ class TestRunAnalysis:
                 path_aliases={"src/b.py": "src/c.py"},
             )
 
+        fetch.assert_called_once_with(
+            Path("/fake/repo"), 30, None, aliases={"src/b.py": "src/c.py"}
+        )
         by_path = {file.path: file for file in result.files}
         assert set(by_path) == {"src/c.py", "src/other.py"}
         assert by_path["src/c.py"].commits == 2

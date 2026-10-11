@@ -8,6 +8,7 @@ from black_box_unlock.core.models import (
     FileForensics,
     TemporalCoupling,
 )
+from black_box_unlock.path_roles import PathRole
 from black_box_unlock.visualization.report_data import build_report_payload
 
 
@@ -165,3 +166,35 @@ def test_report_roles_separate_code_from_repository_support_files() -> None:
         "src/tiny.py": "source",
         "uv.lock": "generated",
     }
+
+
+def test_report_keeps_the_path_role_the_analysis_assigned() -> None:
+    result = _result(
+        couplings=[
+            TemporalCoupling(
+                file_a="lib/widget.py",
+                file_b="src/strong.py",
+                co_change_count=4,
+                commits_a=6,
+                commits_b=10,
+            )
+        ]
+    )
+    result.files.append(
+        FileForensics(
+            path="lib/widget.py",
+            path_role=PathRole.generated,
+            commits=6,
+            lines_changed=40,
+            complexity=3,
+            authors=["Ada"],
+            coupled_with=[],
+        )
+    )
+
+    payload = build_report_payload(result)
+
+    roles = {file["path"]: file["path_role"] for file in payload["analysis"]["files"]}
+    assert roles["lib/widget.py"] == "generated"
+    row = payload["couplings"][0]
+    assert (row["file_a"], row["role_a"], row["role_b"]) == ("lib/widget.py", "generated", "source")

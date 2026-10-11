@@ -42,6 +42,24 @@ class CouplingPolicy(BaseModel):
     max_changeset_size: int = Field(default=50, ge=2)
     require_live_partner: bool = True
 
+    def with_overrides(
+        self,
+        *,
+        min_ratio: float | None = None,
+        min_shared_revisions: int | None = None,
+        max_changeset_size: int | None = None,
+    ) -> "CouplingPolicy":
+        """Return a validated copy with each override that is not None applied."""
+        overrides = {
+            "min_ratio": min_ratio,
+            "min_shared_revisions": min_shared_revisions,
+            "max_changeset_size": max_changeset_size,
+        }
+        return CouplingPolicy.model_validate(
+            self.model_dump()
+            | {key: value for key, value in overrides.items() if value is not None}
+        )
+
 
 def _validate_non_empty_path(v: str) -> str:
     """Validate that path is not empty or whitespace."""

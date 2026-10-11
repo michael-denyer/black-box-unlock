@@ -17,14 +17,16 @@ from black_box_unlock.validation import (
 
 
 class TestTreeContents:
-    @patch("black_box_unlock.validation.subprocess.run")
+    @patch("black_box_unlock.git.run.subprocess.run")
     def test_missing_git_raises_git_tool_not_found(self, mock_run, tmp_path):
+        (tmp_path / ".git").mkdir()
         mock_run.side_effect = FileNotFoundError(2, "No such file or directory", "git")
         with pytest.raises(GitToolNotFoundError):
             _tree_contents(tmp_path, "abc", ["a.py"])
 
-    @patch("black_box_unlock.validation.subprocess.run")
+    @patch("black_box_unlock.git.run.subprocess.run")
     def test_failed_cat_file_raises_project_error_with_stderr(self, mock_run, tmp_path):
+        (tmp_path / ".git").mkdir()
         mock_run.side_effect = subprocess.CalledProcessError(
             128, ["git"], stderr=b"fatal: not a git repository"
         )

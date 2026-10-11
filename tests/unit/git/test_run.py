@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from black_box_unlock.core.exceptions import RepositoryPathError
-from black_box_unlock.git.run import head_oid, relative_to_repo
+from black_box_unlock.core.exceptions import NotAGitRepoError, RepositoryPathError
+from black_box_unlock.git.run import head_oid, relative_to_repo, run_git_bytes
 
 
 def _git(repo: Path, *args: str) -> None:
@@ -63,3 +63,20 @@ class TestHeadOid:
 
         assert oid is not None and len(oid) == 40
         assert head_oid(repo, "nope") is None
+
+
+class TestRunGitBytes:
+    def test_feeds_stdin_and_returns_raw_stdout(self, repo):
+        (repo / "src" / "blob.bin").write_bytes(b"\xff\x00raw\n")
+        _git(repo, "add", "src/blob.bin")
+        _git(repo, "-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-m", "blob")
+
+        output = run_git_bytes(repo, ["cat-file", "--batch"], stdin=b"HEAD:src/blob.bin\n")
+
+        header, _, body = output.partition(b"\n")
+        assert header.split(b" ")[1:] == [b"blob", b"6"]
+        assert body == b"\xff\x00raw\n\n"
+
+    def test_missing_repository_is_refused_before_git_runs(self, tmp_path):
+        with pytest.raises(NotAGitRepoError):
+            run_git_bytes(tmp_path, ["cat-file", "--batch"])

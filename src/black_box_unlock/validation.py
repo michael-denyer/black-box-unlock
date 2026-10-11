@@ -16,11 +16,11 @@ from pydantic import BaseModel
 
 from .complexity import indentation_complexity_text
 from .config import resolve_coupling_policy
-from .core.exceptions import BlackBoxUnlockError, GitToolNotFoundError, InsufficientHistoryError
+from .core.exceptions import BlackBoxUnlockError, InsufficientHistoryError
 from .git.churn import parse_history_entries
 from .git.defects import bugfix_counts, is_bugfix_message
 from .git.log import Clock, Commit, exclude_bulk, fetch_git_history
-from .git.run import run_git
+from .git.run import run_git, run_git_bytes
 
 TOP_DECILE = 0.10
 # The committer date orders history and is what `git log --since` filters on,
@@ -211,50 +211,6 @@ def insufficiency_reasons(universe_size: int, test_bugfix_commits: int) -> list[
     return reasons
 
 
-def _pct(value: float | None) -> str:
-    return f"{value:.0%}" if value is not None else "n/a"
-
-
-def _rho(value: float | None) -> str:
-    return f"{value:.2f}" if value is not None else "n/a"
-
-
-def render_report(report: ValidationReport) -> str:
-    """One text block per repo: header line, then one line per ranking method."""
-    header = (
-        f"{report.repo} @ {report.cutoff_sha[:7]} ({report.cutoff:%Y-%m-%d}): "
-        f"universe={report.universe_size} files, "
-        f"{report.test_bugfix_commits} bug-fix commits after the cutoff, "
-        f"{report.test_bugfix_touches} touches on the universe"
-    )
-    if report.insufficient_data:
-        return "\n".join([header, "  insufficient data: " + "; ".join(report.insufficient_reasons)])
-    lines = [f"{header} (coverage {_pct(report.bugfix_coverage)})"]
-    for name, score in report.methods.items():
-        lines.append(
-            f"  {name:<8} rho={_rho(score.spearman)}  top-10% share={_pct(score.top_decile_share)}"
-        )
-    rnd = report.random
-    sd = f" (sd {rnd.top_decile_share_sd:.0%})" if rnd.top_decile_share_sd is not None else ""
-    lines.append(
-        f"  {'random':<8} rho={_rho(rnd.spearman_mean)}  "
-        f"top-10% share={_pct(rnd.top_decile_share_mean)}{sd}  "
-        f"mean of {rnd.draws} draws, seed {rnd.seed}"
-    )
-    lines.append(f"  hotspot share vs random: one-sided permutation {_p_label(report)}")
-    return "\n".join(lines)
-
-
-def _p_label(report: ValidationReport) -> str:
-    """`p=0.025`, or a bound when no draw reached the observed share."""
-    if report.p_value is None:
-        return "p=n/a"
-    floor = 1 / (report.random.draws + 1)
-    if report.p_value <= floor:
-        return f"p<{floor:.3f} (no draw reached it)"
-    return f"p={report.p_value:.3f}"
-
-
 def _cutoff_commit(repo_path: Path, cutoff: datetime) -> str | None:
     """Latest first-parent commit committed before the cutoff, or None."""
     output = run_git(
@@ -269,27 +225,23 @@ def _tree_contents(repo_path: Path, sha: str, paths: list[str]) -> dict[str, str
     """Read each path's blob at `sha`.
 
     Paths absent from that tree, or naming a tree (a file later replaced by a
-    directory), are omitted. Bytes in and out, so this cannot go through
-    `run_git`, but it maps errors the same way.
+    directory), are omitted.
 
     Raises:
+        NotAGitRepoError: If repo_path is not a git repository.
         GitToolNotFoundError: If the git binary is not installed.
         BlackBoxUnlockError: If `git cat-file` fails.
     """
     if not paths:
         return {}
     try:
-        result = subprocess.run(
-            ["git", "-c", "core.quotePath=false", "-C", str(repo_path), "cat-file", "--batch"],
-            input="".join(f"{sha}:{path}\n" for path in paths).encode(),
-            capture_output=True,
-            check=True,
+        output = run_git_bytes(
+            repo_path,
+            ["cat-file", "--batch"],
+            stdin="".join(f"{sha}:{path}\n" for path in paths).encode(),
         )
-    except FileNotFoundError as e:
-        raise GitToolNotFoundError("git not found on PATH") from e
     except subprocess.CalledProcessError as e:
         raise BlackBoxUnlockError(f"git cat-file failed: {e.stderr.decode(errors='ignore')}") from e
-    output = result.stdout
     contents: dict[str, str] = {}
     pos = 0
     for path in paths:

@@ -2,6 +2,7 @@
 
 import json
 import shutil
+import statistics
 import subprocess
 import sys
 from enum import Enum
@@ -11,20 +12,20 @@ import typer
 from loguru import logger
 from rich.console import Console
 
+from black_box_unlock import __version__, guard, validation
 from black_box_unlock.analysis import SHALLOW_CLONE_WARNING, export_to_json, run_analysis
 from black_box_unlock.config import load_project_config, resolve_coupling_policy
 from black_box_unlock.core.exceptions import BlackBoxUnlockError, RepositoryPathError
 from black_box_unlock.core.logging import configure_logging
+from black_box_unlock.git import xray as xray_mod
 from black_box_unlock.git.changes import BaseChange, StagedChange, WorkingTreeChange
-from black_box_unlock.git.run import is_shallow
+from black_box_unlock.git.run import is_shallow, relative_to_repo, repo_toplevel
 from black_box_unlock.review import ChangeReview, ChangeReviewRequest, run_change_review
 from black_box_unlock.visualization.html import generate_html_report
 
 
 def _version_callback(value: bool) -> None:
     if value:
-        from black_box_unlock import __version__
-
         print(f"Black Box Unlock v{__version__}")
         raise typer.Exit()
 
@@ -162,10 +163,10 @@ def coupling_guard(
     Designed for PostToolUse hooks: prints hook JSON when there is something
     to say, nothing otherwise. Never fails - a guard must not break an edit.
     """
-    from black_box_unlock.guard import coupling_warnings
-
     try:
-        warnings = coupling_warnings(file, repo, resolve_coupling_policy(repo, min_ratio=threshold))
+        warnings = guard.coupling_warnings(
+            file, repo, resolve_coupling_policy(repo, min_ratio=threshold)
+        )
     except Exception as e:
         # A guard must never break the edit it observes; degrade to silence — but
         # log so a permanently-failing guard stays diagnosable instead of silently dead.
@@ -182,21 +183,18 @@ def coupling_guard_hook(
 
     Failures exit 0 and append one line to the repository's hook log.
     """
-    from black_box_unlock.git.run import relative_to_repo, repo_toplevel
-    from black_box_unlock.guard import coupling_warnings, record_hook_failure
-
     try:
         payload = json.loads(sys.stdin.read())
         raw_path = payload.get("tool_input", {}).get("file_path")
         if not isinstance(raw_path, str) or not raw_path:
             return
         repo_root = repo_toplevel(repo.resolve())
-        warnings = coupling_warnings(relative_to_repo(repo_root, raw_path), repo_root)
+        warnings = guard.coupling_warnings(relative_to_repo(repo_root, raw_path), repo_root)
     except RepositoryPathError:
         return
     except Exception as error:
         logger.warning("coupling guard hook skipped: {}", error)
-        record_hook_failure(repo, error)
+        guard.record_hook_failure(repo, error)
         return
     _print_hook_context(warnings)
 
@@ -276,17 +274,12 @@ def doctor(
     repo: Path = typer.Option(Path("."), "--repo", help="Repository root"),
 ) -> None:
     """Report whether local review dependencies are available."""
-    from black_box_unlock.guard import hook_log_path
-
     resolved = repo.resolve()
-    hook_log: Path | None = None
-    hook_log_last_line: str | None = None
     try:
-        hook_log = hook_log_path(resolved)
-        if hook_log.is_file():
-            hook_log_last_line = next(iter(reversed(hook_log.read_text().splitlines())), None)
+        hook_log: Path | None = guard.hook_log_path(resolved)
     except (BlackBoxUnlockError, OSError, subprocess.CalledProcessError):
-        pass
+        hook_log = None
+    hook_log_last_line = guard.last_hook_failure(hook_log) if hook_log is not None else None
     config_error: str | None = None
     try:
         config = load_project_config(resolved)
@@ -321,6 +314,50 @@ def doctor(
     )
 
 
+def _render_validation_report(report: validation.ValidationReport) -> str:
+    """One text block per repo: header line, then one line per ranking method."""
+    header = (
+        f"{report.repo} @ {report.cutoff_sha[:7]} ({report.cutoff:%Y-%m-%d}): "
+        f"universe={report.universe_size} files, "
+        f"{report.test_bugfix_commits} bug-fix commits after the cutoff, "
+        f"{report.test_bugfix_touches} touches on the universe"
+    )
+    if report.insufficient_data:
+        return "\n".join([header, "  insufficient data: " + "; ".join(report.insufficient_reasons)])
+    lines = [f"{header} (coverage {_pct(report.bugfix_coverage)})"]
+    for name, score in report.methods.items():
+        lines.append(
+            f"  {name:<8} rho={_rho(score.spearman)}  top-10% share={_pct(score.top_decile_share)}"
+        )
+    rnd = report.random
+    sd = f" (sd {rnd.top_decile_share_sd:.0%})" if rnd.top_decile_share_sd is not None else ""
+    lines.append(
+        f"  {'random':<8} rho={_rho(rnd.spearman_mean)}  "
+        f"top-10% share={_pct(rnd.top_decile_share_mean)}{sd}  "
+        f"mean of {rnd.draws} draws, seed {rnd.seed}"
+    )
+    lines.append(f"  hotspot share vs random: one-sided permutation {_p_label(report)}")
+    return "\n".join(lines)
+
+
+def _pct(value: float | None) -> str:
+    return f"{value:.0%}" if value is not None else "n/a"
+
+
+def _rho(value: float | None) -> str:
+    return f"{value:.2f}" if value is not None else "n/a"
+
+
+def _p_label(report: validation.ValidationReport) -> str:
+    """`p=0.025`, or a bound when no draw reached the observed share."""
+    if report.p_value is None:
+        return "p=n/a"
+    floor = 1 / (report.random.draws + 1)
+    if report.p_value <= floor:
+        return f"p<{floor:.3f} (no draw reached it)"
+    return f"p={report.p_value:.3f}"
+
+
 @app.command()
 def validate(
     repos: list[Path] = typer.Option(
@@ -335,10 +372,6 @@ def validate(
     Splits history at a cutoff: files are ranked by hotspot score from the
     older half, then scored against bug-fix commits in the newer half.
     """
-    import statistics
-
-    from black_box_unlock import validation
-
     results = []
     for repo in repos:
         try:
@@ -350,7 +383,7 @@ def validate(
         print(json.dumps([r.model_dump(mode="json") for r in results], indent=2))
     else:
         for r in results:
-            console.print(validation.render_report(r), soft_wrap=True)
+            console.print(_render_validation_report(r), soft_wrap=True)
         rhos = [
             r.methods["hotspot"].spearman
             for r in usable
@@ -383,8 +416,6 @@ def xray(
     Ranks the file's functions by revisions x indentation complexity and
     reports function pairs that change together. JSON to stdout.
     """
-    from black_box_unlock.git import xray as xray_mod
-
     try:
         result = xray_mod.xray_file(repo, file, days=days, rev_cap=cap, min_coupling=min_coupling)
     except BlackBoxUnlockError as e:

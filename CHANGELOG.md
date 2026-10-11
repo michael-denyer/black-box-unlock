@@ -25,6 +25,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `validation.py` is the experiment alone: the terminal rendering of a
+  `ValidationReport` lives in the CLI, and the `cat-file --batch` read goes
+  through the new `git.run.run_git_bytes`, so the not-a-repo guard and the
+  git-missing mapping are defined once. `cicd.github_actions.observe_steps`
+  replaces `flaky_steps_from_jobs` and its `include_stable` flag: it returns
+  a record for every executed step and `summarize_flaky_steps` decides what
+  is reported. `bbu validate`, `bbu analyze-repo`, and `bbu doctor` print the
+  same output as before.
 - X-Ray functions in languages without span attribution (every supported
   language except Python) report `complexity` and `hotspot_score` as `null`
   with `score_unavailable_reason: "no span attribution for this language"`,

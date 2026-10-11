@@ -23,14 +23,14 @@ Agent-facing MCP tools and edit hook, and user-facing commands via Typer CLI.
 
 | ID | Component | Description | File:Line |
 |----|-----------|-------------|-----------|
-| 1a | CLI App | Typer application with `bbu` command | [cli.py:43](../src/black_box_unlock/cli.py#L43) |
-| 1a.1 | analyze_repo | Main analysis command | [cli.py:78](../src/black_box_unlock/cli.py#L78) |
-| 1a.2 | version | Version info command | [cli.py:407](../src/black_box_unlock/cli.py#L407) |
+| 1a | CLI App | Typer application with `bbu` command | [cli.py:44](../src/black_box_unlock/cli.py#L44) |
+| 1a.1 | analyze_repo | Main analysis command | [cli.py:79](../src/black_box_unlock/cli.py#L79) |
+| 1a.2 | version | Version info command | [cli.py:428](../src/black_box_unlock/cli.py#L428) |
 | 1b | MCP Server | `bbu-mcp` server exposing forensic signals as agent tools | [mcp_server.py:32](../src/black_box_unlock/mcp_server.py#L32) |
 | 1b.1 | get_hotspots | First of the tools that read the cached analysis | [mcp_server.py:159](../src/black_box_unlock/mcp_server.py#L159) |
 | 1b.2 | xray_file | Per-function churn for one file, computed on each call | [mcp_server.py:328](../src/black_box_unlock/mcp_server.py#L328) |
 | 1b.3 | review_change | Fresh, uncached review of the selected change | [mcp_server.py:369](../src/black_box_unlock/mcp_server.py#L369) |
-| 1c | coupling_warnings | Coupling guard behind the `PostToolUse` edit hook | [guard.py:184](../src/black_box_unlock/guard.py#L184) |
+| 1c | coupling_warnings | Coupling guard behind the `PostToolUse` edit hook | [guard.py:170](../src/black_box_unlock/guard.py#L170) |
 
 ---
 
@@ -41,7 +41,7 @@ Orchestrates forensic analysis by combining data from multiple sources.
 | ID | Component | Description | File:Line |
 |----|-----------|-------------|-----------|
 | 2a | run_analysis | Main analysis pipeline | [analysis.py:118](../src/black_box_unlock/analysis.py#L118) |
-| 2a.1 | collect_ci_signals | Collect failure and flaky-step data from one typed run snapshot | [github_actions.py:216](../src/black_box_unlock/cicd/github_actions.py#L216) |
+| 2a.1 | collect_ci_signals | Collect failure and flaky-step data from one typed run snapshot | [github_actions.py:219](../src/black_box_unlock/cicd/github_actions.py#L219) |
 | 2b | export_to_json | Serialize result to JSON | [analysis.py:280](../src/black_box_unlock/analysis.py#L280) |
 
 #### Analysis Pipeline [2a]

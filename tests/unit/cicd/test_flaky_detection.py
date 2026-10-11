@@ -2,10 +2,7 @@
 
 from datetime import datetime, timezone
 
-from black_box_unlock.cicd.github_actions import (
-    flaky_steps_from_jobs,
-    summarize_flaky_steps,
-)
+from black_box_unlock.cicd.github_actions import observe_steps, summarize_flaky_steps
 from black_box_unlock.cicd.models import WorkflowJob
 from black_box_unlock.core.models import FlakyStepStats
 
@@ -31,9 +28,26 @@ def _job(
     )
 
 
-class TestFlakyStepsFromJobs:
+def _flaky(jobs: list[WorkflowJob]) -> list[FlakyStepStats]:
+    return [step for step in observe_steps(jobs) if step.flaky_runs]
+
+
+class TestObserveSteps:
+    def test_every_executed_step_is_observed_once_per_run(self):
+        observed = observe_steps(
+            [
+                _job(1, [("Run tests", "failure"), ("Checkout", "success")]),
+                _job(2, [("Run tests", "success"), ("Checkout", "success")]),
+            ]
+        )
+
+        by_name = {step.step_name: step for step in observed}
+        assert set(by_name) == {"Run tests", "Checkout"}
+        assert (by_name["Checkout"].runs, by_name["Checkout"].flaky_runs) == (1, 0)
+        assert (by_name["Run tests"].runs, by_name["Run tests"].flaky_runs) == (1, 1)
+
     def test_fail_then_pass_across_attempts_is_flaky(self):
-        step = flaky_steps_from_jobs(
+        step = _flaky(
             [
                 _job(1, [("Run tests", "failure"), ("Checkout", "success")]),
                 _job(2, [("Run tests", "success"), ("Checkout", "success")]),
@@ -52,7 +66,7 @@ class TestFlakyStepsFromJobs:
             _job(2, [("Run tests", "failure")]),
         ]
 
-        assert flaky_steps_from_jobs(jobs) == []
+        assert _flaky(jobs) == []
 
     def test_all_green_and_skipped_steps_are_not_flaky(self):
         jobs = [
@@ -60,10 +74,10 @@ class TestFlakyStepsFromJobs:
             _job(2, [("Run tests", "success"), ("Deploy", "skipped")]),
         ]
 
-        assert flaky_steps_from_jobs(jobs) == []
+        assert _flaky(jobs) == []
 
     def test_two_failures_before_success_both_count(self):
-        step = flaky_steps_from_jobs(
+        step = _flaky(
             [
                 _job(1, [("Run tests", "failure")]),
                 _job(2, [("Run tests", "failure")]),
@@ -83,7 +97,7 @@ class TestFlakyStepsFromJobs:
             _job(1, [("Run tests", "success")]),
         ]
 
-        assert flaky_steps_from_jobs(jobs) == []
+        assert _flaky(jobs) == []
 
 
 class TestFlakyRateDenominator:
@@ -101,8 +115,8 @@ class TestFlakyRateDenominator:
             [("Run tests", "success")],
         )
         observations = [
-            *flaky_steps_from_jobs(flaky_run, include_stable=True),
-            *flaky_steps_from_jobs(stable_run, include_stable=True),
+            *observe_steps(flaky_run),
+            *observe_steps(stable_run),
         ]
 
         summary = summarize_flaky_steps(observations)[0]
@@ -121,8 +135,8 @@ class TestFlakyRateDenominator:
             [("Run tests", "success")],
         )
         observations = [
-            *flaky_steps_from_jobs(with_step, include_stable=True),
-            *flaky_steps_from_jobs(without_deploy, include_stable=True),
+            *observe_steps(with_step),
+            *observe_steps(without_deploy),
         ]
 
         deploy = next(
@@ -134,7 +148,7 @@ class TestFlakyRateDenominator:
     def test_steps_that_never_recovered_are_not_reported(self):
         stable = self._retried_run([("Run tests", "success")], [("Run tests", "success")])
 
-        assert summarize_flaky_steps(flaky_steps_from_jobs(stable, include_stable=True)) == []
+        assert summarize_flaky_steps(observe_steps(stable)) == []
 
 
 class TestSummarizeFlakySteps:

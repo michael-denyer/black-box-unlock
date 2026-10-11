@@ -613,6 +613,20 @@ class TestDoctorCommand:
         assert hook_log["path"] == str(log.resolve())
         assert hook_log["last_line"] == "t2 RuntimeError: newest"
 
+    def test_git_that_cannot_run_is_reported_not_raised(self, tmp_path, monkeypatch):
+        repo = _coupled_repo(tmp_path / "repo")
+        bin_dir = tmp_path / "bin"
+        bin_dir.mkdir()
+        (bin_dir / "git").write_text("#!/bin/sh\n")
+        monkeypatch.setenv("PATH", str(bin_dir))
+
+        result = runner.invoke(app, ["doctor", "--repo", str(repo)])
+
+        assert result.exit_code == 0
+        parsed = json.loads(result.stdout)
+        assert parsed["checks"]["git"] is False
+        assert parsed["hook_log"] == {"path": None, "last_line": None}
+
     def test_invalid_config_makes_doctor_fail_honestly(self, tmp_path):
         (tmp_path / ".git").mkdir()
         (tmp_path / ".bbu.toml").write_text("surprise = true\n")

@@ -10,6 +10,9 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-red.svg)](https://spdx.org/licenses/MIT.html)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![PyPI](https://img.shields.io/pypi/v/black-box-unlock?label=PyPI)](https://pypi.org/project/black-box-unlock/)
+[![Claude Code plugin](https://img.shields.io/badge/Claude_Code-plugin-D97757?logo=claude&logoColor=white)](#claude-code-plugin)
+[![Codex plugin](https://img.shields.io/badge/Codex-plugin-000000?logo=openai&logoColor=white)](#codex-plugin)
 
 # Black Box Unlock
 
@@ -19,7 +22,7 @@ Code forensics tool based on Adam Tornhill's ["Your Code as a Crime Scene"](http
 
 The useful bit from code-forensics research is concentration: **2-8% of files
 cause 60-90% of defects**. Black Box Unlock gives AI coding agents those
-signals through MCP tools and a Claude Code plugin.
+signals through MCP tools, a Claude Code plugin, and a Codex plugin.
 </td>
 </tr>
 </table>
@@ -61,9 +64,11 @@ response cannot look like a clean result. Failed-run data includes the workflow,
 run URL, commit, time, and paths changed in that commit. Those paths are
 implicated by the failed run, not proven to have caused it.
 
-The Claude Code plugin in this repo adds `/review-change`, `/analyze`, `/hotspots`, a
-`git-forensics` agent, and an ambient coupling guard that warns when you
-edit one half of a repeatedly coupled file pair. The hook parses Claude's JSON
+### Claude Code plugin
+
+The Claude Code plugin in this repo adds the `/review-change`, `/analyze`, and
+`/hotspots` skills, a `git-forensics` agent and skill, and an ambient coupling
+guard that warns when you edit one half of a repeatedly coupled file pair. The hook parses Claude's JSON
 directly and does not require `jq`. Install it via the
 self-hosted marketplace:
 
@@ -72,7 +77,22 @@ self-hosted marketplace:
 /plugin install black-box-unlock@black-box-unlock
 ```
 
-Both `bbu` and `bbu-mcp` must be on PATH for the plugin and MCP server
+### Codex plugin
+
+The same repo is a Codex plugin in the portable
+[Agent Plugins](https://agent-plugins.org) format: `plugin.json` at the root,
+`mcp.json` bundling the `bbu-mcp` server over stdio, and the same `skills/`
+directory Claude Code loads. Install it from the repo's marketplace file:
+
+```bash
+codex plugin marketplace add michael-denyer/black-box-unlock
+```
+
+Then enable `black-box-unlock` from the plugin list. Codex does not load the
+coupling guard hook for this manifest format, so the guard works in Claude Code
+only; the skills and MCP tools return the same evidence in both.
+
+Both `bbu` and `bbu-mcp` must be on PATH for either plugin and the MCP server
 to work.
 
 ## CLI

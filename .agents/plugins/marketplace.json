@@ -1,0 +1,20 @@
+{
+  "name": "black-box-unlock",
+  "interface": {
+    "displayName": "Black Box Unlock"
+  },
+  "plugins": [
+    {
+      "name": "black-box-unlock",
+      "source": {
+        "source": "local",
+        "path": "./"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}

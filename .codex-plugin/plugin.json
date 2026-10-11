@@ -1,0 +1,23 @@
+{
+  "name": "black-box-unlock",
+  "version": "2.0.1",
+  "description": "Code forensics for AI coding agents: hotspots, temporal coupling, ownership, bug-fix history, function X-Ray, and evidence-backed change review from git and CI history.",
+  "author": {
+    "name": "Michael Denyer",
+    "url": "https://github.com/michael-denyer"
+  },
+  "skills": "./skills",
+  "mcpServers": "./mcp.json",
+  "interface": {
+    "displayName": "Black Box Unlock",
+    "shortDescription": "Investigate your codebase like a crime scene",
+    "developerName": "Michael Denyer",
+    "category": "Developer Tools",
+    "websiteURL": "https://github.com/michael-denyer/black-box-unlock",
+    "defaultPrompt": [
+      "which files in this repo are riskiest to change?",
+      "review my branch against origin/main with bbu",
+      "what changes together with src/auth.py?"
+    ]
+  }
+}

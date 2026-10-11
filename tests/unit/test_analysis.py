@@ -20,13 +20,17 @@ from black_box_unlock.core.models import (
     SignalState,
     SignalStatus,
 )
-from tests.factories import make_commit
+from tests.factories import make_commit, make_provenance
 
 
 @pytest.fixture(autouse=True)
 def head_tree():
-    """Stand in for the HEAD tree of the fake repositories these tests analyze."""
-    with patch("black_box_unlock.analysis.head_paths", return_value=frozenset()) as mock:
+    """Stand in for the HEAD tree and commit of the fake repositories these tests analyze."""
+    with (
+        patch("black_box_unlock.git.history.head_paths", return_value=frozenset()) as mock,
+        patch("black_box_unlock.analysis.head_oid", return_value="a" * 40),
+        patch("black_box_unlock.analysis.is_shallow", return_value=False),
+    ):
         yield mock
 
 
@@ -151,6 +155,7 @@ class TestAnalysisResultModel:
                 high_risk_ownership=0,
                 coupled_pairs=0,
             ),
+            provenance=make_provenance(),
         )
 
         assert result.repo == "black-box-unlock"
@@ -179,7 +184,7 @@ class TestRunAnalysis:
             ),
         ]
 
-        with patch("black_box_unlock.analysis.fetch_git_history") as mock_fetch:
+        with patch("black_box_unlock.git.history.fetch_git_history") as mock_fetch:
             mock_fetch.return_value = history
             result = run_analysis(Path("/fake/repo"), days=30)
 
@@ -207,7 +212,7 @@ class TestRunAnalysis:
             ),
         ]
 
-        with patch("black_box_unlock.analysis.fetch_git_history") as mock_fetch:
+        with patch("black_box_unlock.git.history.fetch_git_history") as mock_fetch:
             mock_fetch.return_value = history
             result = run_analysis(Path("/fake/repo"), days=30)
 
@@ -224,7 +229,7 @@ class TestRunAnalysis:
         history = [make_commit(["low.py", "high.py"], author_email="alice@example.com")]
         complexity_by_path = {"low.py": 1.0, "high.py": 50.0}
 
-        with patch("black_box_unlock.analysis.fetch_git_history") as mock_fetch:
+        with patch("black_box_unlock.git.history.fetch_git_history") as mock_fetch:
             mock_fetch.return_value = history
             with patch("black_box_unlock.analysis.indentation_complexity") as mock_cx:
                 mock_cx.side_effect = lambda p: complexity_by_path.get(p.name, 0.0)
@@ -241,7 +246,7 @@ class TestRunAnalysis:
             make_commit(["a.py", "b.py"], author_email="alice@example.com"),
         ]
 
-        with patch("black_box_unlock.analysis.fetch_git_history") as mock_fetch:
+        with patch("black_box_unlock.git.history.fetch_git_history") as mock_fetch:
             mock_fetch.return_value = history
             result = run_analysis(Path("/fake/repo"), days=30)
 
@@ -263,7 +268,7 @@ class TestRunAnalysis:
             make_commit(files=[{"path": "src/c.py", "former_paths": ["src/a.py", "src/b.py"]}]),
             make_commit(["src/other.py"]),
         ]
-        with patch("black_box_unlock.analysis.fetch_git_history", return_value=history) as fetch:
+        with patch("black_box_unlock.git.history.fetch_git_history", return_value=history) as fetch:
             result = run_analysis(
                 Path("/fake/repo"),
                 include_ci=False,
@@ -280,9 +285,20 @@ class TestRunAnalysis:
         assert by_path["src/c.py"].renamed_from == ["src/a.py", "src/b.py"]
         assert by_path["src/other.py"].renamed_from == []
 
+    def test_result_carries_the_provenance_of_the_state_it_read(self):
+        history = [make_commit(["a.py"])]
+        with patch("black_box_unlock.git.history.fetch_git_history", return_value=history):
+            result = run_analysis(Path("/fake/repo"), days=30, include_ci=False, xray_top=0)
+
+        assert result.provenance.head_oid == "a" * 40
+        assert result.provenance.days == 30
+        assert result.provenance.include_ci is False
+        assert result.provenance.cached is False
+        assert result.provenance.analysed_at == result.generated_at
+
     def test_ensure_paths_includes_a_current_file_without_history(self):
         with (
-            patch("black_box_unlock.analysis.fetch_git_history", return_value=[]),
+            patch("black_box_unlock.git.history.fetch_git_history", return_value=[]),
             patch("black_box_unlock.analysis.indentation_complexity", return_value=7.0),
         ):
             result = run_analysis(
@@ -307,7 +323,7 @@ class TestRunAnalysis:
             make_commit(["safe.py"], author_email="a@x.com"),
         ]
 
-        with patch("black_box_unlock.analysis.fetch_git_history") as mock_fetch:
+        with patch("black_box_unlock.git.history.fetch_git_history") as mock_fetch:
             mock_fetch.return_value = history
             result = run_analysis(Path("/fake/repo"), days=30)
 
@@ -318,7 +334,7 @@ class TestRunAnalysis:
         """Files with tied hotspot scores sort by path, so output is reproducible."""
         names = ["m.py", "b.py", "z.py", "a.py", "k.py", "f.py"]
         history = [make_commit(names)]  # each file: one commit, equal complexity -> tied score
-        with patch("black_box_unlock.analysis.fetch_git_history") as mock_fetch:
+        with patch("black_box_unlock.git.history.fetch_git_history") as mock_fetch:
             mock_fetch.return_value = history
             with patch("black_box_unlock.analysis.indentation_complexity") as mock_cx:
                 mock_cx.return_value = 3.0
@@ -328,7 +344,7 @@ class TestRunAnalysis:
 
     def test_records_parameters_and_ignored_bulk_changesets(self):
         history = [make_commit([f"generated/{i}.py" for i in range(51)])]
-        with patch("black_box_unlock.analysis.fetch_git_history", return_value=history):
+        with patch("black_box_unlock.git.history.fetch_git_history", return_value=history):
             result = run_analysis(
                 Path("/fake/repo"),
                 days=45,
@@ -351,7 +367,7 @@ class TestRunAnalysis:
 
     def test_policy_defaults_come_from_bbu_toml(self, tmp_path):
         (tmp_path / ".bbu.toml").write_text("[coupling]\nmin_shared_revisions = 4\n")
-        with patch("black_box_unlock.analysis.fetch_git_history", return_value=[]):
+        with patch("black_box_unlock.git.history.fetch_git_history", return_value=[]):
             result = run_analysis(tmp_path, include_ci=False, xray_top=0)
 
         assert result.parameters.coupling == CouplingPolicy(min_shared_revisions=4)
@@ -371,7 +387,7 @@ class TestCouplingPolicyInPipeline:
             make_commit(["src/a.py", "src/b.py"], author_email="dev@example.com"),
         ]
 
-        with patch("black_box_unlock.analysis.fetch_git_history", return_value=history):
+        with patch("black_box_unlock.git.history.fetch_git_history", return_value=history):
             result = run_analysis(Path("/fake/repo"), include_ci=False, xray_top=0)
 
         a = next(file for file in result.files if file.path == "src/a.py")
@@ -384,7 +400,7 @@ class TestCouplingPolicyInPipeline:
         head_tree.return_value = frozenset({"a.py", "b.py"})
         history = [make_commit(["a.py", "b.py"])]
 
-        with patch("black_box_unlock.analysis.fetch_git_history", return_value=history):
+        with patch("black_box_unlock.git.history.fetch_git_history", return_value=history):
             result = run_analysis(Path("/fake/repo"), include_ci=False, xray_top=0)
 
         assert result.couplings == []
@@ -394,7 +410,7 @@ class TestCouplingPolicyInPipeline:
         head_tree.return_value = frozenset({"src/a.py"})
         history = [make_commit(["src/a.py", "src/gone.py"]) for _ in range(3)]
 
-        with patch("black_box_unlock.analysis.fetch_git_history", return_value=history):
+        with patch("black_box_unlock.git.history.fetch_git_history", return_value=history):
             result = run_analysis(Path("/fake/repo"), include_ci=False, xray_top=0)
 
         a = next(file for file in result.files if file.path == "src/a.py")
@@ -405,7 +421,7 @@ class TestCouplingPolicyInPipeline:
     def test_deleted_partner_is_kept_when_live_partner_is_not_required(self, head_tree):
         history = [make_commit(["src/a.py", "src/gone.py"]) for _ in range(3)]
 
-        with patch("black_box_unlock.analysis.fetch_git_history", return_value=history):
+        with patch("black_box_unlock.git.history.fetch_git_history", return_value=history):
             result = run_analysis(
                 Path("/fake/repo"),
                 include_ci=False,
@@ -422,7 +438,7 @@ class TestCouplingPolicyInPipeline:
         history = [make_commit(["src/new_name.py", "src/b.py"]) for _ in range(2)]
         head_tree.return_value = frozenset({"src/b.py"})
 
-        with patch("black_box_unlock.analysis.fetch_git_history", return_value=history):
+        with patch("black_box_unlock.git.history.fetch_git_history", return_value=history):
             result = run_analysis(
                 Path("/fake/repo"),
                 include_ci=False,
@@ -439,7 +455,7 @@ class TestCouplingPolicyInPipeline:
             *[make_commit(["hub.py"]) for _ in range(27)],
         ]
 
-        with patch("black_box_unlock.analysis.fetch_git_history", return_value=history):
+        with patch("black_box_unlock.git.history.fetch_git_history", return_value=history):
             result = run_analysis(Path("/fake/repo"), include_ci=False, xray_top=0)
 
         by_path = {file.path: file for file in result.files}
@@ -474,6 +490,7 @@ class TestExportToJson:
                 high_risk_ownership=0,
                 coupled_pairs=1,
             ),
+            provenance=make_provenance(),
         )
 
         json_str = export_to_json(result)
@@ -508,6 +525,7 @@ class TestExportToJson:
                 high_risk_ownership=1,
                 coupled_pairs=0,
             ),
+            provenance=make_provenance(),
         )
 
         json_str = export_to_json(result)
@@ -523,7 +541,7 @@ class TestCIInPipeline:
     """CI collection crosses one typed seam into repository analysis."""
 
     @patch("black_box_unlock.analysis.collect_ci_signals")
-    @patch("black_box_unlock.analysis.fetch_git_history")
+    @patch("black_box_unlock.git.history.fetch_git_history")
     def test_includes_ci_data_and_status(self, mock_history, mock_ci):
         mock_history.return_value = [
             make_commit(
@@ -570,7 +588,7 @@ class TestCIInPipeline:
         assert result.ci_status.state is SignalState.available
 
     @patch("black_box_unlock.analysis.collect_ci_signals")
-    @patch("black_box_unlock.analysis.fetch_git_history")
+    @patch("black_box_unlock.git.history.fetch_git_history")
     def test_ci_failures_under_a_former_name_count_on_the_current_path(self, mock_history, mock_ci):
         """A failed run that touched a.py before its rename implicates b.py; a reused name does not move."""
         mock_history.return_value = [
@@ -600,7 +618,7 @@ class TestCIInPipeline:
         assert result.failed_ci_runs[0].implicated_paths == ["b.py", "d.py"]
 
     @patch("black_box_unlock.analysis.collect_ci_signals")
-    @patch("black_box_unlock.analysis.fetch_git_history")
+    @patch("black_box_unlock.git.history.fetch_git_history")
     def test_ci_only_files_remain_visible(self, mock_history, mock_ci):
         mock_history.return_value = []
         mock_ci.return_value = CIAnalysis(
@@ -615,7 +633,7 @@ class TestCIInPipeline:
         ]
 
     @patch("black_box_unlock.analysis.collect_ci_signals")
-    @patch("black_box_unlock.analysis.fetch_git_history")
+    @patch("black_box_unlock.git.history.fetch_git_history")
     def test_no_ci_skips_collection_and_records_disabled(self, mock_history, mock_ci):
         mock_history.return_value = []
 
@@ -626,7 +644,7 @@ class TestCIInPipeline:
         assert result.parameters.include_ci is False
 
     @patch("black_box_unlock.analysis.collect_ci_signals")
-    @patch("black_box_unlock.analysis.fetch_git_history")
+    @patch("black_box_unlock.git.history.fetch_git_history")
     def test_include_ci_defaults_to_true(self, mock_history, mock_ci):
         mock_history.return_value = []
         mock_ci.return_value = CIAnalysis(
@@ -648,7 +666,7 @@ class TestCIInPipeline:
             )
         ]
 
-        with patch("black_box_unlock.analysis.fetch_git_history", return_value=history):
+        with patch("black_box_unlock.git.history.fetch_git_history", return_value=history):
             result = run_analysis(Path("/fake/repo"), days=30, include_ci=False)
 
         auth = next(file for file in result.files if file.path == "src/auth.py")
@@ -665,7 +683,7 @@ class TestCIInPipeline:
             )
         ]
 
-        with patch("black_box_unlock.analysis.fetch_git_history", return_value=history):
+        with patch("black_box_unlock.git.history.fetch_git_history", return_value=history):
             result = run_analysis(Path("/fake/repo"), days=30, include_ci=False)
 
         roles = {file.path: file.path_role for file in result.files}
@@ -683,7 +701,7 @@ class TestCIInPipeline:
             )
         ]
 
-        with patch("black_box_unlock.analysis.fetch_git_history", return_value=history):
+        with patch("black_box_unlock.git.history.fetch_git_history", return_value=history):
             result = run_analysis(tmp_path, days=30, include_ci=False)
 
         assert result.files[0].path_role == "generated"
@@ -709,7 +727,7 @@ class TestAutoXray:
             revision_cap_hit=False,
             functions=[FunctionChurn(name="f", revisions=1, lines_added=5, lines_deleted=0)],
         )
-        with patch("black_box_unlock.analysis.fetch_git_history") as mock_hist:
+        with patch("black_box_unlock.git.history.fetch_git_history") as mock_hist:
             mock_hist.return_value = self._history()
             with patch("black_box_unlock.analysis.xray_file") as mock_xray:
                 mock_xray.return_value = fake
@@ -720,7 +738,7 @@ class TestAutoXray:
 
     def test_xray_top_zero_disables(self, tmp_path):
         (tmp_path / "mod.py").write_text("def f():\n    return 1\n")
-        with patch("black_box_unlock.analysis.fetch_git_history") as mock_hist:
+        with patch("black_box_unlock.git.history.fetch_git_history") as mock_hist:
             mock_hist.return_value = self._history()
             with patch("black_box_unlock.analysis.xray_file") as mock_xray:
                 result = run_analysis(tmp_path, days=30, include_ci=False, xray_top=0)
@@ -729,7 +747,7 @@ class TestAutoXray:
 
     def test_xray_failure_degrades_gracefully(self, tmp_path):
         (tmp_path / "mod.py").write_text("def f():\n    return 1\n")
-        with patch("black_box_unlock.analysis.fetch_git_history") as mock_hist:
+        with patch("black_box_unlock.git.history.fetch_git_history") as mock_hist:
             mock_hist.return_value = self._history()
             with patch("black_box_unlock.analysis.xray_file") as mock_xray:
                 mock_xray.side_effect = RuntimeError("boom")

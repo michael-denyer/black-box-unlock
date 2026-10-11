@@ -148,6 +148,7 @@ src/black_box_unlock/
 │   └── logging.py           # [4c] Loguru config
 ├── git/
 │   ├── log.py               # Native git log --numstat extraction
+│   ├── history.py           # HistoryWindow shared by analysis and the guard
 │   ├── churn.py             # [3a] FileChurn extraction
 │   ├── coupling.py          # [3b] Coupling detection + bulk-commit cap
 │   ├── ownership.py         # [3c] Ownership parsing

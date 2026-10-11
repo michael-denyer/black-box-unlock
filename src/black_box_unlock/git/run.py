@@ -4,10 +4,11 @@ Centralizes the three things every git invocation in this package needs: the
 not-a-repo guard, the git-missing mapping, and the unborn-HEAD tolerance.
 """
 
+import os
 import subprocess
 from pathlib import Path
 
-from ..core.exceptions import GitToolNotFoundError, NotAGitRepoError
+from ..core.exceptions import GitToolNotFoundError, NotAGitRepoError, RepositoryPathError
 
 _UNBORN_HEAD_MARKERS = ("does not have any commits", "bad default revision")
 
@@ -97,3 +98,26 @@ def head_paths(repo_path: Path, rev: str = "HEAD") -> frozenset[str]:
     """
     output = run_git(repo_path, ["ls-tree", "-r", "--name-only", "--full-tree", rev])
     return frozenset(output.splitlines())
+
+
+def relative_to_repo(repo_path: Path, file_path: str) -> str:
+    """Return file_path as the repo-relative POSIX path git records it under.
+
+    Parent directories are resolved, so a path through a symlinked directory
+    (macOS ``/tmp`` versus ``/private/tmp``) lands inside the repository. The
+    final component is not, so a tracked symlink keeps its own path.
+
+    Raises:
+        RepositoryPathError: If the path lies outside the repository, or is a directory.
+    """
+    root = repo_path.resolve()
+    candidate = Path(file_path)
+    joined = candidate if candidate.is_absolute() else root / candidate
+    normalised = Path(os.path.normpath(joined))
+    path = normalised.parent.resolve() / normalised.name
+    if not path.is_relative_to(root):
+        raise RepositoryPathError(f"{file_path} is outside the repository at {root}")
+    rel = path.relative_to(root).as_posix()
+    if rel == "." or (path.is_dir() and not path.is_symlink()):
+        raise RepositoryPathError(f"{file_path} is a directory; name a file")
+    return rel

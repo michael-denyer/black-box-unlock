@@ -17,7 +17,7 @@ def _cache_payload(files: dict | None = None) -> dict:
     return {
         "version": 4,
         "generated_at": "2026-06-12T10:00:00Z",
-        "head_oid": "unknown",
+        "head_oid": None,
         "max_changeset_size": 50,
         "require_live_partner": True,
         "files": files
@@ -226,6 +226,7 @@ class TestCouplingWarnings:
             "ignored_large_changesets",
             "dropped_deleted_partners",
         }
+        assert payload["head_oid"] is None
 
     @pytest.mark.parametrize(
         "payload",

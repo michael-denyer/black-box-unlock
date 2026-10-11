@@ -25,6 +25,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- X-Ray functions in languages without span attribution (every supported
+  language except Python) report `complexity` and `hotspot_score` as `null`
+  with `score_unavailable_reason: "no span attribution for this language"`,
+  the same channel an unparseable Python snapshot already used, instead of a
+  misleading `0.0`.
+- `FileForensics.path_role` is required and no longer defaults to the
+  built-in classification; `PathRole` is defined in `core.models` and stays
+  importable from `path_roles`. `FlakyStep` and `FlakyStepSummary` are folded
+  into `FlakyStepStats`, whose count invariant now checks the merged totals.
 - `black_box_unlock.config.ReviewProfile` is now `ReviewOverrides`, the one
   shape for the five optional review policy values, and `ChangeReviewRequest`
   is that shape plus a selector and a profile name. The request rejects

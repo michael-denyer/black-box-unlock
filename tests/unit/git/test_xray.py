@@ -2,9 +2,11 @@
 
 from black_box_unlock.git.xray import (
     DIFF_DRIVERS,
+    HEADER_ONLY_ATTRIBUTION,
     Hunk,
     _attribute_hunk,
     _attributes_content,
+    _build_functions,
     _header_name,
     parse_patch_log,
 )
@@ -188,3 +190,17 @@ class TestAttributeHunkParentSide:
     def test_parsed_but_empty_spans_do_not_fall_back(self):
         hunk = Hunk(1, 1, 1, 1, "def a():")
         assert _attribute_hunk(hunk, [], []) == {}
+
+
+class TestBuildFunctions:
+    def test_header_only_attribution_has_no_complexity_or_score(self, tmp_path):
+        """A language without span attribution gets null, never a misleading zero."""
+        functions = _build_functions(
+            tmp_path, "main.go", False, {"func main": [3, 1]}, {"func main": {"a", "b"}}
+        )
+
+        (main,) = functions
+        assert main.revisions == 2
+        assert main.complexity is None
+        assert main.hotspot_score is None
+        assert main.score_unavailable_reason == HEADER_ONLY_ATTRIBUTION

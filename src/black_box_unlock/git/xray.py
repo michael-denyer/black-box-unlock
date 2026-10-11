@@ -39,6 +39,8 @@ UNSUPPORTED_LANGUAGE = "unsupported language"
 
 UNPARSEABLE_SNAPSHOT = "current snapshot could not be parsed"
 
+HEADER_ONLY_ATTRIBUTION = "no span attribution for this language"
+
 _COMMIT_MARKER = "\x01"
 _PRETTY_FORMAT = f"{_COMMIT_MARKER}%H"
 _HUNK_RE = re.compile(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@ ?(.*)$")
@@ -378,6 +380,8 @@ def _build_functions(
                 revisions=len(touched[name]),
                 lines_added=added,
                 lines_deleted=deleted,
+                complexity=None,
+                score_unavailable_reason=HEADER_ONLY_ATTRIBUTION,
             )
             for name, (added, deleted) in tallies.items()
         ]

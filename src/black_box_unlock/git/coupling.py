@@ -4,7 +4,13 @@ from collections import defaultdict
 from dataclasses import dataclass
 from itertools import combinations
 
-from ..core.models import CouplingPolicy, TemporalCoupling
+from ..core.models import (
+    CouplingInfo,
+    CouplingPolicy,
+    TemporalCoupling,
+    coupling_info_for,
+    coupling_info_sort_key,
+)
 from .log import Commit
 
 
@@ -84,3 +90,21 @@ def analyze_temporal_coupling(  # [3b] Find co-changing files
         couplings=included,
         dropped_deleted_partners=dropped_deleted_partners,
     )
+
+
+def couplings_by_file(
+    couplings: list[TemporalCoupling], *, min_rate: float = 0.0
+) -> dict[str, list[CouplingInfo]]:
+    """Index pairs by each side, keeping partners whose rate_to_partner reaches min_rate.
+
+    Each file's partners are sorted by ``coupling_info_sort_key``.
+    """
+    by_file: dict[str, list[CouplingInfo]] = defaultdict(list)
+    for coupling in couplings:
+        for path in (coupling.file_a, coupling.file_b):
+            info = coupling_info_for(coupling, path)
+            if info.rate_to_partner >= min_rate:
+                by_file[path].append(info)
+    for partners in by_file.values():
+        partners.sort(key=coupling_info_sort_key)
+    return dict(by_file)

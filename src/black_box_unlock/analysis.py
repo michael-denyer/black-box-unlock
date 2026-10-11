@@ -16,17 +16,14 @@ from .core.models import (
     AnalysisParameters,
     AnalysisResult,
     AnalysisSummary,
-    CouplingInfo,
     CouplingPolicy,
     FileForensics,
     Provenance,
     SignalState,
     SignalStatus,
-    coupling_info_for,
-    coupling_info_sort_key,
 )
 from .git.churn import parse_history_entries
-from .git.coupling import analyze_temporal_coupling
+from .git.coupling import analyze_temporal_coupling, couplings_by_file
 from .git.defects import bugfix_counts
 from .git.log import Commit, CommitFile, exclude_bulk, fetch_git_history, merge_commit_files
 from .git.ownership import parse_ownership_from_history
@@ -206,15 +203,7 @@ def run_analysis(  # [2a] Main analysis pipeline
     churn_by_path = {c.path: c for c in churn_list}
     ownership_by_path = {o.path: o for o in ownership_list}
 
-    # Build coupling lookup: for each file, which files is it coupled with?
-    coupling_by_file: dict[str, list[CouplingInfo]] = defaultdict(list)
-    for coupling in coupling_list:
-        for path in (coupling.file_a, coupling.file_b):
-            info = coupling_info_for(coupling, path)
-            if info.rate_to_partner >= policy.min_ratio:
-                coupling_by_file[path].append(info)
-    for coupled_files in coupling_by_file.values():
-        coupled_files.sort(key=coupling_info_sort_key)
+    coupling_by_file = couplings_by_file(coupling_list, min_rate=policy.min_ratio)
 
     # All unique paths
     all_paths = (

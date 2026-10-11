@@ -6,10 +6,8 @@ ownership, defect, CI, or X-Ray analysis.
 """
 
 import os
-import subprocess
 import tempfile
 import time
-from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal
@@ -18,11 +16,10 @@ from loguru import logger
 from pydantic import BaseModel, Field, ValidationError
 
 from .config import resolve_coupling_policy
-from .core.exceptions import BlackBoxUnlockError
-from .core.models import CouplingInfo, CouplingPolicy, coupling_info_for, coupling_info_sort_key
-from .git.coupling import analyze_temporal_coupling
+from .core.models import CouplingInfo, CouplingPolicy, coupling_info_sort_key
+from .git.coupling import analyze_temporal_coupling, couplings_by_file
 from .git.log import exclude_bulk, fetch_git_history
-from .git.run import head_paths, repo_toplevel, run_git
+from .git.run import head_oid, head_paths, repo_toplevel, run_git
 
 CACHE_FILENAME = "cache.json"
 HOOK_LOG_FILENAME = "hook.log"
@@ -42,7 +39,7 @@ class CouplingSnapshot(BaseModel):
 
     version: Literal[4] = CACHE_VERSION
     generated_at: datetime
-    head_oid: str
+    head_oid: str | None
     max_changeset_size: int = Field(ge=2)
     require_live_partner: bool
     files: dict[str, list[CouplingInfo]] = Field(default_factory=dict)
@@ -85,18 +82,7 @@ def record_hook_failure(path: Path, error: Exception) -> None:
         logger.warning("could not record coupling guard hook failure: {}", log_error)
 
 
-def _head_oid(repo_path: Path) -> str:
-    try:
-        return run_git(
-            repo_path,
-            ["rev-parse", "--verify", "HEAD^{commit}"],
-            tolerate_unborn=True,
-        ).strip()
-    except (BlackBoxUnlockError, subprocess.CalledProcessError):
-        return "unknown"
-
-
-def _build_snapshot(repo_path: Path, head_oid: str, policy: CouplingPolicy) -> CouplingSnapshot:
+def _build_snapshot(repo_path: Path, oid: str | None, policy: CouplingPolicy) -> CouplingSnapshot:
     history, bulk_commits = exclude_bulk(
         fetch_git_history(repo_path, CACHE_HISTORY_DAYS), policy.max_changeset_size
     )
@@ -106,25 +92,19 @@ def _build_snapshot(repo_path: Path, head_oid: str, policy: CouplingPolicy) -> C
         policy.model_copy(update={"min_ratio": 0.0, "min_shared_revisions": 1}),
         live_paths,
     )
-    by_file: dict[str, list[CouplingInfo]] = defaultdict(list)
-    for coupling in analysis.couplings:
-        by_file[coupling.file_a].append(coupling_info_for(coupling, coupling.file_a))
-        by_file[coupling.file_b].append(coupling_info_for(coupling, coupling.file_b))
-    for coupled_files in by_file.values():
-        coupled_files.sort(key=coupling_info_sort_key)
     return CouplingSnapshot(
         generated_at=datetime.now(timezone.utc),
-        head_oid=head_oid,
+        head_oid=oid,
         max_changeset_size=policy.max_changeset_size,
         require_live_partner=policy.require_live_partner,
-        files=dict(by_file),
+        files=couplings_by_file(analysis.couplings),
         ignored_large_changesets=bulk_commits,
         dropped_deleted_partners=analysis.dropped_deleted_partners,
     )
 
 
 def _read_fresh_snapshot(
-    cache: Path, head_oid: str, policy: CouplingPolicy
+    cache: Path, oid: str | None, policy: CouplingPolicy
 ) -> CouplingSnapshot | None:
     if not cache.exists():
         return None
@@ -138,7 +118,7 @@ def _read_fresh_snapshot(
             snapshot.max_changeset_size,
             snapshot.require_live_partner,
         )
-        wanted = (head_oid, policy.max_changeset_size, policy.require_live_partner)
+        wanted = (oid, policy.max_changeset_size, policy.require_live_partner)
         return snapshot if built_under == wanted else None
     except (OSError, ValidationError) as error:
         logger.warning("coupling cache at {} is unusable, rebuilding: {}", cache, error)
@@ -169,11 +149,11 @@ def _write_snapshot(cache: Path, snapshot: CouplingSnapshot) -> None:
 
 def _load_or_build_cache(repo_path: Path, policy: CouplingPolicy) -> CouplingSnapshot:
     cache = state_dir(repo_path) / CACHE_FILENAME
-    head_oid = _head_oid(repo_path)
-    snapshot = _read_fresh_snapshot(cache, head_oid, policy)
+    oid = head_oid(repo_path)
+    snapshot = _read_fresh_snapshot(cache, oid, policy)
     if snapshot is not None:
         return snapshot
-    snapshot = _build_snapshot(repo_path, head_oid, policy)
+    snapshot = _build_snapshot(repo_path, oid, policy)
     try:
         _write_snapshot(cache, snapshot)
     except OSError as error:

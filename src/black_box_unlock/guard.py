@@ -179,7 +179,7 @@ def coupling_warnings(  # [1c] Coupling guard for the edit hook
     it reaches ``policy.min_ratio`` and the pair has at least
     ``policy.min_shared_revisions`` shared revisions. Editing a hub therefore
     stays quiet about leaves it once touched, while editing a leaf that always
-    moves with the hub warns. Results are sorted by Wilson lower bound, shared
+    moves with the hub warns. Results are sorted by ``rate_lower_bound``, shared
     revisions, observed ratio, and path. At most ``top`` detailed warnings are
     returned, followed by a summary when more matches exist.
 

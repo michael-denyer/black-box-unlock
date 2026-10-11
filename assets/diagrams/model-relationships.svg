@@ -28,7 +28,7 @@
 <text x="989" y="241" fill="#b6cbdd" font-family="DejaVu Sans Mono, monospace" font-size="19" font-weight="400" text-anchor="start">file_a · file_b</text>
 <text x="989" y="274" fill="#b6cbdd" font-family="DejaVu Sans Mono, monospace" font-size="19" font-weight="400" text-anchor="start">co_change_count</text>
 <text x="989" y="307" fill="#b6cbdd" font-family="DejaVu Sans Mono, monospace" font-size="19" font-weight="400" text-anchor="start">coupling_ratio</text>
-<text x="989" y="340" fill="#b6cbdd" font-family="DejaVu Sans Mono, monospace" font-size="19" font-weight="400" text-anchor="start">confidence_lower_bound</text>
+<text x="989" y="340" fill="#b6cbdd" font-family="DejaVu Sans Mono, monospace" font-size="19" font-weight="400" text-anchor="start">ratio_lower_bound</text>
 <path d="M1180 370V416H720" fill="none" stroke="#47e4ef" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
 <path d="M720 416V458" fill="none" stroke="#47e4ef" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#cyan-arrow)"/>
 <text x="750" y="444" fill="#b6cbdd" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="400" text-anchor="start">Aggregated and joined by path</text>

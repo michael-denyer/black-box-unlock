@@ -22,7 +22,7 @@ from black_box_unlock.git.changes import (
     WorkingTreeChange,
     WorkingTreeProvenance,
 )
-from black_box_unlock.path_roles import PathRole, PathRoleRule
+from black_box_unlock.path_roles import PathRole, PathRoleRule, classify_path_role
 from black_box_unlock.review import (
     ChangeReview,
     ChangeReviewRequest,
@@ -53,6 +53,7 @@ def _analysis() -> AnalysisResult:
         files=[
             FileForensics(
                 path="src/a.py",
+                path_role=PathRole.source,
                 commits=13,
                 lines_changed=100,
                 complexity=10,
@@ -62,6 +63,7 @@ def _analysis() -> AnalysisResult:
             ),
             FileForensics(
                 path="tests/test_a.py",
+                path_role=PathRole.test,
                 commits=13,
                 lines_changed=80,
                 complexity=5,
@@ -347,6 +349,7 @@ def test_documentation_change_does_not_create_production_actions():
     analysis.files.append(
         FileForensics(
             path="docs/guide.md",
+            path_role=PathRole.docs,
             commits=9,
             lines_changed=100,
             complexity=4,
@@ -476,6 +479,7 @@ def _shared_file_analysis(path: str, authors: list[str], share: float) -> Analys
     analysis.files = [
         FileForensics(
             path=path,
+            path_role=classify_path_role(path).role,
             commits=20,
             lines_changed=100,
             complexity=5,

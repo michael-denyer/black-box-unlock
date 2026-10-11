@@ -95,5 +95,4 @@ def _build_ownership(
         main_author=main_author,
         main_author_share=share,
         last_active=max(latest.values()) if latest else None,
-        authors_by_commits=dict(sorted(counts.items())),
     )

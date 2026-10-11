@@ -13,6 +13,7 @@ from black_box_unlock.core.models import (
     SignalStatus,
     TemporalCoupling,
 )
+from black_box_unlock.path_roles import PathRole, classify_path_role
 from black_box_unlock.visualization.html import generate_html_report
 from tests.factories import make_provenance
 
@@ -25,6 +26,7 @@ def _result(*, repo: str = "test-repo", path: str = "src/auth.py") -> AnalysisRe
         files=[
             FileForensics(
                 path=path,
+                path_role=classify_path_role(path).role,
                 commits=10,
                 lines_changed=200,
                 complexity=20,
@@ -35,6 +37,7 @@ def _result(*, repo: str = "test-repo", path: str = "src/auth.py") -> AnalysisRe
             ),
             FileForensics(
                 path="src/user.py",
+                path_role=PathRole.source,
                 commits=12,
                 lines_changed=150,
                 complexity=8,

@@ -3,13 +3,13 @@
 import json
 import subprocess
 from collections import Counter, defaultdict
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from ..core.models import FailedWorkflowRun, FlakyStepSummary, SignalState, SignalStatus
+from ..core.models import FailedWorkflowRun, FlakyStepStats, SignalState, SignalStatus
 from ..git.run import run_git
-from .models import CIAnalysis, FlakyStep, WorkflowJob, WorkflowRun
+from .models import CIAnalysis, WorkflowJob, WorkflowRun
 
 GH_TIMEOUT_SECONDS = 60
 MAX_PAGES = 10
@@ -123,7 +123,7 @@ class _StepHistory:
 
 def flaky_steps_from_jobs(
     jobs: list[WorkflowJob], *, include_stable: bool = False
-) -> list[FlakyStep]:
+) -> list[FlakyStepStats]:
     """Observe each executed step of one run and flag fail-then-pass retries.
 
     Each returned step stands for one run in which the step executed. Only steps
@@ -141,7 +141,7 @@ def flaky_steps_from_jobs(
                 step.completed_at,
             )
 
-    flaky: list[FlakyStep] = []
+    flaky: list[FlakyStepStats] = []
     now = datetime.now(timezone.utc)
     for (job_name, step_name), history in histories.items():
         attempts = sorted(history.attempts)
@@ -158,7 +158,7 @@ def flaky_steps_from_jobs(
         )
         if flaky_count or include_stable:
             flaky.append(
-                FlakyStep(
+                FlakyStepStats(
                     job_name=job_name,
                     step_name=step_name,
                     first_seen=history.first_seen or now,
@@ -173,36 +173,41 @@ def flaky_steps_from_jobs(
     return flaky
 
 
-def summarize_flaky_steps(steps: list[FlakyStep]) -> list[FlakyStepSummary]:
-    """Merge per-run observations into one summary per job and step.
+@dataclass
+class _MergedStep:
+    first_seen: datetime
+    last_seen: datetime
+    runs: int = 0
+    flaky_runs: int = 0
+    total_attempts: int = 0
+    failures: int = 0
+    flaky_count: int = 0
 
-    Steps that never recovered in any observed run are dropped.
+    def add(self, step: FlakyStepStats) -> None:
+        self.first_seen = min(self.first_seen, step.first_seen)
+        self.last_seen = max(self.last_seen, step.last_seen)
+        self.runs += step.runs
+        self.flaky_runs += step.flaky_runs
+        self.total_attempts += step.total_attempts
+        self.failures += step.failures
+        self.flaky_count += step.flaky_count
+
+
+def summarize_flaky_steps(steps: list[FlakyStepStats]) -> list[FlakyStepStats]:
+    """Merge per-run observations into one record per job and step.
+
+    Steps that never recovered in any observed run are dropped. The merged
+    counts are validated once, as a whole, when the record is built.
     """
-    summaries: dict[tuple[str, str], FlakyStepSummary] = {}
+    merged: dict[tuple[str, str], _MergedStep] = {}
     for step in steps:
         key = (step.job_name, step.step_name)
-        summary = summaries.get(key)
-        if summary is None:
-            summaries[key] = FlakyStepSummary(
-                job_name=step.job_name,
-                step_name=step.step_name,
-                first_seen=step.first_seen,
-                last_seen=step.last_seen,
-                runs=step.runs,
-                flaky_runs=step.flaky_runs,
-                total_attempts=step.total_attempts,
-                failures=step.failures,
-                flaky_count=step.flaky_count,
-            )
-            continue
-        summary.runs += step.runs
-        summary.flaky_runs += step.flaky_runs
-        summary.total_attempts += step.total_attempts
-        summary.failures += step.failures
-        summary.flaky_count += step.flaky_count
-        summary.first_seen = min(summary.first_seen, step.first_seen)
-        summary.last_seen = max(summary.last_seen, step.last_seen)
-    flaky = (summary for summary in summaries.values() if summary.flaky_runs)
+        merged.setdefault(key, _MergedStep(step.first_seen, step.last_seen)).add(step)
+    flaky = [
+        FlakyStepStats(job_name=job_name, step_name=step_name, **asdict(total))
+        for (job_name, step_name), total in merged.items()
+        if total.flaky_runs
+    ]
     return sorted(flaky, key=lambda step: (step.job_name, step.step_name))
 
 
@@ -237,7 +242,7 @@ def collect_ci_signals(
 
     file_failures: Counter[str] = Counter()
     failed_runs: list[FailedWorkflowRun] = []
-    flaky_observations: list[FlakyStep] = []
+    flaky_observations: list[FlakyStepStats] = []
     errors: list[str] = []
     if truncated:
         errors.append(f"run list truncated at {MAX_PAGES * limit} runs; older runs not examined")

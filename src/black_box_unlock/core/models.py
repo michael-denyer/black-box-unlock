@@ -10,11 +10,8 @@ from pydantic import (
     ConfigDict,
     Field,
     computed_field,
-    field_validator,
     model_validator,
 )
-
-from ..path_roles import PathRole, classify_path_role
 
 HIGH_RISK_AUTHOR_THRESHOLD = 3
 """Above this many authors a file is shared or diffuse; see ``ownership_risk``."""
@@ -26,6 +23,18 @@ DOMINANT_AUTHOR_SHARE = 0.5
 def is_diffuse(author_count: int, main_author_share: float) -> bool:
     """The one rule behind ``is_high_risk``, the HTML badge, and ``ownership_risk``."""
     return author_count > HIGH_RISK_AUTHOR_THRESHOLD and main_author_share < DOMINANT_AUTHOR_SHARE
+
+
+class PathRole(str, Enum):
+    """Stable, coarse role of a repository path."""
+
+    source = "source"
+    test = "test"
+    docs = "docs"
+    config = "config"
+    migration = "migration"
+    generated = "generated"
+    other = "other"
 
 
 class CouplingPolicy(BaseModel):
@@ -61,20 +70,6 @@ class CouplingPolicy(BaseModel):
         )
 
 
-def _validate_non_empty_path(v: str) -> str:
-    """Validate that path is not empty or whitespace."""
-    if not v.strip():
-        raise ValueError("path must not be empty")
-    return v
-
-
-def _validate_non_negative_int(v: int, field_name: str) -> int:
-    """Validate that an integer field is non-negative."""
-    if v < 0:
-        raise ValueError(f"{field_name} must be non-negative")
-    return v
-
-
 def tornhill_ratio(shared: int, count_a: int, count_b: int) -> float:
     """Co-change coupling ratio (Tornhill): shared / min(count_a, count_b), 0 if either is 0."""
     lo = min(count_a, count_b)
@@ -103,26 +98,14 @@ def wilson_lower_bound(successes: int, trials: int, z: float = 1.96) -> float:
 class FileChurn(BaseModel):  # [4a] Churn metrics per file
     """Churn metrics for a single file."""
 
-    path: str
-    commits: int
+    path: str = Field(min_length=1)
+    commits: int = Field(ge=0)
     lines_added: int
     lines_deleted: int
-    first_commit: datetime
-    last_commit: datetime
 
     @property
     def total_lines_changed(self) -> int:
         return self.lines_added + self.lines_deleted
-
-    @field_validator("path")
-    @classmethod
-    def path_must_not_be_empty(cls, v: str) -> str:
-        return _validate_non_empty_path(v)
-
-    @field_validator("commits")
-    @classmethod
-    def commits_must_be_non_negative(cls, v: int) -> int:
-        return _validate_non_negative_int(v, "commits")
 
 
 class TemporalCoupling(BaseModel):  # [4a.1] File pair co-change
@@ -181,13 +164,13 @@ class FileOwnership(BaseModel):  # [4a.2] Authors per file
     that often correlate with higher defect rates due to diffuse ownership.
 
     ``commits`` counts every commit that touched the file, bots included
-    (1.5.2 behaviour). ``authors``, ``authors_by_commits``, ``main_author``,
-    ``main_author_share`` and ``last_active`` ignore bot commits.
+    (1.5.2 behaviour). ``authors``, ``main_author``, ``main_author_share`` and
+    ``last_active`` ignore bot commits.
     """
 
-    path: str
+    path: str = Field(min_length=1)
     authors: list[str]
-    commits: int
+    commits: int = Field(ge=0)
     main_author: str | None = None
     """Author with the most commits in the window. Ties go to the author with the
     most recent commit, then to the lower name. None when there is no human author."""
@@ -195,28 +178,11 @@ class FileOwnership(BaseModel):  # [4a.2] Authors per file
     """Main author's commits over the file's non-bot commits; 0.0 when there are none."""
     last_active: datetime | None = None
     """Author timestamp of the latest non-bot commit in the window (committer when fetched with clock="committer"); None when there is none."""
-    authors_by_commits: dict[str, int] = Field(default_factory=dict)
-    """Non-bot commit count per author."""
 
     @property
     def author_count(self) -> int:
         """Number of unique authors."""
         return len(self.authors)
-
-    @property
-    def is_high_risk(self) -> bool:
-        """Diffuse ownership: more than the threshold of authors and no one holds half the commits."""
-        return is_diffuse(self.author_count, self.main_author_share)
-
-    @field_validator("path")
-    @classmethod
-    def path_must_not_be_empty(cls, v: str) -> str:
-        return _validate_non_empty_path(v)
-
-    @field_validator("commits")
-    @classmethod
-    def commits_must_be_non_negative(cls, v: int) -> int:
-        return _validate_non_negative_int(v, "commits")
 
 
 class CouplingInfo(BaseModel):
@@ -325,11 +291,8 @@ class FileForensics(BaseModel):  # [4a.3] Combined forensics
     """Combined forensics for a single file."""
 
     path: str
-    path_role: PathRole = Field(
-        default_factory=lambda data: classify_path_role(data.get("path", "")).role
-    )
-    """Role of the path. Defaults to the built-in classification; analysis passes
-    the role resolved with the project's ``.bbu.toml`` rules."""
+    path_role: PathRole
+    """Role of the path as the analysis resolved it, project ``.bbu.toml`` rules included."""
     commits: int
     lines_changed: int
     complexity: float = 0.0
@@ -340,8 +303,8 @@ class FileForensics(BaseModel):  # [4a.3] Combined forensics
     last_active: datetime | None = None
     """Latest non-bot commit in the window; see ``FileOwnership``."""
     coupled_with: list[CouplingInfo]
-    build_failures: int = 0
-    bugfix_commits: int = 0
+    build_failures: int = Field(default=0, ge=0)
+    bugfix_commits: int = Field(default=0, ge=0)
     renamed_from: list[str] = Field(default_factory=list)
     """Earlier names whose history within the window is merged into this path."""
     functions: list[FunctionChurn] = Field(default_factory=list)
@@ -350,16 +313,6 @@ class FileForensics(BaseModel):  # [4a.3] Combined forensics
     xray_failed: bool = False
     """True when an X-Ray attempt on this file raised; lets consumers tell a crash
     from a file that genuinely has no attributable functions (both leave functions empty)."""
-
-    @field_validator("build_failures")
-    @classmethod
-    def build_failures_must_be_non_negative(cls, v: int) -> int:
-        return _validate_non_negative_int(v, "build_failures")
-
-    @field_validator("bugfix_commits")
-    @classmethod
-    def bugfix_commits_must_be_non_negative(cls, v: int) -> int:
-        return _validate_non_negative_int(v, "bugfix_commits")
 
     @computed_field
     @property
@@ -447,10 +400,6 @@ class FlakyStepStats(BaseModel):
         return (datetime.now(timezone.utc) - self.last_seen).days <= 7
 
 
-class FlakyStepSummary(FlakyStepStats):
-    """Flaky-step counts merged across runs, included in AnalysisResult."""
-
-
 class SignalState(str, Enum):
     """Availability of an optional analysis signal."""
 
@@ -513,5 +462,5 @@ class AnalysisResult(BaseModel):  # [4a.4] Complete analysis output
     parameters: AnalysisParameters = Field(default_factory=AnalysisParameters)
     ci_status: SignalStatus = Field(default_factory=SignalStatus)
     failed_ci_runs: list[FailedWorkflowRun] = Field(default_factory=list)
-    flaky_steps: list[FlakyStepSummary] = Field(default_factory=list)
+    flaky_steps: list[FlakyStepStats] = Field(default_factory=list)
     provenance: Provenance

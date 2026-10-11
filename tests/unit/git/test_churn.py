@@ -1,7 +1,6 @@
 """Tests for file churn extraction."""
 
 import json
-from datetime import datetime
 from pathlib import Path
 
 import pytest
@@ -36,14 +35,6 @@ class TestParseHistoryEntries:
         assert utils_py.commits == 1
         assert utils_py.lines_added == 30
         assert utils_py.lines_deleted == 0
-
-    def test_tracks_first_and_last_commit_dates(self, sample_history):
-        """Tracks first and last commit timestamps per file."""
-        result = parse_history_entries(sample_history)
-
-        main_py = next(f for f in result if f.path == "src/main.py")
-        assert main_py.first_commit == datetime(2026, 1, 20, 10, 0, 0)
-        assert main_py.last_commit == datetime(2026, 1, 25, 10, 0, 0)
 
     def test_returns_empty_list_for_no_entries(self):
         """Returns empty list when no commits."""

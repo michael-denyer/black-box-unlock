@@ -30,7 +30,7 @@
     {column: "path", dir: "asc"},
   ];
   const couplingEvidenceSort = [
-    {column: "confidence_lower_bound", dir: "desc"},
+    {column: "ratio_lower_bound", dir: "desc"},
     {column: "shared_revisions", dir: "desc"},
     {column: "raw_ratio", dir: "desc"},
   ];
@@ -44,7 +44,7 @@
     "strongest_confidence",
   ];
   const couplingEvidenceFields = [
-    "confidence_lower_bound",
+    "ratio_lower_bound",
     "shared_revisions",
     "revisions_a",
     "revisions_b",
@@ -96,7 +96,7 @@
   }
 
   function couplingSentence(pair) {
-    return `${formatInteger(pair.shared_revisions)} shared / min(${formatInteger(pair.revisions_a)}, ${formatInteger(pair.revisions_b)}) revisions · ${formatPercent(pair.raw_ratio)} raw · ${formatPercent(pair.confidence_lower_bound)} lower bound`;
+    return `${formatInteger(pair.shared_revisions)} shared / min(${formatInteger(pair.revisions_a)}, ${formatInteger(pair.revisions_b)}) revisions · ${formatPercent(pair.raw_ratio)} raw · ${formatPercent(pair.ratio_lower_bound)} lower bound`;
   }
 
   function addBadge(container, label, tone) {
@@ -209,7 +209,7 @@
 
   function strongestConfidence(path) {
     const pair = activeCouplings.find(item => item.file_a === path || item.file_b === path);
-    return pair ? pair.confidence_lower_bound : 0;
+    return pair ? pair.ratio_lower_bound : 0;
   }
 
   function scopedFileRows() {
@@ -317,7 +317,7 @@
       columns: [
         {title: "File A", field: "file_a", width: 300, minWidth: 210, formatter: pathFormatter},
         {title: "File B", field: "file_b", width: 300, minWidth: 210, formatter: pathFormatter},
-        {title: "95% lower bound", field: "confidence_lower_bound", sorter: "number", headerSortStartingDir: "desc", formatter: couplingMeter("confidence_lower_bound", "#6754a6", formatPercent)},
+        {title: "95% lower bound", field: "ratio_lower_bound", sorter: "number", headerSortStartingDir: "desc", formatter: couplingMeter("ratio_lower_bound", "#6754a6", formatPercent)},
         {title: "Shared", field: "shared_revisions", sorter: "number", headerSortStartingDir: "desc", formatter: couplingMeter("shared_revisions", "#2c6480")},
         {title: "Revisions A", field: "revisions_a", sorter: "number", headerSortStartingDir: "desc", formatter: couplingMeter("revisions_a", "#2c6480")},
         {title: "Revisions B", field: "revisions_b", sorter: "number", headerSortStartingDir: "desc", formatter: couplingMeter("revisions_b", "#2c6480")},
@@ -419,7 +419,7 @@
 
     const strongestPair = [...activeCouplings].sort(
       (a, b) =>
-        (b.confidence_lower_bound || 0) - (a.confidence_lower_bound || 0) ||
+        (b.ratio_lower_bound || 0) - (a.ratio_lower_bound || 0) ||
         (b.shared_revisions || 0) - (a.shared_revisions || 0) ||
         a.key.localeCompare(b.key)
     )[0];
@@ -427,7 +427,7 @@
       container.append(investigationLead(
         "Review these files together",
         `${basename(strongestPair.file_a)} ↔ ${basename(strongestPair.file_b)}`,
-        `${formatInteger(strongestPair.shared_revisions)} shared revisions · ${formatPercent(strongestPair.confidence_lower_bound)} lower-bound confidence · ${formatPercent(strongestPair.raw_ratio)} raw.`,
+        `${formatInteger(strongestPair.shared_revisions)} shared revisions · ${formatPercent(strongestPair.ratio_lower_bound)} lower-bound confidence · ${formatPercent(strongestPair.raw_ratio)} raw.`,
         "Include both files in the same impact review and test plan; then decide whether the relationship is intentional.",
         "Open coupling evidence",
         () => {

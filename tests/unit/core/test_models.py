@@ -69,7 +69,7 @@ class TestCouplingEvidence:
         assert info.shared_revisions == 11
         assert info.file_revisions == 12
         assert info.coupled_file_revisions == 13
-        assert info.confidence_lower_bound == coupling.confidence_lower_bound
+        assert info.rate_lower_bound == wilson_lower_bound(11, 12)
 
     def test_rejects_impossible_coupling_counts(self):
         with pytest.raises(ValueError, match="co-change count exceeds"):
@@ -340,9 +340,9 @@ class TestCouplingInfoConfidence:
         hub = coupling_info_for(pair, "hub.py")
         leaf = coupling_info_for(pair, "leaf.py")
 
-        assert hub.confidence_lower_bound == wilson_lower_bound(4, 10)
-        assert hub.confidence_lower_bound < hub.rate_to_partner
-        assert leaf.confidence_lower_bound == wilson_lower_bound(4, 4)
+        assert hub.rate_lower_bound == wilson_lower_bound(4, 10)
+        assert hub.rate_lower_bound < hub.rate_to_partner
+        assert leaf.rate_lower_bound == wilson_lower_bound(4, 4)
 
 
 class TestIsHighRiskFollowsTheShare:

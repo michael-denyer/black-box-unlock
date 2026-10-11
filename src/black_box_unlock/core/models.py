@@ -149,8 +149,8 @@ class TemporalCoupling(BaseModel):  # [4a.1] File pair co-change
 
     @computed_field
     @property
-    def confidence_lower_bound(self) -> float:
-        """95% Wilson lower bound for the symmetric coupling ratio."""
+    def ratio_lower_bound(self) -> float:
+        """95% Wilson lower bound of ``coupling_ratio`` over min(commits_a, commits_b)."""
         return wilson_lower_bound(
             self.co_change_count,
             min(self.commits_a, self.commits_b),
@@ -186,14 +186,19 @@ class FileOwnership(BaseModel):  # [4a.2] Authors per file
 
 
 class CouplingInfo(BaseModel):
-    """Coupling relationship for display."""
+    """One partner of a file, oriented from that file's side.
+
+    ``rate_lower_bound`` is the 95% Wilson lower bound of ``rate_to_partner``
+    over this file's own revisions, so it differs from the pair's
+    ``ratio_lower_bound`` unless this file is the side with fewer revisions.
+    """
 
     file: str
     ratio: float = Field(ge=0.0, le=1.0)
     shared_revisions: int = Field(default=0, ge=0)
     file_revisions: int = Field(default=0, ge=0)
     coupled_file_revisions: int = Field(default=0, ge=0)
-    confidence_lower_bound: float = Field(default=0.0, ge=0.0, le=1.0)
+    rate_lower_bound: float = Field(default=0.0, ge=0.0, le=1.0)
 
     @computed_field
     @property
@@ -220,14 +225,14 @@ def coupling_info_for(coupling: TemporalCoupling, file_path: str) -> CouplingInf
         shared_revisions=coupling.co_change_count,
         file_revisions=file_revisions,
         coupled_file_revisions=partner_revisions,
-        confidence_lower_bound=wilson_lower_bound(coupling.co_change_count, file_revisions),
+        rate_lower_bound=wilson_lower_bound(coupling.co_change_count, file_revisions),
     )
 
 
 def coupling_info_sort_key(info: CouplingInfo) -> tuple[float, int, float, str]:
     """Stable strongest-evidence-first ordering for display projections."""
     return (
-        -info.confidence_lower_bound,
+        -info.rate_lower_bound,
         -info.shared_revisions,
         -info.ratio,
         info.file,

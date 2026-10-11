@@ -83,8 +83,7 @@ def test_couplings_are_ordered_by_supported_confidence_before_raw_ratio() -> Non
 
     assert payload["couplings"][0]["file_a"] == "src/strong.py"
     assert (
-        payload["couplings"][0]["confidence_lower_bound"]
-        > payload["couplings"][1]["confidence_lower_bound"]
+        payload["couplings"][0]["ratio_lower_bound"] > payload["couplings"][1]["ratio_lower_bound"]
     )
     assert payload["couplings"][1]["raw_ratio"] == 1.0
 
@@ -116,7 +115,7 @@ def test_coupling_projection_keeps_support_and_both_revision_counts() -> None:
         "revisions_b": 12,
         "denominator": 10,
         "raw_ratio": 0.8,
-        "confidence_lower_bound": row["confidence_lower_bound"],
+        "ratio_lower_bound": row["ratio_lower_bound"],
     }
 
 

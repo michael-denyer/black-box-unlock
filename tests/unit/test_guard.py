@@ -15,7 +15,7 @@ from tests.factories import make_commit
 
 def _cache_payload(files: dict | None = None) -> dict:
     return {
-        "version": 4,
+        "version": 5,
         "generated_at": "2026-06-12T10:00:00Z",
         "head_oid": None,
         "max_changeset_size": 50,
@@ -30,7 +30,7 @@ def _cache_payload(files: dict | None = None) -> dict:
                     "shared_revisions": 8,
                     "file_revisions": 10,
                     "coupled_file_revisions": 10,
-                    "confidence_lower_bound": 0.49,
+                    "rate_lower_bound": 0.49,
                 },
                 {
                     "file": "src/util.py",
@@ -38,7 +38,7 @@ def _cache_payload(files: dict | None = None) -> dict:
                     "shared_revisions": 3,
                     "file_revisions": 10,
                     "coupled_file_revisions": 10,
-                    "confidence_lower_bound": 0.11,
+                    "rate_lower_bound": 0.11,
                 },
             ]
         },
@@ -144,7 +144,7 @@ class TestCouplingWarnings:
                             "shared_revisions": 3,
                             "file_revisions": 30,
                             "coupled_file_revisions": 3,
-                            "confidence_lower_bound": 0.44,
+                            "rate_lower_bound": 0.44,
                         }
                     ],
                     "leaf.py": [
@@ -154,7 +154,7 @@ class TestCouplingWarnings:
                             "shared_revisions": 3,
                             "file_revisions": 3,
                             "coupled_file_revisions": 30,
-                            "confidence_lower_bound": 0.44,
+                            "rate_lower_bound": 0.44,
                         }
                     ],
                 }
@@ -246,7 +246,7 @@ class TestCouplingWarnings:
 
         mock_history.assert_called_once_with(tmp_path, 90, None, aliases={})
         rebuilt = json.loads(_cache_file(tmp_path).read_text())
-        assert rebuilt["version"] == 4
+        assert rebuilt["version"] == 5
         assert rebuilt["files"] == {}
 
     @patch("black_box_unlock.git.history.fetch_git_history")
@@ -284,7 +284,7 @@ class TestCouplingWarnings:
                             "shared_revisions": 1,
                             "file_revisions": 1,
                             "coupled_file_revisions": 1,
-                            "confidence_lower_bound": 0.21,
+                            "rate_lower_bound": 0.21,
                         }
                     ]
                 }

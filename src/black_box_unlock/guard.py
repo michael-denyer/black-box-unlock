@@ -25,7 +25,7 @@ CACHE_FILENAME = "cache.json"
 HOOK_LOG_FILENAME = "hook.log"
 HOOK_LOG_MAX_LINES = 200
 CACHE_MAX_AGE_HOURS = 24
-CACHE_VERSION = 4
+CACHE_VERSION = 5
 CACHE_HISTORY_DAYS = 90
 
 
@@ -37,7 +37,7 @@ class CouplingSnapshot(BaseModel):
     shape the stored pairs, so a snapshot built under other values is stale.
     """
 
-    version: Literal[4] = CACHE_VERSION
+    version: Literal[5] = CACHE_VERSION
     generated_at: datetime
     head_oid: str | None
     max_changeset_size: int = Field(ge=2)
@@ -207,7 +207,7 @@ def coupling_warnings(  # [1c] Coupling guard for the edit hook
         f"{file_path} historically co-changes with {item.file} in "
         f"{item.shared_revisions} of its {item.file_revisions} revisions "
         f"({round(item.rate_to_partner * 100)}%, 95% lower bound "
-        f"{round(item.confidence_lower_bound * 100)}%) - check whether that file "
+        f"{round(item.rate_lower_bound * 100)}%) - check whether that file "
         "needs the same change"
         for item in above[:top]
     ]

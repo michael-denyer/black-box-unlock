@@ -106,7 +106,7 @@ class TestRunAnalysis:
         assert a_file.coupled_with[0].shared_revisions == 2
         assert a_file.coupled_with[0].file_revisions == 2
         assert a_file.coupled_with[0].coupled_file_revisions == 2
-        assert a_file.coupled_with[0].confidence_lower_bound > 0
+        assert a_file.coupled_with[0].rate_lower_bound > 0
         assert result.couplings[0].co_change_count == 2
 
     def test_caller_renames_reach_history_as_aliases_and_surface_in_renamed_from(self):

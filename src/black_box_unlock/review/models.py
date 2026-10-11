@@ -74,7 +74,7 @@ class CouplingEvidence(BaseModel):
     coupled_path_revisions: int = Field(ge=1)
     coupling_ratio: float = Field(ge=0.0, le=1.0)
     changed_to_coupled_rate: float = Field(ge=0.0, le=1.0)
-    confidence_lower_bound: float = Field(ge=0.0, le=1.0)
+    ratio_lower_bound: float = Field(ge=0.0, le=1.0)
     coupled_path_is_changed: bool
 
 

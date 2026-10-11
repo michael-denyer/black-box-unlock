@@ -25,6 +25,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `black_box_unlock.config.ReviewProfile` is now `ReviewOverrides`, the one
+  shape for the five optional review policy values, and `ChangeReviewRequest`
+  is that shape plus a selector and a profile name. The request rejects
+  unknown fields. `bbu review-change` and the MCP `review_change` tool keep
+  their arguments and results.
 - `bbu-mcp` tools and the `coupling-guard-hook` command resolve file paths with
   one shared function. It resolves parent directories but not the final
   component, so a path that reaches the repository through a symlinked

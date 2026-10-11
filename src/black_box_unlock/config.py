@@ -16,8 +16,8 @@ except ModuleNotFoundError:  # pragma: no cover - exercised by the Python 3.10 C
 CONFIG_FILE_NAME = ".bbu.toml"
 
 
-class ReviewProfile(BaseModel):
-    """Optional policy values supplied by one named profile."""
+class ReviewOverrides(BaseModel):
+    """Optional policy values a named profile or a review request supplies."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -36,7 +36,7 @@ class ProjectConfig(BaseModel):
     default_profile: str | None = None
     coupling: CouplingPolicy = Field(default_factory=CouplingPolicy)
     path_roles: tuple[PathRoleRule, ...] = ()
-    profiles: dict[str, ReviewProfile] = Field(default_factory=dict)
+    profiles: dict[str, ReviewOverrides] = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def default_profile_exists(self) -> "ProjectConfig":
@@ -72,16 +72,12 @@ def resolve_coupling_policy(
     Raises:
         ConfigurationError: If ``.bbu.toml`` or an override is invalid.
     """
-    overrides = {
-        "min_ratio": min_ratio,
-        "min_shared_revisions": min_shared_revisions,
-        "max_changeset_size": max_changeset_size,
-    }
     base = load_project_config(repo_path).coupling
     try:
-        return CouplingPolicy.model_validate(
-            base.model_dump()
-            | {key: value for key, value in overrides.items() if value is not None}
+        return base.with_overrides(
+            min_ratio=min_ratio,
+            min_shared_revisions=min_shared_revisions,
+            max_changeset_size=max_changeset_size,
         )
     except ValidationError as error:
         raise ConfigurationError(f"Invalid coupling policy: {error}") from error

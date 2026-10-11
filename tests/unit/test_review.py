@@ -92,7 +92,7 @@ def test_no_selected_paths_has_an_explicit_result():
     assert result.ci_status.state.value == "disabled"
 
 
-@patch("black_box_unlock.review.collect_change_set")
+@patch("black_box_unlock.review.run.collect_change_set")
 def test_change_review_request_resolves_public_defaults(mock_collect, tmp_path):
     mock_collect.return_value = _change_set()
 
@@ -117,7 +117,7 @@ def test_change_review_request_resolves_public_defaults(mock_collect, tmp_path):
     }
 
 
-@patch("black_box_unlock.review.collect_change_set")
+@patch("black_box_unlock.review.run.collect_change_set")
 def test_request_overrides_win_over_the_named_profile(mock_collect, tmp_path):
     (tmp_path / ".bbu.toml").write_text(
         """
@@ -146,7 +146,7 @@ include_ci = true
     assert result.parameters.config_path == ".bbu.toml"
 
 
-@patch("black_box_unlock.review.collect_change_set")
+@patch("black_box_unlock.review.run.collect_change_set")
 def test_coupling_table_then_profile_then_request_set_the_policy(mock_collect, tmp_path):
     (tmp_path / ".bbu.toml").write_text(
         """

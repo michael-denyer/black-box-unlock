@@ -554,6 +554,14 @@ class TestPathHandling:
 
         assert absolute["path"] == rel["path"] == "a.py"
 
+    def test_absolute_path_through_a_symlinked_root_is_accepted(self, scratch, tmp_path):
+        alias = tmp_path / "alias"
+        alias.symlink_to(scratch, target_is_directory=True)
+
+        result = mcp_server.get_file_forensics(str(alias / "a.py"), repo_path=str(scratch))
+
+        assert result["path"] == "a.py"
+
     def test_absolute_path_outside_repo_raises(self, scratch, tmp_path):
         outside = tmp_path / "elsewhere.py"
         outside.write_text("x = 1\n")

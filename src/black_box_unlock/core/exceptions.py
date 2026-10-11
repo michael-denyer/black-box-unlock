@@ -27,3 +27,7 @@ class InvalidRevisionError(ChangeSelectionError):
 
 class ConfigurationError(BlackBoxUnlockError):
     """Raised when project configuration cannot be parsed or resolved."""
+
+
+class RepositoryPathError(BlackBoxUnlockError):
+    """Raised when a path lies outside the repository or names a directory."""

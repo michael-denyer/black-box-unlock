@@ -60,7 +60,12 @@ def exclude_bulk(commits: list[Commit], max_changeset_size: int) -> tuple[list[C
 
 
 def fetch_git_history(
-    repo_path: Path, days: int, rev: str | None = None, *, clock: Clock = "author"
+    repo_path: Path,
+    days: int,
+    rev: str | None = None,
+    *,
+    clock: Clock = "author",
+    aliases: dict[str, str] | None = None,
 ) -> list[Commit]:
     """Fetch commit history with per-file line stats as typed Commit models.
 
@@ -76,7 +81,9 @@ def fetch_git_history(
     under its name at the end of the history, and older names move to
     ``CommitFile.former_paths``. Detection uses git's default similarity
     threshold (50%); bbu does not expose ``--find-renames`` tuning. A path
-    reused after its file was renamed away stays a separate file.
+    reused after its file was renamed away stays a separate file. ``aliases``
+    adds renames history cannot see yet (a reviewed change's own), mapping a
+    path at ``rev`` to its new name; they are followed the same way.
 
     An empty repo (unborn HEAD) returns an empty list.
 
@@ -97,10 +104,10 @@ def fetch_git_history(
         ],
         tolerate_unborn=True,
     )
-    return _parse_log_output(output)
+    return _parse_log_output(output, aliases)
 
 
-def _parse_log_output(output: str) -> list[Commit]:
+def _parse_log_output(output: str, aliases: dict[str, str] | None = None) -> list[Commit]:
     """Parse NUL-delimited git log --numstat output, newest commit first, into Commit models.
 
     With -z, a commit header ends in a newline that runs straight into its
@@ -108,12 +115,13 @@ def _parse_log_output(output: str) -> list[Commit]:
     by the old and new paths as separate NUL-terminated fields.
 
     Walking from newest to oldest, ``current_names`` maps a name seen in older
-    history to the file's final name. A rename's effect starts at the commit
+    history to the file's final name. It starts from ``aliases``, the renames
+    newer than the history itself. A rename's effect starts at the commit
     below it, so the renames a commit records apply once it is fully parsed.
     """
     commits: list[Commit] = []
     current: Commit | None = None
-    current_names: dict[str, str] = {}
+    current_names: dict[str, str] = dict(aliases or {})
     pending_renames: list[tuple[str, str]] = []
     fields = iter(output.split("\0"))
 

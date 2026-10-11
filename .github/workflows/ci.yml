@@ -50,6 +50,11 @@ jobs:
         run: uv sync --only-group dev
 
       - name: Check Markdown links
+        # cargo-binstall queries the GitHub releases API to fetch the lychee
+        # binary; unauthenticated calls share one rate limit across runners and
+        # fall back to a cargo source build that the hook cannot complete.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: uv run prek run lychee --all-files
 
   test:

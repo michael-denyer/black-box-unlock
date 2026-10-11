@@ -13,7 +13,7 @@ from rich.console import Console
 
 from black_box_unlock.analysis import SHALLOW_CLONE_WARNING, export_to_json, run_analysis
 from black_box_unlock.config import load_project_config, resolve_coupling_policy
-from black_box_unlock.core.exceptions import BlackBoxUnlockError
+from black_box_unlock.core.exceptions import BlackBoxUnlockError, RepositoryPathError
 from black_box_unlock.core.logging import configure_logging
 from black_box_unlock.git.changes import BaseChange, StagedChange, WorkingTreeChange
 from black_box_unlock.git.run import is_shallow
@@ -130,6 +130,21 @@ def analyze_repo(  # [1a.1] Main analysis command
             print(generate_html_report(result))
 
 
+def _print_hook_context(warnings: list[str]) -> None:
+    """Print Claude Code PostToolUse context for warnings; print nothing when there are none."""
+    if warnings:
+        print(
+            json.dumps(
+                {
+                    "hookSpecificOutput": {
+                        "hookEventName": "PostToolUse",
+                        "additionalContext": " ".join(warnings),
+                    }
+                }
+            )
+        )
+
+
 @app.command()
 def coupling_guard(
     file: str = typer.Argument(..., help="Repo-relative path of the edited file"),
@@ -156,17 +171,7 @@ def coupling_guard(
         # log so a permanently-failing guard stays diagnosable instead of silently dead.
         logger.warning("coupling guard skipped for {}: {}", file, e)
         raise typer.Exit(code=0) from None
-    if warnings:
-        print(
-            json.dumps(
-                {
-                    "hookSpecificOutput": {
-                        "hookEventName": "PostToolUse",
-                        "additionalContext": " ".join(warnings),
-                    }
-                }
-            )
-        )
+    _print_hook_context(warnings)
 
 
 @app.command("coupling-guard-hook", hidden=True)
@@ -177,7 +182,7 @@ def coupling_guard_hook(
 
     Failures exit 0 and append one line to the repository's hook log.
     """
-    from black_box_unlock.git.run import repo_toplevel
+    from black_box_unlock.git.run import relative_to_repo, repo_toplevel
     from black_box_unlock.guard import coupling_warnings, record_hook_failure
 
     try:
@@ -186,29 +191,14 @@ def coupling_guard_hook(
         if not isinstance(raw_path, str) or not raw_path:
             return
         repo_root = repo_toplevel(repo.resolve())
-        candidate = Path(raw_path)
-        absolute_path = (
-            candidate.resolve() if candidate.is_absolute() else (repo_root / candidate).resolve()
-        )
-        if not absolute_path.is_relative_to(repo_root):
-            return
-        file_path = absolute_path.relative_to(repo_root).as_posix()
-        warnings = coupling_warnings(file_path, repo_root)
+        warnings = coupling_warnings(relative_to_repo(repo_root, raw_path), repo_root)
+    except RepositoryPathError:
+        return
     except Exception as error:
         logger.warning("coupling guard hook skipped: {}", error)
         record_hook_failure(repo, error)
         return
-    if warnings:
-        print(
-            json.dumps(
-                {
-                    "hookSpecificOutput": {
-                        "hookEventName": "PostToolUse",
-                        "additionalContext": " ".join(warnings),
-                    }
-                }
-            )
-        )
+    _print_hook_context(warnings)
 
 
 @app.command("review-change")

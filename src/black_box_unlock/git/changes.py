@@ -9,7 +9,7 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, Field, model_validator
 
 from ..core.exceptions import ChangeSelectionError, InvalidRevisionError
-from .run import run_git
+from .run import head_oid, run_git
 
 
 class ChangeKind(str, Enum):
@@ -131,21 +131,10 @@ class ChangeSet(BaseModel):
 
 
 def _resolve_ref(repo_path: Path, ref: str) -> str:
-    try:
-        return run_git(repo_path, ["rev-parse", "--verify", f"{ref}^{{commit}}"]).strip()
-    except subprocess.CalledProcessError as error:
-        raise InvalidRevisionError(f"Cannot resolve Git revision: {ref}") from error
-
-
-def _resolve_optional_head(repo_path: Path) -> str | None:
-    """Resolve HEAD, returning None for a repository without commits."""
-    try:
-        return run_git(
-            repo_path,
-            ["rev-parse", "--verify", "HEAD^{commit}"],
-        ).strip()
-    except subprocess.CalledProcessError:
-        return None
+    oid = head_oid(repo_path, ref)
+    if oid is None:
+        raise InvalidRevisionError(f"Cannot resolve Git revision: {ref}")
+    return oid
 
 
 def parse_name_status_z(output: str) -> list[ChangedPath]:
@@ -219,11 +208,11 @@ def collect_change_set(repo_path: Path, selector: ChangeSelector) -> ChangeSet:
 
     if isinstance(selector, BaseChange):
         base_oid = _resolve_ref(repo_path, selector.base_ref)
-        head_oid = _resolve_ref(repo_path, "HEAD")
+        oid = _resolve_ref(repo_path, "HEAD")
         try:
             merge_base_oid = run_git(
                 repo_path,
-                ["merge-base", base_oid, head_oid],
+                ["merge-base", base_oid, oid],
             ).strip()
         except subprocess.CalledProcessError as error:
             raise ChangeSelectionError(
@@ -237,24 +226,24 @@ def collect_change_set(repo_path: Path, selector: ChangeSelector) -> ChangeSet:
         )
         paths = _deduplicate([*tracked, *_untracked_paths(repo_path)])
         provenance = BaseProvenance(
-            head_oid=head_oid,
+            head_oid=oid,
             requested_base=selector.base_ref,
             resolved_base_oid=base_oid,
             merge_base_oid=merge_base_oid,
             analysed_at=analysed_at,
         )
     elif isinstance(selector, StagedChange):
-        head_oid = _resolve_optional_head(repo_path)
+        oid = head_oid(repo_path)
         diff_args = ["diff", "--cached", "--name-status", "-z", "--find-renames"]
-        if head_oid is not None:
+        if oid is not None:
             diff_args.append("HEAD")
         paths = _deduplicate(parse_name_status_z(run_git(repo_path, diff_args)))
         provenance = StagedProvenance(
-            head_oid=head_oid,
+            head_oid=oid,
             analysed_at=analysed_at,
         )
     else:
-        head_oid = _resolve_optional_head(repo_path)
+        oid = head_oid(repo_path)
         tracked = parse_name_status_z(
             run_git(
                 repo_path,
@@ -263,7 +252,7 @@ def collect_change_set(repo_path: Path, selector: ChangeSelector) -> ChangeSet:
         )
         paths = _deduplicate([*tracked, *_untracked_paths(repo_path)])
         provenance = WorkingTreeProvenance(
-            head_oid=head_oid,
+            head_oid=oid,
             analysed_at=analysed_at,
         )
 

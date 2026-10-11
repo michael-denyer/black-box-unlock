@@ -22,6 +22,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `bbu-mcp` tools and the `coupling-guard-hook` command resolve file paths with
+  one shared function. It resolves parent directories but not the final
+  component, so a path that reaches the repository through a symlinked
+  directory such as macOS `/tmp` is accepted where the MCP tools used to
+  reject it, and a tracked symlink keeps its own path in both.
+- The coupling guard cache stores `null` instead of `"unknown"` as `head_oid`
+  for a repository with no commits. A cache written for such a repository by
+  an earlier version is rebuilt once.
 - `/analyze`, `/hotspots`, and `/review-change` are skills under `skills/`
   instead of `commands/`, shared by both plugins, alongside a `git-forensics`
   skill that mirrors the agent. Claude Code loads `skills/` on its own and
@@ -29,6 +37,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dead once the skills existed. Invocation names are unchanged; the bodies now
   describe 2.0 fields (`rate_to_partner`, `ownership_risk`, `omitted_actions`,
   `warnings`, `provenance`) and install via `uv tool install black-box-unlock`.
+
+### Fixed
+
+- The HTML report keeps the `path_role` the analysis assigned, so
+  `[[path_roles]]` project rules apply to the report's scope filter, role
+  badges, and coupling endpoints. The report used to reclassify every file
+  with the built-in rules alone. The embedded payload no longer carries
+  `path_role_rule`, which the report never read.
 
 ## [2.0.1] - 2026-10-11
 

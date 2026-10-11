@@ -8,12 +8,13 @@ so a new commit or a new hour triggers a fresh analysis. Every result carries a
 ``provenance`` object saying which HEAD it read and whether the cache served it.
 """
 
-import os
+import functools
 import subprocess
 import time
 from collections import OrderedDict
+from collections.abc import Callable
 from pathlib import Path
-from typing import Literal
+from typing import Literal, ParamSpec, TypeVar
 
 from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
@@ -23,7 +24,7 @@ from .core.exceptions import BlackBoxUnlockError
 from .core.models import AnalysisResult, FileForensics
 from .git.changes import BaseChange, StagedChange, WorkingTreeChange
 from .git.ownership import ownership_risk
-from .git.run import head_oid, run_git
+from .git.run import head_oid, relative_to_repo, run_git
 from .git.xray import xray_file as _xray_file
 from .path_roles import PathRole
 from .review import ChangeReviewRequest
@@ -70,12 +71,21 @@ def _analysis(repo_path: str, days: int, include_ci: bool = False) -> AnalysisRe
     return result
 
 
-def _safe_analysis(repo_path: str, days: int, include_ci: bool = False) -> AnalysisResult:
-    """Call _analysis and surface BlackBoxUnlockError as a ToolError so the message reaches the client."""
-    try:
-        return _analysis(repo_path, days, include_ci)
-    except BlackBoxUnlockError as e:
-        raise ToolError(str(e)) from e
+_P = ParamSpec("_P")
+_R = TypeVar("_R")
+
+
+def _tool(fn: Callable[_P, _R]) -> Callable[_P, _R]:
+    """Register fn as a tool, surfacing BlackBoxUnlockError as ToolError so the message reaches the client."""
+
+    @functools.wraps(fn)
+    def wrapper(*args: _P.args, **kwargs: _P.kwargs) -> _R:
+        try:
+            return fn(*args, **kwargs)
+        except BlackBoxUnlockError as e:
+            raise ToolError(str(e)) from e
+
+    return mcp.tool()(wrapper)
 
 
 def _parse_roles(roles: list[str] | None) -> set[PathRole] | None:
@@ -102,33 +112,6 @@ def _provenance(result: AnalysisResult) -> dict | None:
     return result.provenance.model_dump(mode="json") if result.provenance else None
 
 
-def _repo_relative(repo_path: str, file_path: str) -> str:
-    """Return file_path relative to the repo root without following the file's own symlink.
-
-    Git records a tracked symlink under its own path, so only the root is
-    resolved. An absolute file_path is accepted under either the given or the
-    resolved root (macOS /tmp versus /private/tmp).
-
-    Raises:
-        ToolError: If the path lies outside the repository, or is a directory.
-    """
-    given_root = Path(repo_path).absolute()
-    root = given_root.resolve()
-    candidate = Path(file_path)
-    joined = candidate if candidate.is_absolute() else root / candidate
-    normalised = Path(os.path.normpath(joined))
-    for base in (root, given_root):
-        if normalised.is_relative_to(base):
-            rel = normalised.relative_to(base).as_posix()
-            break
-    else:
-        raise ToolError(f"{file_path} is outside the repository at {root}")
-    target = root / rel
-    if rel == "." or (target.is_dir() and not target.is_symlink()):
-        raise ToolError(f"{file_path} is a directory; name a file")
-    return rel
-
-
 def _in_tree(repo_path: str, rel: str) -> bool:
     """True when git tracks rel in the index or at HEAD; untracked and ignored files are not."""
     root = Path(repo_path).resolve()
@@ -151,14 +134,14 @@ def _no_history(repo_path: str, rel: str, days: int) -> ToolError:
 
 
 def _find_file(repo_path: str, file_path: str, days: int, result: AnalysisResult) -> FileForensics:
-    rel = _repo_relative(repo_path, file_path)
+    rel = relative_to_repo(Path(repo_path), file_path)
     for f in result.files:
         if f.path == rel:
             return f
     raise _no_history(repo_path, rel, days)
 
 
-@mcp.tool()
+@_tool
 def get_hotspots(
     repo_path: str = ".",
     days: int = 30,
@@ -182,7 +165,7 @@ def get_hotspots(
     only files with those path roles; the filter runs before top_n.
     """
     wanted = _parse_roles(roles)
-    result = _safe_analysis(repo_path, days, include_ci)
+    result = _analysis(repo_path, days, include_ci)
     files = [f for f in result.files if wanted is None or f.path_role in wanted]
     return {
         "hotspots": [_file_dict(f) for f in files[:top_n]],
@@ -190,7 +173,7 @@ def get_hotspots(
     }
 
 
-@mcp.tool()
+@_tool
 def get_file_forensics(
     file_path: str,
     repo_path: str = ".",
@@ -207,12 +190,12 @@ def get_file_forensics(
 
     Set include_ci=True to include CI build-failure counts; slower, needs gh.
     """
-    result = _safe_analysis(repo_path, days, include_ci)
+    result = _analysis(repo_path, days, include_ci)
     found = _find_file(repo_path, file_path, days, result)
     return {**_file_dict(found), "provenance": _provenance(result)}
 
 
-@mcp.tool()
+@_tool
 def get_coupled_files(
     file_path: str,
     repo_path: str = ".",
@@ -235,7 +218,7 @@ def get_coupled_files(
 
     Set include_ci=True to include CI build-failure counts; slower, needs gh.
     """
-    result = _safe_analysis(repo_path, days, include_ci)
+    result = _analysis(repo_path, days, include_ci)
     found = _find_file(repo_path, file_path, days, result)
     return {
         "coupled_files": [c.model_dump(mode="json") for c in found.coupled_with],
@@ -243,7 +226,7 @@ def get_coupled_files(
     }
 
 
-@mcp.tool()
+@_tool
 def get_ownership(
     file_path: str,
     repo_path: str = ".",
@@ -274,7 +257,7 @@ def get_ownership(
 
     Set include_ci=True to include CI build-failure counts; slower, needs gh.
     """
-    result = _safe_analysis(repo_path, days, include_ci)
+    result = _analysis(repo_path, days, include_ci)
     f = _find_file(repo_path, file_path, days, result)
     return {
         "path": f.path,
@@ -289,7 +272,7 @@ def get_ownership(
     }
 
 
-@mcp.tool()
+@_tool
 def get_ci_failures(repo_path: str = ".") -> dict:
     """Failed CI runs and implicated files, with most-failing files first.
 
@@ -298,7 +281,7 @@ def get_ci_failures(repo_path: str = ".") -> dict:
     The result has a ``provenance`` object.
     """
     # days=30: canonical window for cache reuse; CI runs are bounded to the same window
-    result = _safe_analysis(repo_path, 30, include_ci=True)
+    result = _analysis(repo_path, 30, include_ci=True)
     failing = [f for f in result.files if f.build_failures > 0]
     failing.sort(key=lambda f: f.build_failures, reverse=True)
     return {
@@ -310,7 +293,7 @@ def get_ci_failures(repo_path: str = ".") -> dict:
     }
 
 
-@mcp.tool()
+@_tool
 def get_flaky_steps(repo_path: str = ".") -> dict:
     """CI steps that failed then passed on re-run (unreliable tests/infra).
 
@@ -318,7 +301,7 @@ def get_flaky_steps(repo_path: str = ".") -> dict:
     The result has a ``provenance`` object.
     """
     # days=30: canonical window for cache reuse; CI runs are bounded to the same window
-    result = _safe_analysis(repo_path, 30, include_ci=True)
+    result = _analysis(repo_path, 30, include_ci=True)
     return {
         "status": result.ci_status.state.value,
         "errors": result.ci_status.errors,
@@ -327,7 +310,7 @@ def get_flaky_steps(repo_path: str = ".") -> dict:
     }
 
 
-@mcp.tool()
+@_tool
 def xray_file(
     file_path: str,
     repo_path: str = ".",
@@ -348,27 +331,22 @@ def xray_file(
     file_path may be repo-relative or absolute inside the repo. Always computed
     fresh from git, never cached; the result has a ``provenance`` object.
     """
-    try:
-        root = Path(repo_path).resolve()
-        rel = _repo_relative(repo_path, file_path)
-        result = _xray_file(
-            root,
-            rel,
-            days=days,
-            rev_cap=revision_cap,
-            min_coupling=min_coupling,
-        )
-        if result.revisions_analyzed == 0 and (
-            result.skipped is None or not _in_tree(repo_path, rel)
-        ):
-            raise _no_history(repo_path, rel, days)
-        provenance = build_provenance(root, days, False, oid=head_oid(root))
-    except BlackBoxUnlockError as e:
-        raise ToolError(str(e)) from e
+    root = Path(repo_path).resolve()
+    rel = relative_to_repo(root, file_path)
+    result = _xray_file(
+        root,
+        rel,
+        days=days,
+        rev_cap=revision_cap,
+        min_coupling=min_coupling,
+    )
+    if result.revisions_analyzed == 0 and (result.skipped is None or not _in_tree(repo_path, rel)):
+        raise _no_history(repo_path, rel, days)
+    provenance = build_provenance(root, days, False, oid=head_oid(root))
     return {**result.model_dump(mode="json"), "provenance": provenance.model_dump(mode="json")}
 
 
-@mcp.tool()
+@_tool
 def review_change(
     repo_path: str = ".",
     mode: Literal["base", "staged", "working_tree"] = "working_tree",
@@ -394,20 +372,17 @@ def review_change(
         "staged": StagedChange(),
         "working_tree": WorkingTreeChange(),
     }
-    try:
-        result = _run_change_review(
-            Path(repo_path),
-            ChangeReviewRequest(
-                selector=selectors[mode],
-                profile=profile,
-                days=days,
-                min_coupling=min_coupling,
-                min_shared_revisions=min_shared_revisions,
-                include_ci=include_ci,
-            ),
-        )
-    except BlackBoxUnlockError as error:
-        raise ToolError(str(error)) from error
+    result = _run_change_review(
+        Path(repo_path),
+        ChangeReviewRequest(
+            selector=selectors[mode],
+            profile=profile,
+            days=days,
+            min_coupling=min_coupling,
+            min_shared_revisions=min_shared_revisions,
+            include_ci=include_ci,
+        ),
+    )
     return result.model_dump(mode="json")
 
 

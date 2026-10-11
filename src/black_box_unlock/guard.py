@@ -18,8 +18,8 @@ from pydantic import BaseModel, Field, ValidationError
 from .config import resolve_coupling_policy
 from .core.models import CouplingInfo, CouplingPolicy, coupling_info_sort_key
 from .git.coupling import analyze_temporal_coupling, couplings_by_file
-from .git.log import exclude_bulk, fetch_git_history
-from .git.run import head_oid, head_paths, repo_toplevel, run_git
+from .git.history import load_history_window
+from .git.run import head_oid, repo_toplevel, run_git
 
 CACHE_FILENAME = "cache.json"
 HOOK_LOG_FILENAME = "hook.log"
@@ -83,14 +83,11 @@ def record_hook_failure(path: Path, error: Exception) -> None:
 
 
 def _build_snapshot(repo_path: Path, oid: str | None, policy: CouplingPolicy) -> CouplingSnapshot:
-    history, bulk_commits = exclude_bulk(
-        fetch_git_history(repo_path, CACHE_HISTORY_DAYS), policy.max_changeset_size
-    )
-    live_paths = head_paths(repo_path) if policy.require_live_partner and history else None
+    window = load_history_window(repo_path, CACHE_HISTORY_DAYS, policy)
     analysis = analyze_temporal_coupling(
-        history,
+        window.commits,
         policy.model_copy(update={"min_ratio": 0.0, "min_shared_revisions": 1}),
-        live_paths,
+        window.live_paths,
     )
     return CouplingSnapshot(
         generated_at=datetime.now(timezone.utc),
@@ -98,7 +95,7 @@ def _build_snapshot(repo_path: Path, oid: str | None, policy: CouplingPolicy) ->
         max_changeset_size=policy.max_changeset_size,
         require_live_partner=policy.require_live_partner,
         files=couplings_by_file(analysis.couplings),
-        ignored_large_changesets=bulk_commits,
+        ignored_large_changesets=window.ignored_bulk_commits,
         dropped_deleted_partners=analysis.dropped_deleted_partners,
     )
 

@@ -200,8 +200,8 @@ class TestCouplingWarnings:
 
         assert coupling_warnings("src/new.py", tmp_path) == []
 
-    @patch("black_box_unlock.guard.head_paths")
-    @patch("black_box_unlock.guard.fetch_git_history")
+    @patch("black_box_unlock.git.history.head_paths")
+    @patch("black_box_unlock.git.history.fetch_git_history")
     def test_missing_cache_builds_minimal_versioned_snapshot(
         self, mock_history, mock_head_paths, tmp_path
     ):
@@ -213,7 +213,7 @@ class TestCouplingWarnings:
 
         warnings = coupling_warnings("src/auth.py", tmp_path)
 
-        mock_history.assert_called_once_with(tmp_path, 90)
+        mock_history.assert_called_once_with(tmp_path, 90, None, aliases={})
         assert "src/token.py" in warnings[0]
         payload = json.loads(_cache_file(tmp_path).read_text())
         assert set(payload) == {
@@ -237,19 +237,19 @@ class TestCouplingWarnings:
             _cache_payload({"src/auth.py": [{}]}),
         ],
     )
-    @patch("black_box_unlock.guard.fetch_git_history")
+    @patch("black_box_unlock.git.history.fetch_git_history")
     def test_unusable_fresh_cache_is_rebuilt(self, mock_history, payload, tmp_path):
         _write_cache(tmp_path, payload)
         mock_history.return_value = []
 
         assert coupling_warnings("src/auth.py", tmp_path) == []
 
-        mock_history.assert_called_once_with(tmp_path, 90)
+        mock_history.assert_called_once_with(tmp_path, 90, None, aliases={})
         rebuilt = json.loads(_cache_file(tmp_path).read_text())
         assert rebuilt["version"] == 4
         assert rebuilt["files"] == {}
 
-    @patch("black_box_unlock.guard.fetch_git_history")
+    @patch("black_box_unlock.git.history.fetch_git_history")
     def test_stale_cache_is_rebuilt(self, mock_history, tmp_path):
         _write_cache(tmp_path, _cache_payload())
         cache = _cache_file(tmp_path)
@@ -259,9 +259,9 @@ class TestCouplingWarnings:
 
         coupling_warnings("src/auth.py", tmp_path)
 
-        mock_history.assert_called_once_with(tmp_path, 90)
+        mock_history.assert_called_once_with(tmp_path, 90, None, aliases={})
 
-    @patch("black_box_unlock.guard.fetch_git_history")
+    @patch("black_box_unlock.git.history.fetch_git_history")
     def test_cache_from_another_head_is_rebuilt(self, mock_history, tmp_path):
         payload = _cache_payload()
         payload["head_oid"] = "old-head"
@@ -270,7 +270,7 @@ class TestCouplingWarnings:
 
         coupling_warnings("src/auth.py", tmp_path)
 
-        mock_history.assert_called_once_with(tmp_path, 90)
+        mock_history.assert_called_once_with(tmp_path, 90, None, aliases={})
 
     def test_one_off_evidence_does_not_warn(self, tmp_path):
         _write_cache(
@@ -293,14 +293,14 @@ class TestCouplingWarnings:
 
         assert coupling_warnings("src/auth.py", tmp_path) == []
 
-    @patch("black_box_unlock.guard.fetch_git_history")
+    @patch("black_box_unlock.git.history.fetch_git_history")
     def test_cache_built_under_another_bulk_cap_is_rebuilt(self, mock_history, tmp_path):
         _write_cache(tmp_path, _cache_payload())
         mock_history.return_value = []
 
         coupling_warnings("src/auth.py", tmp_path, CouplingPolicy(max_changeset_size=80))
 
-        mock_history.assert_called_once_with(tmp_path, 90)
+        mock_history.assert_called_once_with(tmp_path, 90, None, aliases={})
 
     def test_rejects_invalid_top(self, tmp_path):
         with pytest.raises(ValueError):

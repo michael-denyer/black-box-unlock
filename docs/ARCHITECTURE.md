@@ -23,6 +23,7 @@ src/black_box_unlock/
 │   └── logging.py          # loguru configuration (--verbose)
 ├── git/
 │   ├── log.py              # Native git log --numstat extraction, rename following
+│   ├── history.py          # HistoryWindow: non-bulk commits, live paths, rename identity
 │   ├── churn.py            # FileChurn aggregation
 │   ├── coupling.py         # Temporal coupling (symmetric ratio, directional rates)
 │   ├── changes.py          # Base, staged, and working-tree selection

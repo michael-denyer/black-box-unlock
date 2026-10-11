@@ -121,14 +121,13 @@ class _StepHistory:
             self.last_seen = completed_at
 
 
-def flaky_steps_from_jobs(
-    jobs: list[WorkflowJob], *, include_stable: bool = False
-) -> list[FlakyStepStats]:
-    """Observe each executed step of one run and flag fail-then-pass retries.
+def observe_steps(jobs: list[WorkflowJob]) -> list[FlakyStepStats]:
+    """Record every step that executed in one run, with its retry history.
 
-    Each returned step stands for one run in which the step executed. Only steps
-    that failed and then passed on a later attempt are returned unless
-    include_stable is set, which the cross-run rate needs for its denominator.
+    Each record stands for one run, so ``runs`` is 1 and ``flaky_runs`` is 1
+    when the step failed and then passed on a later attempt. Stable steps are
+    kept because the cross-run flaky rate counts them in its denominator;
+    summarize_flaky_steps drops steps that never recovered.
     """
     histories: dict[tuple[str, str], _StepHistory] = defaultdict(_StepHistory)
     for job in jobs:
@@ -141,7 +140,7 @@ def flaky_steps_from_jobs(
                 step.completed_at,
             )
 
-    flaky: list[FlakyStepStats] = []
+    observations: list[FlakyStepStats] = []
     now = datetime.now(timezone.utc)
     for (job_name, step_name), history in histories.items():
         attempts = sorted(history.attempts)
@@ -156,21 +155,20 @@ def flaky_steps_from_jobs(
                 if later_attempt > attempt
             )
         )
-        if flaky_count or include_stable:
-            flaky.append(
-                FlakyStepStats(
-                    job_name=job_name,
-                    step_name=step_name,
-                    first_seen=history.first_seen or now,
-                    last_seen=history.last_seen or now,
-                    runs=1,
-                    flaky_runs=1 if flaky_count else 0,
-                    total_attempts=len(attempts),
-                    failures=failures,
-                    flaky_count=flaky_count,
-                )
+        observations.append(
+            FlakyStepStats(
+                job_name=job_name,
+                step_name=step_name,
+                first_seen=history.first_seen or now,
+                last_seen=history.last_seen or now,
+                runs=1,
+                flaky_runs=1 if flaky_count else 0,
+                total_attempts=len(attempts),
+                failures=failures,
+                flaky_count=flaky_count,
             )
-    return flaky
+        )
+    return observations
 
 
 @dataclass
@@ -272,7 +270,7 @@ def collect_ci_signals(
             except Exception as error:
                 errors.append(_error_message(f"jobs for run {run.run_id}", error))
             else:
-                flaky_observations.extend(flaky_steps_from_jobs(jobs, include_stable=True))
+                flaky_observations.extend(observe_steps(jobs))
 
     state = SignalState.partial if errors else SignalState.available
     return CIAnalysis(

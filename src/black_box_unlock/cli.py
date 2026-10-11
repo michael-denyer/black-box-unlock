@@ -12,21 +12,20 @@ import typer
 from loguru import logger
 from rich.console import Console
 
-from black_box_unlock import validation
+from black_box_unlock import __version__, guard, validation
 from black_box_unlock.analysis import SHALLOW_CLONE_WARNING, export_to_json, run_analysis
 from black_box_unlock.config import load_project_config, resolve_coupling_policy
 from black_box_unlock.core.exceptions import BlackBoxUnlockError, RepositoryPathError
 from black_box_unlock.core.logging import configure_logging
+from black_box_unlock.git import xray as xray_mod
 from black_box_unlock.git.changes import BaseChange, StagedChange, WorkingTreeChange
-from black_box_unlock.git.run import is_shallow
+from black_box_unlock.git.run import is_shallow, relative_to_repo, repo_toplevel
 from black_box_unlock.review import ChangeReview, ChangeReviewRequest, run_change_review
 from black_box_unlock.visualization.html import generate_html_report
 
 
 def _version_callback(value: bool) -> None:
     if value:
-        from black_box_unlock import __version__
-
         print(f"Black Box Unlock v{__version__}")
         raise typer.Exit()
 
@@ -164,10 +163,10 @@ def coupling_guard(
     Designed for PostToolUse hooks: prints hook JSON when there is something
     to say, nothing otherwise. Never fails - a guard must not break an edit.
     """
-    from black_box_unlock.guard import coupling_warnings
-
     try:
-        warnings = coupling_warnings(file, repo, resolve_coupling_policy(repo, min_ratio=threshold))
+        warnings = guard.coupling_warnings(
+            file, repo, resolve_coupling_policy(repo, min_ratio=threshold)
+        )
     except Exception as e:
         # A guard must never break the edit it observes; degrade to silence — but
         # log so a permanently-failing guard stays diagnosable instead of silently dead.
@@ -184,21 +183,18 @@ def coupling_guard_hook(
 
     Failures exit 0 and append one line to the repository's hook log.
     """
-    from black_box_unlock.git.run import relative_to_repo, repo_toplevel
-    from black_box_unlock.guard import coupling_warnings, record_hook_failure
-
     try:
         payload = json.loads(sys.stdin.read())
         raw_path = payload.get("tool_input", {}).get("file_path")
         if not isinstance(raw_path, str) or not raw_path:
             return
         repo_root = repo_toplevel(repo.resolve())
-        warnings = coupling_warnings(relative_to_repo(repo_root, raw_path), repo_root)
+        warnings = guard.coupling_warnings(relative_to_repo(repo_root, raw_path), repo_root)
     except RepositoryPathError:
         return
     except Exception as error:
         logger.warning("coupling guard hook skipped: {}", error)
-        record_hook_failure(repo, error)
+        guard.record_hook_failure(repo, error)
         return
     _print_hook_context(warnings)
 
@@ -278,17 +274,12 @@ def doctor(
     repo: Path = typer.Option(Path("."), "--repo", help="Repository root"),
 ) -> None:
     """Report whether local review dependencies are available."""
-    from black_box_unlock.guard import hook_log_path
-
     resolved = repo.resolve()
-    hook_log: Path | None = None
-    hook_log_last_line: str | None = None
     try:
-        hook_log = hook_log_path(resolved)
-        if hook_log.is_file():
-            hook_log_last_line = next(iter(reversed(hook_log.read_text().splitlines())), None)
+        hook_log: Path | None = guard.hook_log_path(resolved)
     except (BlackBoxUnlockError, OSError, subprocess.CalledProcessError):
-        pass
+        hook_log = None
+    hook_log_last_line = guard.last_hook_failure(hook_log) if hook_log is not None else None
     config_error: str | None = None
     try:
         config = load_project_config(resolved)
@@ -425,8 +416,6 @@ def xray(
     Ranks the file's functions by revisions x indentation complexity and
     reports function pairs that change together. JSON to stdout.
     """
-    from black_box_unlock.git import xray as xray_mod
-
     try:
         result = xray_mod.xray_file(repo, file, days=days, rev_cap=cap, min_coupling=min_coupling)
     except BlackBoxUnlockError as e:

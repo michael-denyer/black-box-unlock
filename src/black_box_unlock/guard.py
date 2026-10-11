@@ -82,6 +82,15 @@ def record_hook_failure(path: Path, error: Exception) -> None:
         logger.warning("could not record coupling guard hook failure: {}", log_error)
 
 
+def last_hook_failure(log: Path) -> str | None:
+    """Return the newest line of a hook log, or None when it is missing, empty, or unreadable."""
+    try:
+        lines = log.read_text().splitlines()
+    except OSError:
+        return None
+    return lines[-1] if lines else None
+
+
 def _build_snapshot(repo_path: Path, oid: str | None, policy: CouplingPolicy) -> CouplingSnapshot:
     window = load_history_window(repo_path, CACHE_HISTORY_DAYS, policy)
     analysis = analyze_temporal_coupling(

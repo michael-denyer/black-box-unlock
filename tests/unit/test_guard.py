@@ -358,3 +358,23 @@ class TestHookLogCap:
         assert len(lines) == HOOK_LOG_MAX_LINES
         assert lines[0].endswith("old 1")
         assert lines[-1].endswith("RuntimeError: newest")
+
+
+class TestLastHookFailure:
+    def test_reads_the_newest_recorded_failure(self, tmp_path):
+        from black_box_unlock.guard import hook_log_path, last_hook_failure, record_hook_failure
+
+        _commit_coupled_pair(tmp_path)
+        record_hook_failure(tmp_path, RuntimeError("old"))
+        record_hook_failure(tmp_path, RuntimeError("newest"))
+
+        assert last_hook_failure(hook_log_path(tmp_path)).endswith("RuntimeError: newest")
+
+    def test_missing_or_empty_log_reads_as_none(self, tmp_path):
+        from black_box_unlock.guard import last_hook_failure
+
+        empty = tmp_path / "hook.log"
+        empty.write_text("")
+
+        assert last_hook_failure(tmp_path / "absent.log") is None
+        assert last_hook_failure(empty) is None

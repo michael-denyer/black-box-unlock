@@ -30,6 +30,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   describe 2.0 fields (`rate_to_partner`, `ownership_risk`, `omitted_actions`,
   `warnings`, `provenance`) and install via `uv tool install black-box-unlock`.
 
+### Fixed
+
+- The HTML report keeps the `path_role` the analysis assigned, so
+  `[[path_roles]]` project rules apply to the report's scope filter, role
+  badges, and coupling endpoints. The report used to reclassify every file
+  with the built-in rules alone. The embedded payload no longer carries
+  `path_role_rule`, which the report never read.
+
 ## [2.0.1] - 2026-10-11
 
 ### Changed

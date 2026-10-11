@@ -125,7 +125,6 @@ def test_complete_analysis_shape_is_retained_and_files_are_stable() -> None:
     assert payload["analysis"]["files"][0]["bugfix_commits"] == 3
     assert payload["analysis"]["files"][0]["build_failures"] == 2
     assert payload["analysis"]["files"][0]["path_role"] == "source"
-    assert payload["analysis"]["files"][0]["path_role_rule"] == "source-extension"
 
 
 def test_report_roles_separate_code_from_repository_support_files() -> None:

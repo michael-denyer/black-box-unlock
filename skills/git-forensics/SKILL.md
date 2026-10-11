@@ -29,9 +29,10 @@ Interpretation rules:
 - build_failures and flaky steps point at fragile integration points. A path
   changed in a failed run is implicated, not proven causal. Preserve the
   workflow name, run URL, commit, and timestamp when reporting it.
-- Every MCP result carries `provenance`: the HEAD oid analysed, the window,
-  whether the clone is shallow, and whether the cache served it. Repeat any
-  warnings.
+- Every analysis result carries `provenance`: the HEAD oid analysed, the
+  window, whether the clone is shallow, and whether the cache served it.
+  `review_change` provenance holds the head and base oids, and shallow-clone
+  status arrives in its top-level `warnings`. Repeat any warnings.
 
 Report findings with numbers, not adjectives. Recommend at most three actions.
 For a branch, staged change, working tree, or PR, use the typed change-review

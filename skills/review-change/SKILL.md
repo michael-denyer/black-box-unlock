@@ -6,7 +6,9 @@ description: Review the current branch, index, or working tree with calibrated r
 Review the change that is about to ship:
 
 1. Run `bbu review-change --base origin/main`, or call the `review_change` MCP
-   tool when the `black-box-unlock` server is connected.
+   tool with `mode="base"` and `base_ref="origin/main"` when the
+   `black-box-unlock` server is connected. The tool's default mode is
+   `working_tree`, which skips branch commits.
    - If `origin/main` is not the intended upstream, use the base named by the
      user.
    - For index-only review, run `bbu review-change --staged`.

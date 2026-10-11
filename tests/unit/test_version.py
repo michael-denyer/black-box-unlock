@@ -30,13 +30,17 @@ def test_package_and_plugin_versions_match(repo_root):
     } == {project_version}
 
 
-def test_codex_plugin_skills_mirror_the_claude_commands(repo_root):
-    """Every Claude Code command and the forensics agent has a Codex skill of the same name."""
-    commands = {p.stem for p in (repo_root / "commands").glob("*.md")}
+def test_skills_are_the_shared_plugin_surface(repo_root):
+    """Both plugins load skills/, so the slash commands live there and every agent has a skill twin.
+
+    Claude Code resolves a skill over a command of the same name, so a commands/
+    directory would be dead code; this test fails if one comes back.
+    """
     agents = {p.stem for p in (repo_root / "agents").glob("*.md")}
     skills = {p.name for p in (repo_root / "skills").iterdir() if (p / "SKILL.md").exists()}
 
-    assert skills == commands | agents
+    assert not (repo_root / "commands").exists()
+    assert skills == {"analyze", "hotspots", "review-change"} | agents
     for name in skills:
         text = (repo_root / "skills" / name / "SKILL.md").read_text()
         assert text.startswith(f"---\nname: {name}\ndescription: ")

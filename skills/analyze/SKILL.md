@@ -22,6 +22,7 @@ Run a forensic analysis of this repository using the bbu CLI:
    why. Ground every recommendation in the numbers you just reported.
 
 If the `black-box-unlock` MCP server is connected, `get_hotspots`,
-`get_coupled_files`, `get_ownership`, and `get_flaky_steps` return the same
-evidence without parsing JSON. Every result carries `provenance` naming the
-HEAD it read.
+`get_coupled_files`, `get_ownership`, and `get_flaky_steps` return this
+evidence without parsing JSON. Pass `days=90` to the first three; their
+default window is 30 days, and `get_flaky_steps` always uses 30. Every result
+carries `provenance` naming the HEAD it read.

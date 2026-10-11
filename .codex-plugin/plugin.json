@@ -7,7 +7,7 @@
     "url": "https://github.com/michael-denyer"
   },
   "skills": "./skills",
-  "mcp": "./mcp.json",
+  "mcpServers": "./mcp.json",
   "interface": {
     "displayName": "Black Box Unlock",
     "shortDescription": "Investigate your codebase like a crime scene",

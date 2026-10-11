@@ -87,7 +87,10 @@ change makes, which history cannot see yet.
 ## Product constraints
 
 The product stays agent-native through MCP and the Claude Code and Codex
-plugins (the Codex plugin ships the same MCP server and skills mirroring the
-commands; only the edit hook is Claude Code specific). The HTML report
+plugins. Both load the same `skills/` directory and MCP server; the edit hook
+runs in Claude Code only, since Codex skips hooks for root-manifest plugins
+and sends patches rather than file paths to any hook it does load. Every agent
+under `agents/` has a skill of the same name so Codex, which has no agents,
+gets the same guidance (`tests/unit/test_version.py` pins this). The HTML report
 is a self-contained investigation workspace.
 There is no IDE telemetry, PR-flow dashboard, or composite risk score.

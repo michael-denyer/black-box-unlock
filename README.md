@@ -66,9 +66,9 @@ implicated by the failed run, not proven to have caused it.
 
 ### Claude Code plugin
 
-The Claude Code plugin in this repo adds `/review-change`, `/analyze`, `/hotspots`, a
-`git-forensics` agent, and an ambient coupling guard that warns when you
-edit one half of a repeatedly coupled file pair. The hook parses Claude's JSON
+The Claude Code plugin in this repo adds the `/review-change`, `/analyze`, and
+`/hotspots` skills, a `git-forensics` agent and skill, and an ambient coupling
+guard that warns when you edit one half of a repeatedly coupled file pair. The hook parses Claude's JSON
 directly and does not require `jq`. Install it via the
 self-hosted marketplace:
 
@@ -81,17 +81,16 @@ self-hosted marketplace:
 
 The same repo is a Codex plugin in the portable
 [Agent Plugins](https://agent-plugins.org) format: `plugin.json` at the root,
-`mcp.json` bundling the `bbu-mcp` server over stdio, and `skills/` with
-`analyze`, `hotspots`, `review-change`, and `git-forensics`. Install it from
-the repo's marketplace file:
+`mcp.json` bundling the `bbu-mcp` server over stdio, and the same `skills/`
+directory Claude Code loads. Install it from the repo's marketplace file:
 
 ```bash
 codex plugin marketplace add michael-denyer/black-box-unlock
 ```
 
-Then enable `black-box-unlock` from the plugin list. The coupling guard is a
-Claude Code hook and has no Codex equivalent yet; everything else is the same
-evidence.
+Then enable `black-box-unlock` from the plugin list. Codex does not load the
+coupling guard hook for this manifest format, so the guard works in Claude Code
+only; the skills and MCP tools return the same evidence in both.
 
 Both `bbu` and `bbu-mcp` must be on PATH for either plugin and the MCP server
 to work.

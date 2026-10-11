@@ -75,6 +75,37 @@ class TestRenameFollowing:
             [("new.py", ["old.py"])],
         ]
 
+    def test_caller_aliases_seed_the_rename_map(self):
+        """A rename the caller knows about (an uncommitted git mv) lands history on the new name."""
+        log = (
+            _record(3, "1\t1\tsrc/b.py")
+            + _record(2, "0\t0\t\0src/a.py\0src/b.py")
+            + _record(1, "4\t2\tsrc/a.py")
+        )
+
+        commits = _parse_log_output(log, {"src/b.py": "src/c.py"})
+
+        assert _paths(commits) == [
+            [("src/c.py", ["src/b.py"])],
+            [("src/c.py", ["src/a.py", "src/b.py"])],
+            [("src/c.py", ["src/a.py"])],
+        ]
+
+    def test_an_alias_does_not_follow_a_reused_name_into_an_older_file(self):
+        log = (
+            _record(3, "2\t0\told.py")
+            + _record(2, "0\t0\t\0old.py\0new.py")
+            + _record(1, "5\t0\told.py")
+        )
+
+        commits = _parse_log_output(log, {"old.py": "fresh.py"})
+
+        assert _paths(commits) == [
+            [("fresh.py", ["old.py"])],
+            [("new.py", ["old.py"])],
+            [("new.py", ["old.py"])],
+        ]
+
     def test_a_binary_rename_still_redirects_older_history(self):
         log = _record(2, "-\t-\t\0logo.bin\0art.bin") + _record(1, "1\t0\tlogo.bin")
 

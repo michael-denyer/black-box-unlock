@@ -13,7 +13,12 @@ src/black_box_unlock/
 ├── complexity.py           # Indentation-depth complexity proxy
 ├── analysis.py             # Pipeline: fetch -> parse -> join -> AnalysisResult
 ├── mcp_server.py           # MCP server: cached signals + fresh review
-├── review.py               # Request resolution, changed-path identity, and bounded action policy
+├── review/
+│   ├── models.py           # Request, parameters, evidence, action, and result models
+│   ├── resolve.py          # .bbu.toml table, then profile, then request
+│   ├── evidence.py         # File, coupling, and CI evidence for the selected paths
+│   ├── rules.py            # The action rules, in order, and project_change_review
+│   └── run.py              # Collect the change, analyze it afresh, review it
 ├── config.py               # .bbu.toml parsing
 ├── path_roles.py           # Project and built-in path-role classifier (sets FileForensics.path_role)
 ├── guard.py                # Coupling guard: small typed cache for the edit hook

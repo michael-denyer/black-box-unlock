@@ -37,8 +37,8 @@ Pairs have a stable, evidence-first order: Wilson lower bound, shared
 revisions, raw ratio, then paths. `FileForensics.coupled_with` is not used to
 reconstruct raw pairs.
 
-Every file and coupling endpoint also carries the shared path-role
-classification from `path_roles.py`. The default `Code only` scope admits
+Every file and coupling endpoint carries the `path_role` the analysis assigned,
+so `[[path_roles]]` project rules apply. The default `Code only` scope admits
 source files and migrations. A coupling pair is visible only when both
 endpoints are admitted. Tests, configuration, documentation, generated files,
 and other repository metadata are retained in the document and can be opted

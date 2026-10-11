@@ -5,7 +5,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from ..core.models import FailedWorkflowRun, FlakyStepStats, FlakyStepSummary, SignalStatus
+from ..core.models import FailedWorkflowRun, FlakyStepStats, SignalStatus
 
 
 class WorkflowRun(BaseModel):
@@ -45,14 +45,10 @@ class WorkflowJob(BaseModel):
     steps: list[WorkflowStep] = Field(default_factory=list)
 
 
-class FlakyStep(FlakyStepStats):
-    """One run's flakiness observation before the cross-run merge."""
-
-
 class CIAnalysis(BaseModel):
     """Complete optional CI signal result, including availability."""
 
     status: SignalStatus
     file_failures: dict[str, int] = Field(default_factory=dict)
     failed_runs: list[FailedWorkflowRun] = Field(default_factory=list)
-    flaky_steps: list[FlakyStepSummary] = Field(default_factory=list)
+    flaky_steps: list[FlakyStepStats] = Field(default_factory=list)

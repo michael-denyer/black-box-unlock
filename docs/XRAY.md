@@ -37,7 +37,8 @@ still wins) so hunk headers carry real function context.
   longer exist, because there is no current span list to filter against.
 - **Other languages** (~27 covered by git's drivers): attribution uses the hunk-header
   function name. Boundaries and complexity are unknown there, so those functions rank
-  by revisions with `complexity: 0.0`.
+  by revisions with `complexity` and `hotspot_score` `null` and
+  `score_unavailable_reason: "no span attribution for this language"`.
 - **Unsupported languages** (any extension without a git diff driver, such as `.js` or
   `.ts`): X-Ray does not guess. `bbu xray` returns no functions and
   `"skipped": "unsupported language"`; the top-hotspot pass in `analyze-repo` sets
@@ -112,7 +113,7 @@ one file, one pass of this work.
   still starts a new identity.
 - **Non-Python attribution is heuristic**: git's hunk-header context can attribute
   decorator/signature edits to the *preceding* function and cannot see nesting. Python
-  avoids this via ast; other languages carry the error tail (and `complexity: 0.0`
+  avoids this via ast; other languages carry the error tail (and `complexity: null`
   marks those rows as less authoritative).
 - **Hunk headers truncate at ~80 bytes** — long signatures are matched by prefix.
 - **Coupling is same-file only** — cross-file function coupling (CodeScene tier) would

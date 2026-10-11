@@ -22,6 +22,7 @@ from black_box_unlock.core.models import (
     SignalState,
     SignalStatus,
 )
+from black_box_unlock.path_roles import PathRole
 
 
 def _result() -> AnalysisResult:
@@ -32,6 +33,7 @@ def _result() -> AnalysisResult:
         files=[
             FileForensics(
                 path="src/auth.py",
+                path_role=PathRole.source,
                 commits=10,
                 lines_changed=500,
                 complexity=40.0,
@@ -51,6 +53,7 @@ def _result() -> AnalysisResult:
             ),
             FileForensics(
                 path="src/util.py",
+                path_role=PathRole.source,
                 commits=2,
                 lines_changed=20,
                 complexity=5.0,
@@ -90,6 +93,7 @@ class TestMcpTools:
             0,
             FileForensics(
                 path="tests/test_auth.py",
+                path_role=PathRole.test,
                 commits=20,
                 lines_changed=900,
                 complexity=50.0,

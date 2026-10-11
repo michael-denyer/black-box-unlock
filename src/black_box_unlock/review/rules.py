@@ -157,7 +157,7 @@ def project_change_review(
                 change=change,
                 evidence=file_evidence(
                     change.path,
-                    by_path.get(change.path) or empty_forensics(change.path),
+                    by_path.get(change.path) or empty_forensics(change.path, path_role_rules),
                     path_role_rules,
                 ),
             )

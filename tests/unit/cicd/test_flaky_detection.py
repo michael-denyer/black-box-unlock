@@ -6,7 +6,8 @@ from black_box_unlock.cicd.github_actions import (
     flaky_steps_from_jobs,
     summarize_flaky_steps,
 )
-from black_box_unlock.cicd.models import FlakyStep, WorkflowJob
+from black_box_unlock.cicd.models import WorkflowJob
+from black_box_unlock.core.models import FlakyStepStats
 
 
 def _job(
@@ -148,8 +149,8 @@ class TestSummarizeFlakySteps:
         step: str = "Run tests",
         runs: int = 1,
         flaky_runs: int = 1,
-    ) -> FlakyStep:
-        return FlakyStep(
+    ) -> FlakyStepStats:
+        return FlakyStepStats(
             job_name="test (3.11)",
             step_name=step,
             first_seen=first,

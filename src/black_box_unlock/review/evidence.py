@@ -6,9 +6,10 @@ from ..path_roles import PathRoleRule, classify_path_role
 from .models import CIFailureEvidence, CouplingEvidence, FileEvidence, ReviewParameters
 
 
-def empty_forensics(path: str) -> FileForensics:
+def empty_forensics(path: str, path_role_rules: tuple[PathRoleRule, ...]) -> FileForensics:
     return FileForensics(
         path=path,
+        path_role=classify_path_role(path, path_role_rules).role,
         commits=0,
         lines_changed=0,
         authors=[],

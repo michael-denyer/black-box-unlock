@@ -16,10 +16,11 @@ from black_box_unlock.core.models import (
     CouplingPolicy,
     FailedWorkflowRun,
     FileForensics,
-    FlakyStepSummary,
+    FlakyStepStats,
     SignalState,
     SignalStatus,
 )
+from black_box_unlock.path_roles import PathRole
 from tests.factories import make_commit, make_provenance
 
 
@@ -41,6 +42,7 @@ class TestFileForensicsModel:
         """Creates a FileForensics with all required fields."""
         forensics = FileForensics(
             path="src/auth.py",
+            path_role=PathRole.source,
             commits=42,
             lines_changed=1234,
             authors=["alice@example.com", "bob@example.com"],
@@ -57,6 +59,7 @@ class TestFileForensicsModel:
         """hotspot_score is commits × complexity (Tornhill's formula)."""
         forensics = FileForensics(
             path="src/auth.py",
+            path_role=PathRole.source,
             commits=42,
             lines_changed=1234,
             complexity=10.0,
@@ -70,6 +73,7 @@ class TestFileForensicsModel:
         """author_count returns len(authors)."""
         forensics = FileForensics(
             path="src/auth.py",
+            path_role=PathRole.source,
             commits=10,
             lines_changed=100,
             authors=["a@x.com", "b@x.com", "c@x.com"],
@@ -82,6 +86,7 @@ class TestFileForensicsModel:
         """is_high_risk is True when author_count > 3 and no author holds half."""
         forensics = FileForensics(
             path="src/auth.py",
+            path_role=PathRole.source,
             commits=10,
             lines_changed=100,
             authors=["a@x.com", "b@x.com", "c@x.com", "d@x.com"],
@@ -95,6 +100,7 @@ class TestFileForensicsModel:
         """is_high_risk is False when author_count <= 3."""
         forensics = FileForensics(
             path="src/auth.py",
+            path_role=PathRole.source,
             commits=10,
             lines_changed=100,
             authors=["a@x.com", "b@x.com", "c@x.com"],
@@ -144,6 +150,7 @@ class TestAnalysisResultModel:
             files=[
                 FileForensics(
                     path="src/auth.py",
+                    path_role=PathRole.source,
                     commits=42,
                     lines_changed=1234,
                     authors=["alice@example.com"],
@@ -479,6 +486,7 @@ class TestExportToJson:
             files=[
                 FileForensics(
                     path="src/auth.py",
+                    path_role=PathRole.source,
                     commits=10,
                     lines_changed=200,
                     authors=["alice@example.com"],
@@ -513,6 +521,7 @@ class TestExportToJson:
             files=[
                 FileForensics(
                     path="src/auth.py",
+                    path_role=PathRole.source,
                     commits=10,
                     lines_changed=200,
                     complexity=200.0,
@@ -564,7 +573,7 @@ class TestCIInPipeline:
                 )
             ],
             flaky_steps=[
-                FlakyStepSummary(
+                FlakyStepStats(
                     job_name="test",
                     step_name="Run tests",
                     first_seen=datetime(2026, 6, 1),

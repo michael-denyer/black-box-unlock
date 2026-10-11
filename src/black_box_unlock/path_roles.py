@@ -1,23 +1,12 @@
 """Explainable repository path-role classification."""
 
 import re
-from enum import Enum
 from functools import lru_cache
 from pathlib import PurePosixPath
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
-
-class PathRole(str, Enum):
-    """Stable, coarse role of a repository path."""
-
-    source = "source"
-    test = "test"
-    docs = "docs"
-    config = "config"
-    migration = "migration"
-    generated = "generated"
-    other = "other"
+from .core.models import PathRole
 
 
 class PathRoleRule(BaseModel):

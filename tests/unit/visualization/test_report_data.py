@@ -8,7 +8,7 @@ from black_box_unlock.core.models import (
     FileForensics,
     TemporalCoupling,
 )
-from black_box_unlock.path_roles import PathRole
+from black_box_unlock.path_roles import PathRole, classify_path_role
 from black_box_unlock.visualization.report_data import build_report_payload
 from tests.factories import make_provenance
 
@@ -21,6 +21,7 @@ def _result(*, couplings: list[TemporalCoupling] | None = None) -> AnalysisResul
         files=[
             FileForensics(
                 path="src/strong.py",
+                path_role=PathRole.source,
                 commits=10,
                 lines_changed=200,
                 complexity=8,
@@ -31,6 +32,7 @@ def _result(*, couplings: list[TemporalCoupling] | None = None) -> AnalysisResul
             ),
             FileForensics(
                 path="src/tiny.py",
+                path_role=PathRole.source,
                 commits=1,
                 lines_changed=10,
                 complexity=2,
@@ -39,6 +41,7 @@ def _result(*, couplings: list[TemporalCoupling] | None = None) -> AnalysisResul
             ),
             FileForensics(
                 path="src/partner.py",
+                path_role=PathRole.source,
                 commits=12,
                 lines_changed=100,
                 complexity=4,
@@ -137,6 +140,7 @@ def test_report_roles_separate_code_from_repository_support_files() -> None:
     ) -> FileForensics:
         return FileForensics(
             path=path,
+            path_role=classify_path_role(path).role,
             commits=commits,
             lines_changed=lines_changed,
             complexity=complexity,

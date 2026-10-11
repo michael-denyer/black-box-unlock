@@ -12,6 +12,7 @@ from black_box_unlock.core.models import (
     coupling_info_for,
     wilson_lower_bound,
 )
+from black_box_unlock.path_roles import PathRole
 
 
 class TestFailedWorkflowRun:
@@ -91,8 +92,6 @@ class TestFileChurn:
             commits=10,
             lines_added=100,
             lines_deleted=50,
-            first_commit=datetime(2025, 1, 1),
-            last_commit=datetime(2025, 1, 25),
         )
 
         assert churn.path == "src/main.py"
@@ -107,8 +106,6 @@ class TestFileChurn:
             commits=5,
             lines_added=100,
             lines_deleted=30,
-            first_commit=datetime(2025, 1, 1),
-            last_commit=datetime(2025, 1, 25),
         )
 
         assert churn.total_lines_changed == 130
@@ -121,8 +118,6 @@ class TestFileChurn:
                 commits=-1,
                 lines_added=100,
                 lines_deleted=50,
-                first_commit=datetime(2025, 1, 1),
-                last_commit=datetime(2025, 1, 25),
             )
 
     def test_rejects_empty_path(self):
@@ -133,8 +128,6 @@ class TestFileChurn:
                 commits=10,
                 lines_added=100,
                 lines_deleted=50,
-                first_commit=datetime(2025, 1, 1),
-                last_commit=datetime(2025, 1, 25),
             )
 
 
@@ -145,6 +138,7 @@ class TestFileForensicsBuildFailures:
         """build_failures defaults to 0."""
         forensics = FileForensics(
             path="src/main.py",
+            path_role=PathRole.source,
             commits=5,
             lines_changed=100,
             authors=["alice"],
@@ -156,6 +150,7 @@ class TestFileForensicsBuildFailures:
         """build_failures can be set to a value."""
         forensics = FileForensics(
             path="src/main.py",
+            path_role=PathRole.source,
             commits=5,
             lines_changed=100,
             authors=["alice"],
@@ -169,6 +164,7 @@ class TestFileForensicsBuildFailures:
         with pytest.raises(ValueError):
             FileForensics(
                 path="src/main.py",
+                path_role=PathRole.source,
                 commits=5,
                 lines_changed=100,
                 authors=["alice"],
@@ -219,7 +215,14 @@ class TestFileForensicsFunctions:
     def test_functions_default_empty(self):
         from black_box_unlock.core.models import FileForensics
 
-        f = FileForensics(path="a.py", commits=1, lines_changed=1, authors=[], coupled_with=[])
+        f = FileForensics(
+            path="a.py",
+            path_role=PathRole.source,
+            commits=1,
+            lines_changed=1,
+            authors=[],
+            coupled_with=[],
+        )
         assert f.functions == []
 
 
@@ -291,12 +294,6 @@ class TestFlakyStepStatsInvariant:
         with pytest.raises(ValueError):
             FlakyStepStats(**self._fields(flaky_count=-1))
 
-    def test_invariant_inherited_by_summary_subclass(self):
-        from black_box_unlock.core.models import FlakyStepSummary
-
-        with pytest.raises(ValueError):
-            FlakyStepSummary(**self._fields(flaky_count=10, failures=1, total_attempts=2))
-
 
 class TestFunctionCoupling:
     def test_ratio_uses_min_revisions(self):
@@ -350,15 +347,16 @@ class TestCouplingInfoConfidence:
 
 class TestIsHighRiskFollowsTheShare:
     def test_dominant_author_among_four_is_not_high_risk(self):
-        from black_box_unlock.core.models import FileForensics, FileOwnership
+        from black_box_unlock.core.models import FileForensics
 
         four = ["a", "b", "c", "d"]
-        owned = FileOwnership(path="a.py", authors=four, commits=10, main_author_share=0.7)
-        diffuse = FileOwnership(path="b.py", authors=four, commits=10, main_author_share=0.3)
-
-        assert owned.is_high_risk is False
-        assert diffuse.is_high_risk is True
-        base = {"commits": 10, "lines_changed": 100, "complexity": 1.0, "coupled_with": []}
+        base = {
+            "path_role": PathRole.source,
+            "commits": 10,
+            "lines_changed": 100,
+            "complexity": 1.0,
+            "coupled_with": [],
+        }
         assert (
             FileForensics(path="a.py", authors=four, main_author_share=0.7, **base).is_high_risk
             is False

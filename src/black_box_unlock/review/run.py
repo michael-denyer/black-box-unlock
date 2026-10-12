@@ -57,6 +57,7 @@ def run_change_review(
         include_ci=policy.include_ci,
         xray_top=0,
         policy=policy.coupling,
+        config=settings.config,
         ensure_paths=current_paths,
         path_aliases=_change_renames(change_set),
         rev=_history_end(change_set.provenance),
@@ -65,6 +66,6 @@ def run_change_review(
         change_set,
         analysis,
         policy,
-        path_role_rules=settings.path_roles,
+        path_role_rules=settings.config.path_roles,
         warnings=[SHALLOW_CLONE_WARNING] if is_shallow(repo_path) else [],
     )

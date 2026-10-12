@@ -6,10 +6,12 @@ from unittest.mock import patch
 import pytest
 
 from black_box_unlock.analysis import run_analysis
+from black_box_unlock.config import ProjectConfig
 from black_box_unlock.core.models import (
     AnalysisResult,
     CouplingPolicy,
 )
+from black_box_unlock.path_roles import PathRole
 from tests.factories import make_commit
 
 
@@ -312,3 +314,15 @@ class TestCouplingPolicyInPipeline:
         assert by_path["leaf.py"].coupled_with[0].rate_to_partner == 1.0
         pair = result.couplings[0]
         assert (pair.rate_a_to_b, pair.rate_b_to_a, pair.coupling_ratio) == (0.1, 1.0, 1.0)
+
+
+def test_supplied_config_is_used_instead_of_reading_bbu_toml(tmp_path):
+    (tmp_path / ".bbu.toml").write_text('[[path_roles]]\npattern = "src/**"\nrole = "docs"\n')
+    history = [make_commit(["src/a.py"])]
+
+    with patch("black_box_unlock.git.history.fetch_git_history", return_value=history):
+        result = run_analysis(
+            tmp_path, include_ci=False, xray_top=0, config=ProjectConfig(path_roles=())
+        )
+
+    assert [(file.path, file.path_role) for file in result.files] == [("src/a.py", PathRole.source)]

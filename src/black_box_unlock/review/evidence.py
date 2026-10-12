@@ -48,7 +48,7 @@ def coupling_evidence(
     """
     selected_paths = {change.path for change in change_set.paths}
 
-    evidence: dict[tuple[str, str], CouplingEvidence] = {}
+    evidence: list[CouplingEvidence] = []
     for coupling in analysis.couplings:
         changed_path = next(
             (path for path in (coupling.file_a, coupling.file_b) if path in selected_paths), None
@@ -71,13 +71,10 @@ def coupling_evidence(
             ratio_lower_bound=coupling.ratio_lower_bound,
             coupled_path_is_changed=info.file in selected_paths,
         )
-        key = (changed_path, info.file)
-        current = evidence.get(key)
-        if current is None or item.ratio_lower_bound > current.ratio_lower_bound:
-            evidence[key] = item
+        evidence.append(item)
 
     return sorted(
-        evidence.values(),
+        evidence,
         key=lambda item: (
             -item.ratio_lower_bound,
             -item.shared_revisions,

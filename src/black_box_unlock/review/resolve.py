@@ -3,16 +3,15 @@
 from dataclasses import dataclass
 from pathlib import Path
 
-from ..config import CONFIG_FILE_NAME, load_project_config
+from ..config import CONFIG_FILE_NAME, ProjectConfig, load_project_config
 from ..core.exceptions import ConfigurationError
-from ..path_roles import PathRoleRule
 from .models import ChangeReviewRequest, ReviewParameters
 
 
 @dataclass(frozen=True)
 class ResolvedReviewSettings:
     parameters: ReviewParameters
-    path_roles: tuple[PathRoleRule, ...]
+    config: ProjectConfig
 
 
 def resolve_review_settings(
@@ -41,4 +40,4 @@ def resolve_review_settings(
                 f"Unknown review profile {name!r}; available profiles: {available}"
             )
         parameters = parameters.apply(profile)
-    return ResolvedReviewSettings(parameters.apply(request), config.path_roles)
+    return ResolvedReviewSettings(parameters.apply(request), config)

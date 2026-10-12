@@ -11,7 +11,7 @@ from . import __version__
 from .cicd.github_actions import collect_ci_signals
 from .cicd.models import CIAnalysis
 from .complexity import indentation_complexity
-from .config import load_project_config
+from .config import ProjectConfig, load_project_config
 from .core.models import (
     AnalysisParameters,
     AnalysisResult,
@@ -122,6 +122,7 @@ def run_analysis(  # [2a] Main analysis pipeline
     xray_top: int = 5,
     *,
     policy: CouplingPolicy | None = None,
+    config: ProjectConfig | None = None,
     ensure_paths: frozenset[str] = frozenset(),
     path_aliases: dict[str, str] | None = None,
     rev: str | None = None,
@@ -148,7 +149,8 @@ def run_analysis(  # [2a] Main analysis pipeline
         days: Number of days of history to analyze.
         include_ci: Whether to include CI/CD build failure data.
         xray_top: Auto X-Ray the top N hotspot files (0 disables).
-        policy: Coupling and bulk-commit policy; None reads ``.bbu.toml``.
+        policy: Coupling and bulk-commit policy; None uses ``config``.
+        config: Project configuration; None reads ``.bbu.toml``.
         ensure_paths: Current paths to include even when they have no history.
         path_aliases: Renames git history cannot see yet (a reviewed change's
             own), mapping a path at ``rev`` to its new path. Applied on top of
@@ -159,7 +161,7 @@ def run_analysis(  # [2a] Main analysis pipeline
         AnalysisResult with file forensics, summary, and the provenance of the
         repository state it read.
     """
-    config = load_project_config(repo_path)
+    config = config if config is not None else load_project_config(repo_path)
     policy = policy if policy is not None else config.coupling
     window = load_history_window(
         repo_path, days, policy, rev=rev, aliases=path_aliases, ensure_paths=ensure_paths

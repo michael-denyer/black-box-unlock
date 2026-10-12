@@ -9,6 +9,7 @@ from black_box_unlock.git.changes import (
     WorkingTreeChange,
     collect_change_set,
     parse_name_status_z,
+    selector_for,
 )
 
 
@@ -77,3 +78,10 @@ def test_base_uses_merge_base_and_includes_all_local_layers(mock_git, mock_head,
         "src/branch.py",
         "src/untracked.py",
     ]
+
+
+def test_selector_for_builds_the_selector_a_mode_names():
+    assert selector_for("base", "release") == BaseChange(base_ref="release")
+    assert selector_for("base") == BaseChange()
+    assert selector_for("staged", "ignored") == StagedChange()
+    assert selector_for("working_tree") == WorkingTreeChange()

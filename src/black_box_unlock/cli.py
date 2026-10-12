@@ -18,7 +18,7 @@ from black_box_unlock.config import load_project_config, resolve_coupling_policy
 from black_box_unlock.core.exceptions import BlackBoxUnlockError, RepositoryPathError
 from black_box_unlock.core.logging import configure_logging
 from black_box_unlock.git import xray as xray_mod
-from black_box_unlock.git.changes import BaseChange, StagedChange, WorkingTreeChange
+from black_box_unlock.git.changes import ChangeMode, ChangeSelector, selector_for
 from black_box_unlock.git.run import is_shallow, relative_to_repo, repo_toplevel
 from black_box_unlock.review import ChangeReview, ChangeReviewRequest, run_change_review
 from black_box_unlock.visualization.html import generate_html_report
@@ -59,15 +59,12 @@ def _review_selector(
     base: str | None,
     staged: bool,
     working_tree: bool,
-) -> BaseChange | StagedChange | WorkingTreeChange:
+) -> ChangeSelector:
     selected = sum((base is not None, staged, working_tree))
     if selected > 1:
         raise typer.BadParameter("--base, --staged, and --working-tree are mutually exclusive")
-    if base is not None:
-        return BaseChange(base_ref=base)
-    if staged:
-        return StagedChange()
-    return WorkingTreeChange()
+    mode: ChangeMode = "base" if base is not None else "staged" if staged else "working_tree"
+    return selector_for(mode, base)
 
 
 def _warn_if_shallow(repo_path: Path) -> None:

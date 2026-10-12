@@ -48,6 +48,21 @@ ChangeSelector = Annotated[
     Field(discriminator="kind"),
 ]
 
+ChangeMode = Literal["base", "staged", "working_tree"]
+
+
+def selector_for(mode: ChangeMode, base_ref: str | None = None) -> ChangeSelector:
+    """Build the selector ``mode`` names; ``base_ref`` applies to ``base`` only."""
+    match mode:
+        case "base":
+            return BaseChange() if base_ref is None else BaseChange(base_ref=base_ref)
+        case "staged":
+            return StagedChange()
+        case "working_tree":
+            return WorkingTreeChange()
+        case _:
+            raise ValueError(f"unknown change mode: {mode!r}")
+
 
 class ChangedPath(BaseModel):
     """One path in a selected change."""

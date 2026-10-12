@@ -14,7 +14,7 @@ import time
 from collections import OrderedDict
 from collections.abc import Callable
 from pathlib import Path
-from typing import Literal, ParamSpec, TypeVar
+from typing import ParamSpec, TypeVar
 
 from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
@@ -22,7 +22,7 @@ from mcp.server.mcpserver.exceptions import ToolError
 from .analysis import build_provenance, run_analysis
 from .core.exceptions import BlackBoxUnlockError
 from .core.models import AnalysisResult, FileForensics
-from .git.changes import BaseChange, StagedChange, WorkingTreeChange
+from .git.changes import ChangeMode, selector_for
 from .git.ownership import ownership_risk
 from .git.run import head_oid, relative_to_repo, run_git
 from .git.xray import xray_file as _xray_file
@@ -340,7 +340,7 @@ def xray_file(
 @_tool
 def review_change(
     repo_path: str = ".",
-    mode: Literal["base", "staged", "working_tree"] = "working_tree",
+    mode: ChangeMode = "working_tree",
     base_ref: str = "origin/main",
     profile: str | None = None,
     days: int | None = None,
@@ -358,15 +358,10 @@ def review_change(
     ``min_coupling`` applies to the share of the changed file's revisions
     that also changed the partner.
     """
-    selectors = {
-        "base": BaseChange(base_ref=base_ref),
-        "staged": StagedChange(),
-        "working_tree": WorkingTreeChange(),
-    }
     result = _run_change_review(
         Path(repo_path),
         ChangeReviewRequest(
-            selector=selectors[mode],
+            selector=selector_for(mode, base_ref),
             profile=profile,
             days=days,
             min_coupling=min_coupling,

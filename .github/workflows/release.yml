@@ -7,11 +7,17 @@ on:
 permissions:
   contents: read
 
+# Queue rather than cancel: a cancelled release can publish to PyPI without
+# creating the GitHub release.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           persist-credentials: false
       - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7  # v10.2.0
@@ -29,9 +35,9 @@ jobs:
     runs-on: ubuntu-latest
     environment: pypi
     permissions:
-      id-token: write
-      attestations: write
-      contents: read
+      id-token: write # PyPI trusted publishing and attestation signing
+      attestations: write # store the build provenance attestation
+      contents: read # default read access; no step writes to the repo
     steps:
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
         with:
@@ -49,7 +55,7 @@ jobs:
     needs: publish
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: write # create the GitHub release
     steps:
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
         with:

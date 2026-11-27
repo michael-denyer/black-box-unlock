@@ -385,11 +385,12 @@ def _build_functions(
             )
             for name, (added, deleted) in tallies.items()
         ]
-    full_path = repo_path / file_path
-    if not full_path.exists():
+    # Read the committed snapshot used for history, including a symlink as its Git blob.
+    content = _show(repo_path, "HEAD", file_path)
+    if content is None:
         return []
-    lines = full_path.read_text(errors="ignore").splitlines()
-    spans = _spans_for("\n".join(lines))
+    lines = content.splitlines()
+    spans = _spans_for(content)
     if spans is None:
         return [
             FunctionChurn(

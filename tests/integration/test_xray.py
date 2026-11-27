@@ -50,6 +50,11 @@ class TestXrayFile:
         scores = [f.hotspot_score for f in result.functions]
         assert scores == sorted(scores, reverse=True)
 
+    def test_scores_use_committed_snapshot(self, xray_repo):
+        expected = xray_file(xray_repo, "mod.py")
+        (xray_repo / "mod.py").write_text("# uncommitted content")
+        assert xray_file(xray_repo, "mod.py") == expected
+
     def test_revision_cap(self, xray_repo):
         result = xray_file(xray_repo, "mod.py", days=365, rev_cap=2)
         assert result.revisions_analyzed == 2
